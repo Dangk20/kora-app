@@ -1,0 +1,54 @@
+# KORA — CI
+# Cada push valida: install → generate → migrate → seed → lint → typecheck → test → build.
+# El job de deploy a staging queda deshabilitado hasta tener accesos SSH al VPS (deuda #1).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kora
+          POSTGRES_PASSWORD: kora_ci
+          POSTGRES_DB: kora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kora -d kora"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://kora:kora_ci@localhost:5432/kora?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma generate
+      - run: pnpm prisma migrate deploy
+      - run: pnpm prisma db seed
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # deploy-staging:
+  #   needs: ci
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - TODO(S2): build de imagen Docker → registry → ssh al VPS → docker compose up.
+  #       Bloqueado por accesos SSH/DNS del cliente (bitacora-sprints-kora.md, deuda #1).

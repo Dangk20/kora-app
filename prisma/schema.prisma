@@ -1,0 +1,493 @@
+// KORA — esquema de datos
+// Las tres decisiones que sostienen el sistema (ver tech/plan-tecnico-ejecucion-kora.md §2):
+//   1. El inventario es un libro contable append-only (stock_movements); variants.stock_actual
+//      es una columna materializada que SOLO se modifica en la misma transacción que inserta
+//      el movimiento.
+//   2. Toda venta pasa por una única función transaccional con SELECT ... FOR UPDATE.
+//   3. order.confirmed es el evento central; se propaga vía outbox (domain_events).
+// Decisión cerrada jul 2026: el stock solo se descuenta al confirmar (sin reserva).
+// Los reasons RESERVA / LIBERACION_RESERVA quedan definidos para activarse sin migración.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTH / RBAC
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockMovements  StockMovement[]
+  confirmedOrders Order[]              @relation("OrderConfirmedBy")
+  statusChanges   OrderStatusHistory[]
+  campaigns       Campaign[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique // admin, operador, cajero, marketing
+  description String?
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// Matriz módulo × acción. Ej: (catalog, edit), (orders, confirm), (pos, sell)
+model Permission {
+  id     String @id @default(cuid())
+  module String // catalog | inventory | orders | pos | crm | dashboard | loyalty | marketing | users | settings
+  action String // view | create | edit | delete | confirm | export | sell | adjust
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CATÁLOGO
+// ─────────────────────────────────────────────────────────────
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  position Int        @default(0)
+  active   Boolean    @default(true)
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  description String?
+  brand       String?
+  categoryId  String
+  category    Category       @relation(fields: [categoryId], references: [id])
+  active      Boolean        @default(true)
+  featured    Boolean        @default(false)
+  images      ProductImage[]
+  variants    Variant[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String // key en R2; nunca se sirve desde el VPS
+  alt       String?
+  position  Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// La unidad vendible. Los 4 precios: (COP|USD) × (tienda|online).
+model Variant {
+  id         String  @id @default(cuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku        String  @unique
+  name       String // "Talla M / Rojo"; para producto simple, "Única"
+  attributes Json? // { talla: "M", color: "Rojo" }
+  barcode    String? @unique
+
+  priceCopStore  Decimal @db.Decimal(12, 2)
+  priceCopOnline Decimal @db.Decimal(12, 2)
+  priceUsdStore  Decimal @db.Decimal(12, 2)
+  priceUsdOnline Decimal @db.Decimal(12, 2)
+
+  // Materializado. SOLO lo modifica la función transaccional de inventario.
+  stockActual Int     @default(0)
+  stockMin    Int     @default(0) // umbral de alerta "quedan pocas unidades"
+  active      Boolean @default(true)
+
+  stockMovements StockMovement[]
+  orderItems     OrderItem[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([productId])
+  @@map("variants")
+}
+
+// ─────────────────────────────────────────────────────────────
+// INVENTARIO — libro contable append-only
+// ─────────────────────────────────────────────────────────────
+
+enum StockReason {
+  COMPRA_INICIAL
+  VENTA_ONLINE
+  VENTA_POS
+  AJUSTE_MANUAL
+  DEVOLUCION
+  MERMA
+  RESERVA // definidos pero inactivos: decisión "sin reserva" (jul 2026)
+  LIBERACION_RESERVA
+}
+
+enum SaleChannel {
+  WEB
+  POS
+  ADMIN
+  SYSTEM
+}
+
+model StockMovement {
+  id        String      @id @default(cuid())
+  variantId String
+  variant   Variant     @relation(fields: [variantId], references: [id])
+  delta     Int // positivo entra, negativo sale. Nunca se actualiza ni borra.
+  reason    StockReason
+  channel   SaleChannel
+  actorId   String?
+  actor     User?       @relation(fields: [actorId], references: [id])
+  orderId   String?
+  order     Order?      @relation(fields: [orderId], references: [id])
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@map("stock_movements")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLIENTES (CRM)
+// ─────────────────────────────────────────────────────────────
+
+enum CustomerSource {
+  WEB
+  POS
+  IMPORT
+  MANUAL
+}
+
+model Customer {
+  id               String         @id @default(cuid())
+  name             String
+  phone            String?        @unique // canal principal: WhatsApp
+  email            String?        @unique
+  document         String? // cédula/NIT, opcional
+  country          String         @default("CO")
+  city             String?
+  address          String?
+  source           CustomerSource @default(WEB)
+  acceptsMarketing Boolean        @default(false) // Habeas Data: opt-in explícito
+  unsubscribedAt   DateTime?
+
+  // Materializado desde points_movements (mismo patrón que el stock)
+  pointsBalance Int @default(0)
+
+  orders             Order[]
+  pointsMovements    PointsMovement[]
+  couponRedemptions  CouponRedemption[]
+  campaignRecipients CampaignRecipient[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@map("customers")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PEDIDOS — order.confirmed es el evento central del sistema
+// ─────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PENDING // armado en la web, enviado por WhatsApp; NO descuenta stock
+  CONFIRMED // el operador confirmó el pago → descuenta stock, dispara efectos
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum Currency {
+  COP
+  USD
+}
+
+model Order {
+  id     String @id @default(cuid())
+  number Int    @unique @default(autoincrement()) // código humano: KORA-000123
+
+  channel  SaleChannel // WEB o POS (POS nace y se confirma en el mismo acto)
+  status   OrderStatus @default(PENDING)
+  currency Currency    @default(COP)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @default(0) @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
+
+  couponRedemption CouponRedemption?
+  whatsappMessage  String? // mensaje pre-armado enviado por wa.me
+  note             String?
+
+  confirmedAt   DateTime?
+  confirmedById String?
+  confirmedBy   User?     @relation("OrderConfirmedBy", fields: [confirmedById], references: [id])
+
+  items           OrderItem[]
+  stockMovements  StockMovement[]
+  statusHistory   OrderStatusHistory[]
+  pointsMovements PointsMovement[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   Variant @relation(fields: [variantId], references: [id])
+
+  qty       Int
+  unitPrice Decimal @db.Decimal(12, 2) // precio al momento de la venta
+  total     Decimal @db.Decimal(12, 2)
+
+  // Snapshots: el historial no cambia si el catálogo cambia
+  productName String
+  variantName String
+  sku         String
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  from      OrderStatus
+  to        OrderStatus
+  actorId   String?
+  actor     User?       @relation(fields: [actorId], references: [id])
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUPONES
+// ─────────────────────────────────────────────────────────────
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id       String     @id @default(cuid())
+  code     String     @unique
+  type     CouponType
+  value    Decimal    @db.Decimal(12, 2) // % si PERCENT, monto si FIXED
+  currency Currency? // requerido si FIXED; null si PERCENT (aplica a ambas)
+
+  minSubtotal      Decimal?  @db.Decimal(12, 2)
+  maxUses          Int? // null = ilimitado
+  usedCount        Int       @default(0)
+  perCustomerLimit Int?
+  validFrom        DateTime?
+  validTo          DateTime?
+  active           Boolean   @default(true)
+
+  redemptions CouponRedemption[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id         String    @id @default(cuid())
+  couponId   String
+  coupon     Coupon    @relation(fields: [couponId], references: [id])
+  orderId    String    @unique
+  order      Order     @relation(fields: [orderId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  amount     Decimal   @db.Decimal(12, 2) // descuento efectivamente aplicado
+  createdAt  DateTime  @default(now())
+
+  @@index([couponId])
+  @@map("coupon_redemptions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// KORAPUNTOS — mismo patrón contable que el inventario
+// ─────────────────────────────────────────────────────────────
+
+enum PointsReason {
+  EARN_ORDER // acredita sobre order.confirmed
+  REDEEM
+  ADJUST
+  EXPIRE
+}
+
+model PointsMovement {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  delta      Int // positivo acredita, negativo canjea/expira
+  reason     PointsReason
+  orderId    String?
+  order      Order?       @relation(fields: [orderId], references: [id])
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  @@index([customerId, createdAt])
+  @@map("points_movements")
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMAIL REMARKETING
+// ─────────────────────────────────────────────────────────────
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  subject     String
+  htmlBody    String?
+  segment     Json? // criterios de segmentación serializados
+  status      CampaignStatus @default(DRAFT)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdById String
+  createdBy   User           @relation(fields: [createdById], references: [id])
+
+  recipients CampaignRecipient[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@map("campaigns")
+}
+
+enum RecipientStatus {
+  QUEUED
+  SENT
+  BOUNCED
+  FAILED
+}
+
+model CampaignRecipient {
+  id         String          @id @default(cuid())
+  campaignId String
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer        @relation(fields: [customerId], references: [id])
+  email      String // snapshot del email al momento del envío
+  status     RecipientStatus @default(QUEUED)
+  sentAt     DateTime?
+
+  @@unique([campaignId, customerId])
+  @@map("campaign_recipients")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CONTENIDO DE TIENDA
+// ─────────────────────────────────────────────────────────────
+
+model Banner {
+  id       String    @id @default(cuid())
+  title    String
+  imageUrl String
+  linkUrl  String?
+  position Int       @default(0)
+  active   Boolean   @default(true)
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  @@map("banners")
+}
+
+// Configuración operable (reglas KoraPuntos, WhatsApp de la tienda, etc.)
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ─────────────────────────────────────────────────────────────
+// OUTBOX — nada que cuelgue de order.confirmed se pierde
+// ─────────────────────────────────────────────────────────────
+
+enum EventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model DomainEvent {
+  id          String      @id @default(cuid())
+  type        String // "order.confirmed", ...
+  payload     Json
+  status      EventStatus @default(PENDING)
+  attempts    Int         @default(0)
+  lastError   String?
+  processedAt DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([status, createdAt])
+  @@map("domain_events")
+}

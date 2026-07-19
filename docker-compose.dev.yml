@@ -1,0 +1,38 @@
+# KORA — entorno de desarrollo local
+# Uso: docker compose -f docker-compose.dev.yml up -d
+# Puertos no estándar (5433/6380) para convivir con otros proyectos en la máquina.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kora-postgres
+    environment:
+      POSTGRES_USER: kora
+      POSTGRES_PASSWORD: kora_dev
+      POSTGRES_DB: kora
+    ports:
+      - "5433:5432"
+    volumes:
+      - kora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kora -d kora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: kora-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - kora_redisdata:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  kora_pgdata:
+  kora_redisdata:
