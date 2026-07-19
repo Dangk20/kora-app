@@ -23,14 +23,14 @@ export default async function AdminLayout({
       {/* Sidebar sobre negro oficial: la combinación de mayor contraste del manual */}
       <aside className="flex w-64 flex-col bg-kora-black p-4 text-white">
         <div className="px-2 py-1">
-          {/* El PNG del logo trae fondo negro: solo va sobre superficies oscuras */}
+          {/* Logo oficial (fondo transparente, wordmark blanco): para superficies oscuras */}
           <Image
             src="/logo-kora.png"
             alt="KORA"
             width={140}
             height={36}
             priority
-            className="h-9 w-auto mix-blend-screen"
+            className="h-9 w-auto"
           />
           <p className="mt-1 px-1 text-xs text-white/50">Panel administrativo</p>
         </div>

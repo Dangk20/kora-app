@@ -48,7 +48,7 @@ export default async function LoginPage({
           width={220}
           height={57}
           priority
-          className="h-14 w-auto mix-blend-screen"
+          className="h-14 w-auto"
         />
         <Card className="w-full border-white/10 bg-white">
           <CardHeader>
