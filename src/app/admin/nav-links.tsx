@@ -26,7 +26,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", permission: "dashboard:view", icon: LayoutDashboard },
-  { href: "/admin/catalogo", label: "Catálogo", permission: "catalog:view", icon: Package, soon: "S3" },
+  { href: "/admin/catalogo", label: "Catálogo", permission: "catalog:view", icon: Package },
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart, soon: "S8" },
   { href: "/admin/clientes", label: "Clientes", permission: "crm:view", icon: UsersRound, soon: "S10" },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
@@ -40,7 +40,11 @@ export function NavLinks({ permissions }: { permissions: string[] }) {
   return (
     <nav className="flex flex-1 flex-col gap-1">
       {items.map(({ href, label, icon: Icon, soon }) => {
-        const active = soon ? false : pathname === href;
+        const active = soon
+          ? false
+          : href === "/admin"
+            ? pathname === "/admin"
+            : pathname.startsWith(href);
         return (
           <Link
             key={href}

@@ -4,7 +4,9 @@ import type { NextAuthConfig } from "next-auth";
 // importarse desde el middleware. Los providers se agregan en src/auth.ts.
 export const authConfig = {
   pages: { signIn: "/login" },
-  session: { strategy: "jwt" },
+  // 12h: un turno de trabajo. La revocación real la da requirePermission,
+  // que verifica user.active y permisos contra la base en cada acción.
+  session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
