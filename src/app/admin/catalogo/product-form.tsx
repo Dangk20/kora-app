@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, Plus, Trash2 } from "lucide-react";
+import { Check, ImagePlus, Plus, Trash2 } from "lucide-react";
 import { upsertProduct } from "@/modules/catalog/product-actions";
 import { quickCreateCategory } from "@/modules/catalog/category-actions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,82 +57,75 @@ const inputCls =
   "w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral";
 const labelCls = "mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]";
 
-/** Crear categoría/subcategoría sin salir del formulario (sin <form> anidado). */
-function QuickCreate({
+/**
+ * Modo creación en el lugar del select (patrón Wenú): al elegir
+ * "+ Crear nueva…" en el dropdown, el select se convierte en este input
+ * con su botón de confirmar.
+ */
+function InlineCreate({
   placeholder,
+  confirmLabel,
   parentId,
   onCreated,
+  onCancel,
 }: {
   placeholder: string;
+  confirmLabel: string;
   parentId?: string;
   onCreated: (cat: { id: string; name: string }) => void;
+  onCancel: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-1 text-[11.5px] font-bold text-kora-coral hover:underline"
-      >
-        + Crear nueva
-      </button>
-    );
-  }
 
   const create = () =>
     startTransition(async () => {
       const result = await quickCreateCategory({ name, parentId });
       if (result.ok) {
         onCreated({ id: result.id, name: result.name });
-        setOpen(false);
-        setName("");
-        setError(null);
       } else {
         setError(result.error);
       }
     });
 
   return (
-    <div className="mt-1.5">
-      <div className="flex gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              create();
-            }
-          }}
-          placeholder={placeholder}
-          autoFocus
-          className="flex-1 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-3 py-2 text-[13px] outline-none focus:border-kora-coral"
-        />
-        <button
-          type="button"
-          onClick={create}
-          disabled={pending || name.trim().length < 2}
-          className="rounded-[9px] bg-[#FFE9DD] px-3 py-2 text-[12px] font-bold text-kora-coral hover:opacity-80 disabled:opacity-50"
-        >
-          {pending ? "…" : "Crear"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-[12px] text-muted-foreground hover:text-foreground"
-        >
-          Cancelar
-        </button>
-      </div>
-      {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
+    <div className="space-y-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            create();
+          }
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder={placeholder}
+        autoFocus
+        className="border-kora-coral w-full rounded-[10px] border-[1.6px] px-3.5 py-3 text-sm outline-none"
+      />
+      <button
+        type="button"
+        onClick={create}
+        disabled={pending || name.trim().length < 2}
+        className="bg-kora-gradient flex w-full items-center justify-center gap-1.5 rounded-[10px] py-2.5 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-50"
+      >
+        <Check className="size-4" /> {pending ? "Creando…" : confirmLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="w-full text-center text-[11.5px] text-muted-foreground hover:text-foreground"
+      >
+        Cancelar
+      </button>
+      {error && <p className="text-[11px] text-destructive">{error}</p>}
     </div>
   );
 }
+
+const NEW_OPTION = "__nueva__";
 
 export function ProductForm({
   categories,
@@ -173,6 +166,7 @@ export function ProductForm({
   const [{ parentId, subId }, setCategorySel] = useState(() =>
     resolve(initial?.categoryId ?? ""),
   );
+  const [creating, setCreating] = useState<"parent" | "sub" | null>(null);
   const parent = cats.find((p) => p.id === parentId);
 
   useEffect(() => {
@@ -242,58 +236,51 @@ export function ProductForm({
             placeholder="Kora"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 items-start gap-3">
           <div>
             <label className={labelCls} htmlFor="p-cat">Categoría</label>
-            <select
-              id="p-cat"
-              className={`${inputCls} bg-white`}
-              value={parentId}
-              onChange={(e) => setCategorySel({ parentId: e.target.value, subId: "" })}
-              required
-            >
-              <option value="">Selecciona…</option>
-              {cats.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <QuickCreate
-              placeholder="Nombre de la categoría"
-              onCreated={(cat) => {
-                setCats((prev) => [...prev, { ...cat, children: [] }]);
-                setCategorySel({ parentId: cat.id, subId: "" });
-                router.refresh();
-              }}
-            />
+            {creating === "parent" ? (
+              <InlineCreate
+                placeholder="Nombre de la nueva categoría"
+                confirmLabel="Confirmar categoría"
+                onCreated={(cat) => {
+                  setCats((prev) => [...prev, { ...cat, children: [] }]);
+                  setCategorySel({ parentId: cat.id, subId: "" });
+                  setCreating(null);
+                  router.refresh();
+                }}
+                onCancel={() => setCreating(null)}
+              />
+            ) : (
+              <select
+                id="p-cat"
+                className={`${inputCls} bg-white`}
+                value={parentId}
+                onChange={(e) => {
+                  if (e.target.value === NEW_OPTION) {
+                    setCreating("parent");
+                  } else {
+                    setCategorySel({ parentId: e.target.value, subId: "" });
+                  }
+                }}
+                required
+              >
+                <option value="">Selecciona una categoría</option>
+                {cats.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value={NEW_OPTION}>+ Crear nueva categoría</option>
+              </select>
+            )}
           </div>
           <div>
             <label className={labelCls} htmlFor="p-sub">Subcategoría</label>
-            <select
-              id="p-sub"
-              className={`${inputCls} bg-white`}
-              value={subId}
-              onChange={(e) => setCategorySel({ parentId, subId: e.target.value })}
-              disabled={!parent}
-            >
-              <option value="">
-                {parent ? "Sin subcategoría" : "Elige categoría primero"}
-              </option>
-              {parent?.children.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {parent && parent.children.length === 0 && (
-              <p className="mt-1 text-[11px] text-kora-coral">
-                Esta categoría no tiene subcategorías.
-              </p>
-            )}
-            {parent && (
-              <QuickCreate
+            {creating === "sub" && parent ? (
+              <InlineCreate
                 placeholder={`Nueva subcategoría de ${parent.name}`}
+                confirmLabel="Confirmar subcategoría"
                 parentId={parent.id}
                 onCreated={(cat) => {
                   setCats((prev) =>
@@ -304,9 +291,37 @@ export function ProductForm({
                     ),
                   );
                   setCategorySel({ parentId: parent.id, subId: cat.id });
+                  setCreating(null);
                   router.refresh();
                 }}
+                onCancel={() => setCreating(null)}
               />
+            ) : (
+              <select
+                id="p-sub"
+                className={`${inputCls} bg-white disabled:opacity-50`}
+                value={subId}
+                onChange={(e) => {
+                  if (e.target.value === NEW_OPTION) {
+                    setCreating("sub");
+                  } else {
+                    setCategorySel({ parentId, subId: e.target.value });
+                  }
+                }}
+                disabled={!parent}
+              >
+                <option value="">
+                  {parent ? "Sin subcategoría" : "Elige categoría primero"}
+                </option>
+                {parent?.children.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                {parent && (
+                  <option value={NEW_OPTION}>+ Crear nueva subcategoría</option>
+                )}
+              </select>
             )}
           </div>
         </div>
