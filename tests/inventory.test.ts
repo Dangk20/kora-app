@@ -43,6 +43,7 @@ async function createTestVariant(sku: string, stock: number) {
     await setStockTo({
       variantId: variant.id,
       target: stock,
+      onlineTarget: stock, // todo publicado online, como el default del producto
       reason: "COMPRA_INICIAL",
       actorId: admin.id,
       note: "setup de test",
@@ -84,7 +85,7 @@ describe("motor de inventario — anti-sobreventa", () => {
       (r) =>
         r.status === "rejected" &&
         r.reason instanceof StockError &&
-        r.reason.code === "INSUFFICIENT",
+        (r.reason.code === "INSUFFICIENT" || r.reason.code === "INSUFFICIENT_ONLINE"),
     ).length;
 
     expect(wins).toBe(1);
@@ -135,7 +136,7 @@ describe("motor de inventario — anti-sobreventa", () => {
       actorId: admin.id,
       note: "test de ajuste",
     });
-    expect(result).toEqual({ from: 10, to: 4 });
+    expect(result).toEqual({ from: 10, to: 4, online: 4 });
 
     const movements = await db.stockMovement.findMany({
       where: { variantId: variant.id },
@@ -169,5 +170,60 @@ describe("motor de inventario — anti-sobreventa", () => {
 
   it("después de todo, el libro contable global sigue cuadrando", async () => {
     expect(await findLedgerMismatches()).toEqual([]);
+  });
+});
+
+describe("asignación online/física sobre el mismo pool", () => {
+  it("la web solo vende hasta su cupo, aunque haya stock físico", async () => {
+    const admin = await db.user.findFirstOrThrow({ where: { role: { name: "admin" } } });
+    const variant = await createTestVariant(SKU, 5);
+    await setStockTo({
+      variantId: variant.id,
+      target: 5,
+      onlineTarget: 2, // 2 online, 3 para la tienda física
+      reason: "AJUSTE_MANUAL",
+      actorId: admin.id,
+    });
+
+    // 2 ventas online pasan; la 3ª es "agotado online"
+    await sellStock({ items: [{ variantId: variant.id, qty: 2 }], channel: "WEB", reason: "VENTA_ONLINE" });
+    await expect(
+      sellStock({ items: [{ variantId: variant.id, qty: 1 }], channel: "WEB", reason: "VENTA_ONLINE" }),
+    ).rejects.toMatchObject({ code: "INSUFFICIENT_ONLINE" });
+
+    // Pero el POS sigue vendiendo las 3 físicas sin problema
+    await sellStock({ items: [{ variantId: variant.id, qty: 3 }], channel: "POS", reason: "VENTA_POS" });
+    const final = await db.variant.findUniqueOrThrow({ where: { id: variant.id } });
+    expect(final.stockActual).toBe(0);
+    expect(final.onlineUnits).toBe(0);
+  });
+
+  it("el POS nunca se bloquea: si pisa el cupo online, el cupo se recorta", async () => {
+    const variant = await createTestVariant(SKU, 5); // 5 total, 5 online
+    // El POS vende 4 aunque "todo" estaba asignado a online
+    await sellStock({ items: [{ variantId: variant.id, qty: 4 }], channel: "POS", reason: "VENTA_POS" });
+    const final = await db.variant.findUniqueOrThrow({ where: { id: variant.id } });
+    expect(final.stockActual).toBe(1);
+    expect(final.onlineUnits).toBe(1); // clamp: nunca mayor que el stock
+  });
+
+  it("el ajuste manual clampa el cupo al nuevo total", async () => {
+    const admin = await db.user.findFirstOrThrow({ where: { role: { name: "admin" } } });
+    const variant = await createTestVariant(SKU, 10); // 10 online
+    await setStockTo({
+      variantId: variant.id,
+      target: 4, // baja el total sin tocar el cupo
+      reason: "MERMA",
+      actorId: admin.id,
+    });
+    const final = await db.variant.findUniqueOrThrow({ where: { id: variant.id } });
+    expect(final.onlineUnits).toBe(4);
+  });
+
+  it("nunca hay cupo online mayor que el stock (invariante global)", async () => {
+    const broken = await db.variant.findMany({
+      where: { onlineUnits: { gt: db.variant.fields.stockActual } },
+    });
+    expect(broken).toEqual([]);
   });
 });

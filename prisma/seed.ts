@@ -221,7 +221,7 @@ async function main() {
         });
         await tx.variant.update({
           where: { id: variant.id },
-          data: { stockActual: v.stock },
+          data: { stockActual: v.stock, onlineUnits: v.stock },
         });
       });
     }

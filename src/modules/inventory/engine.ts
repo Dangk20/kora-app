@@ -14,7 +14,10 @@ import { db } from "@/lib/db";
 
 export class StockError extends Error {
   constructor(
-    public readonly code: "INSUFFICIENT" | "VARIANT_NOT_FOUND",
+    public readonly code:
+      | "INSUFFICIENT"
+      | "INSUFFICIENT_ONLINE"
+      | "VARIANT_NOT_FOUND",
     public readonly variantId: string,
     public readonly available?: number,
   ) {
@@ -48,8 +51,8 @@ export async function applyStockMovement(
   }
 
   // Bloqueo de fila: aquí se decide quién gana la última unidad.
-  const rows = await tx.$queryRaw<{ stockActual: number }[]>`
-    SELECT "stockActual" FROM variants WHERE id = ${input.variantId} FOR UPDATE
+  const rows = await tx.$queryRaw<{ stockActual: number; onlineUnits: number }[]>`
+    SELECT "stockActual", "onlineUnits" FROM variants WHERE id = ${input.variantId} FOR UPDATE
   `;
   if (rows.length === 0) {
     throw new StockError("VARIANT_NOT_FOUND", input.variantId);
@@ -59,6 +62,21 @@ export async function applyStockMovement(
   if (next < 0) {
     throw new StockError("INSUFFICIENT", input.variantId, current);
   }
+
+  // Asignación de canal sobre el mismo pool:
+  // - La venta ONLINE consume su cupo (si no hay cupo, para la web está agotado
+  //   aunque queden unidades en la tienda física).
+  // - Cualquier otra salida (POS, merma…) NUNCA se bloquea por el cupo: si pisa
+  //   unidades asignadas a online, el cupo se recorta (clamp) — al cajero no se
+  //   le niega una venta con el producto en la mano.
+  let nextOnline = rows[0].onlineUnits;
+  if (input.reason === "VENTA_ONLINE" && input.delta < 0) {
+    if (nextOnline + input.delta < 0) {
+      throw new StockError("INSUFFICIENT_ONLINE", input.variantId, nextOnline);
+    }
+    nextOnline += input.delta;
+  }
+  nextOnline = Math.max(0, Math.min(nextOnline, next));
 
   await tx.stockMovement.create({
     data: {
@@ -73,7 +91,7 @@ export async function applyStockMovement(
   });
   await tx.variant.update({
     where: { id: input.variantId },
-    data: { stockActual: next },
+    data: { stockActual: next, onlineUnits: nextOnline },
   });
   return next;
 }
@@ -120,39 +138,56 @@ export async function sellStock(params: {
 export async function setStockTo(params: {
   variantId: string;
   target: number;
+  /** Unidades publicadas online. Si se omite, se conserva (con clamp al total). */
+  onlineTarget?: number;
   reason: StockReason; // AJUSTE_MANUAL | MERMA | DEVOLUCION | COMPRA_INICIAL
   actorId: string;
   note?: string;
-}): Promise<{ from: number; to: number }> {
+}): Promise<{ from: number; to: number; online: number }> {
   if (!Number.isInteger(params.target) || params.target < 0) {
     throw new Error(`Stock objetivo inválido: ${params.target}`);
   }
+  if (
+    params.onlineTarget !== undefined &&
+    (!Number.isInteger(params.onlineTarget) ||
+      params.onlineTarget < 0 ||
+      params.onlineTarget > params.target)
+  ) {
+    throw new Error(
+      `Unidades online inválidas: ${params.onlineTarget} (deben estar entre 0 y ${params.target})`,
+    );
+  }
   return db.$transaction(
     async (tx) => {
-      const rows = await tx.$queryRaw<{ stockActual: number }[]>`
-        SELECT "stockActual" FROM variants WHERE id = ${params.variantId} FOR UPDATE
+      const rows = await tx.$queryRaw<{ stockActual: number; onlineUnits: number }[]>`
+        SELECT "stockActual", "onlineUnits" FROM variants WHERE id = ${params.variantId} FOR UPDATE
       `;
       if (rows.length === 0) {
         throw new StockError("VARIANT_NOT_FOUND", params.variantId);
       }
       const current = rows[0].stockActual;
-      if (current === params.target) return { from: current, to: current };
+      const online = Math.max(
+        0,
+        Math.min(params.onlineTarget ?? rows[0].onlineUnits, params.target),
+      );
 
-      await tx.stockMovement.create({
-        data: {
-          variantId: params.variantId,
-          delta: params.target - current,
-          reason: params.reason,
-          channel: "ADMIN",
-          actorId: params.actorId,
-          note: params.note,
-        },
-      });
+      if (current !== params.target) {
+        await tx.stockMovement.create({
+          data: {
+            variantId: params.variantId,
+            delta: params.target - current,
+            reason: params.reason,
+            channel: "ADMIN",
+            actorId: params.actorId,
+            note: params.note,
+          },
+        });
+      }
       await tx.variant.update({
         where: { id: params.variantId },
-        data: { stockActual: params.target },
+        data: { stockActual: params.target, onlineUnits: online },
       });
-      return { from: current, to: params.target };
+      return { from: current, to: params.target, online };
     },
     { timeout: 30_000, maxWait: 30_000 },
   );

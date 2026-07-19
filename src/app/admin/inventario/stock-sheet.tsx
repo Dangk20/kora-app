@@ -49,6 +49,7 @@ export function StockSheet({
     variantName: string;
     sku: string;
     stockActual: number;
+    onlineUnits: number;
     stockMin: number;
     color: string;
     icon: string;
@@ -108,19 +109,39 @@ export function StockSheet({
 
           <form action={formAction} className="space-y-3.5 rounded-xl border-[1.6px] border-[#eee9e2] p-4">
             <input type="hidden" name="variantId" value={variant.id} />
-            <div>
-              <label className={labelCls} htmlFor="target">Nueva cantidad</label>
-              <input
-                id="target"
-                name="target"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={variant.stockActual}
-                required
-                className={inputCls}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls} htmlFor="target">Stock total</label>
+                <input
+                  id="target"
+                  name="target"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={variant.stockActual}
+                  required
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="onlineTarget">Unidades online</label>
+                <input
+                  id="onlineTarget"
+                  name="onlineTarget"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={variant.onlineUnits}
+                  required
+                  className={inputCls}
+                />
+              </div>
             </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Es un solo inventario: lo que no publiques online queda para la
+              tienda física. Si el POS vende unidades asignadas a online, el cupo
+              se recorta solo — la caja nunca se bloquea.
+            </p>
             <div>
               <label className={labelCls} htmlFor="reason">Motivo</label>
               <select id="reason" name="reason" required className={`${inputCls} bg-white`}>

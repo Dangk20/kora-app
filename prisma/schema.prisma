@@ -143,6 +143,11 @@ model Variant {
 
   // Materializado. SOLO lo modifica la función transaccional de inventario.
   stockActual Int     @default(0)
+  // Asignación de canal (patrón del prototipo): cuántas unidades del stock
+  // total están publicadas online. Física = stockActual - onlineUnits.
+  // NO es un segundo stock: es una regla de visibilidad sobre el mismo pool.
+  // Invariante: 0 <= onlineUnits <= stockActual (el motor la mantiene).
+  onlineUnits Int     @default(0)
   stockMin    Int     @default(0) // umbral de alerta "quedan pocas unidades"
   active      Boolean @default(true)
 

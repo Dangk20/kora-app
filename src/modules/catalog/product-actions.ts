@@ -131,9 +131,11 @@ export async function upsertProduct(
                 note: "Stock inicial al crear la variante",
               },
             });
+            // Por defecto todo el stock inicial queda publicado online;
+            // la asignación se afina desde Inventario.
             await tx.variant.update({
               where: { id: created.id },
-              data: { stockActual: v.initialStock },
+              data: { stockActual: v.initialStock, onlineUnits: v.initialStock },
             });
           }
         }

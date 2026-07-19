@@ -6,21 +6,29 @@ import { requirePermission } from "@/auth";
 import { setStockTo, StockError } from "./engine";
 
 export type ActionResult =
-  | { ok: true; from: number; to: number }
+  | { ok: true; from: number; to: number; online: number }
   | { ok: false; error: string }
   | null;
 
-const schema = z.object({
-  variantId: z.string().min(1),
-  target: z.coerce.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
-  reason: z.enum(["AJUSTE_MANUAL", "MERMA", "DEVOLUCION", "COMPRA_INICIAL"]),
-  note: z
-    .string()
-    .trim()
-    .max(300)
-    .optional()
-    .transform((v) => (v ? v : undefined)),
-});
+const schema = z
+  .object({
+    variantId: z.string().min(1),
+    target: z.coerce.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
+    onlineTarget: z.coerce
+      .number()
+      .int("Debe ser un entero")
+      .min(0, "No puede ser negativo"),
+    reason: z.enum(["AJUSTE_MANUAL", "MERMA", "DEVOLUCION", "COMPRA_INICIAL"]),
+    note: z
+      .string()
+      .trim()
+      .max(300)
+      .optional()
+      .transform((v) => (v ? v : undefined)),
+  })
+  .refine((d) => d.onlineTarget <= d.target, {
+    message: "Las unidades online no pueden superar el stock total",
+  });
 
 export async function adjustStock(
   _prev: ActionResult,

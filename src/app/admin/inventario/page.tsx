@@ -58,9 +58,11 @@ export default async function InventoryPage({
       )}
 
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
-        <div className="grid grid-cols-[2.4fr_1fr_0.8fr_0.8fr_0.6fr] gap-3.5 border-b border-[#f0ece6] px-6 py-4 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase">
+        <div className="grid grid-cols-[2.2fr_0.9fr_0.7fr_0.7fr_0.8fr_0.6fr_0.5fr] gap-3.5 border-b border-[#f0ece6] px-6 py-4 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase">
           <span>Producto · SKU</span>
           <span>Categoría</span>
+          <span className="text-right">Online</span>
+          <span className="text-right">Física</span>
           <span className="text-right">Stock total</span>
           <span className="text-right">Alerta</span>
           <span />
@@ -70,7 +72,7 @@ export default async function InventoryPage({
           return (
             <div
               key={v.id}
-              className="grid grid-cols-[2.4fr_1fr_0.8fr_0.8fr_0.6fr] items-center gap-3.5 border-b border-[#f7f4f0] px-6 py-3.5 text-[13px] hover:bg-[#faf8f5]"
+              className="grid grid-cols-[2.2fr_0.9fr_0.7fr_0.7fr_0.8fr_0.6fr_0.5fr] items-center gap-3.5 border-b border-[#f7f4f0] px-6 py-3.5 text-[13px] hover:bg-[#faf8f5]"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <CategoryTile
@@ -92,6 +94,12 @@ export default async function InventoryPage({
                 </div>
               </div>
               <span className="text-muted-foreground">{v.product.category.name}</span>
+              <span className="text-right font-semibold text-kora-coral">
+                {v.onlineUnits}
+              </span>
+              <span className="text-right font-semibold text-[#8a5cb0]">
+                {v.stockActual - v.onlineUnits}
+              </span>
               <span
                 className="text-right text-[15px] font-bold"
                 style={{ color: low ? "#E5484D" : "#16181D" }}
@@ -127,6 +135,7 @@ export default async function InventoryPage({
             variantName: adjusting.name,
             sku: adjusting.sku,
             stockActual: adjusting.stockActual,
+            onlineUnits: adjusting.onlineUnits,
             stockMin: adjusting.stockMin,
             color: adjusting.product.category.color,
             icon: adjusting.product.category.icon,
