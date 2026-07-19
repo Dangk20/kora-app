@@ -1,7 +1,5 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,13 +7,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-async function logout() {
-  "use server";
-  await signOut({ redirectTo: "/login" });
-}
-
 export default async function AdminPage() {
   const session = await auth();
+  if (!session?.user.permissions.includes("dashboard:view")) {
+    return (
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Hola, {session?.user.name}</h1>
+        <p className="text-sm text-muted-foreground">
+          Tu módulo de trabajo estará disponible aquí cuando se active. Usa el menú
+          de la izquierda.
+        </p>
+      </div>
+    );
+  }
+
   const [products, variants, stockUnits] = await Promise.all([
     db.product.count({ where: { active: true } }),
     db.variant.count({ where: { active: true } }),
@@ -23,20 +28,8 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Panel KORA</h1>
-          <p className="text-sm text-muted-foreground">
-            {session?.user.name} · <Badge variant="outline">{session?.user.role}</Badge>
-          </p>
-        </div>
-        <form action={logout}>
-          <Button variant="outline" type="submit">
-            Salir
-          </Button>
-        </form>
-      </header>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
 
       <section className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -68,8 +61,8 @@ export default async function AdminPage() {
       </section>
 
       <p className="text-sm text-muted-foreground">
-        Semana 2 en curso: gestión de usuarios y matriz de permisos por rol.
+        Los informes de ventas llegan en la Semana 11; el catálogo, en la Semana 3.
       </p>
-    </main>
+    </div>
   );
 }
