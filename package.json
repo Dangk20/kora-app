@@ -12,7 +12,8 @@
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "ledger:verify": "tsx scripts/verify-ledger.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

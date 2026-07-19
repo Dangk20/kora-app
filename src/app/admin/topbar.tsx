@@ -8,6 +8,7 @@ import { Plus, Tags } from "lucide-react";
 const VIEWS: { prefix: string; title: string; subtitle: string }[] = [
   { prefix: "/admin/catalogo/categorias", title: "Categorías y subcategorías", subtitle: "Organiza tu catálogo" },
   { prefix: "/admin/catalogo", title: "Productos", subtitle: "Tu catálogo, con variantes y 4 precios" },
+  { prefix: "/admin/inventario", title: "Inventario unificado", subtitle: "Mismo stock para tienda online y física" },
   { prefix: "/admin/usuarios", title: "Usuarios", subtitle: "Roles y accesos del equipo" },
   { prefix: "/admin/clientes", title: "Módulo de clientes", subtitle: "Tu base de compradores" },
   { prefix: "/admin/pedidos", title: "Pedidos y envíos", subtitle: "Ventas online y su estado" },

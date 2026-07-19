@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Layers,
   LayoutDashboard,
   Package,
   ShoppingCart,
@@ -27,6 +28,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", permission: "dashboard:view", icon: LayoutDashboard },
   { href: "/admin/catalogo", label: "Productos", permission: "catalog:view", icon: Package },
+  { href: "/admin/inventario", label: "Inventario", permission: "inventory:view", icon: Layers },
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart, soon: "S8" },
   { href: "/admin/clientes", label: "Clientes", permission: "crm:view", icon: UsersRound, soon: "S10" },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
