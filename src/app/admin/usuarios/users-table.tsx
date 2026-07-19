@@ -79,7 +79,7 @@ function CreateUserDialog({ roles }: { roles: RoleOption[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button variant="brand">
           <Plus className="size-4" /> Nuevo usuario
         </Button>
       </DialogTrigger>

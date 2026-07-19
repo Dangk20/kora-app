@@ -1,28 +1,9 @@
-import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Store,
-  Users,
-  UsersRound,
-} from "lucide-react";
 import { auth, signOut } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-
-// La navegación se filtra con la misma matriz módulo:acción de la sesión.
-// Los módulos de semanas futuras se agregan aquí a medida que existen.
-const NAV = [
-  { href: "/admin", label: "Dashboard", permission: "dashboard:view", icon: LayoutDashboard },
-  { href: "/admin/catalogo", label: "Catálogo", permission: "catalog:view", icon: Package, soon: "S3" },
-  { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart, soon: "S8" },
-  { href: "/admin/clientes", label: "Clientes", permission: "crm:view", icon: UsersRound, soon: "S10" },
-  { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
-  { href: "/admin/usuarios", label: "Usuarios", permission: "users:view", icon: Users },
-] as const;
+import { NavLinks } from "./nav-links";
 
 async function logout() {
   "use server";
@@ -36,49 +17,44 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  const permissions = session.user.permissions ?? [];
-  const items = NAV.filter((item) => permissions.includes(item.permission));
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-60 flex-col border-r bg-muted/30 p-4">
+      {/* Sidebar sobre negro oficial: la combinación de mayor contraste del manual */}
+      <aside className="flex w-64 flex-col bg-kora-black p-4 text-white">
         <div className="px-2 py-1">
-          <span className="text-xl font-bold tracking-tight">KORA</span>
-          <p className="text-xs text-muted-foreground">Panel administrativo</p>
+          {/* El PNG del logo trae fondo negro: solo va sobre superficies oscuras */}
+          <Image
+            src="/logo-kora.png"
+            alt="KORA"
+            width={140}
+            height={36}
+            priority
+            className="h-9 w-auto mix-blend-screen"
+          />
+          <p className="mt-1 px-1 text-xs text-white/50">Panel administrativo</p>
         </div>
-        <Separator className="my-4" />
-        <nav className="flex flex-1 flex-col gap-1">
-          {items.map(({ href, label, icon: Icon, ...item }) => (
-            <Link
-              key={href}
-              href={"soon" in item ? "#" : href}
-              aria-disabled={"soon" in item}
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted ${
-                "soon" in item ? "pointer-events-none opacity-50" : ""
-              }`}
-            >
-              <Icon className="size-4" />
-              {label}
-              {"soon" in item && (
-                <Badge variant="outline" className="ml-auto text-[10px]">
-                  {item.soon}
-                </Badge>
-              )}
-            </Link>
-          ))}
-        </nav>
-        <Separator className="my-4" />
+        <div className="my-4 h-px bg-white/10" />
+        <NavLinks permissions={session.user.permissions ?? []} />
+        <div className="my-4 h-px bg-white/10" />
         <div className="space-y-2 px-2">
           <p className="truncate text-sm">{session.user.name}</p>
-          <Badge variant="secondary">{session.user.role}</Badge>
+          <Badge className="bg-kora-gradient border-0 text-white">
+            {session.user.role}
+          </Badge>
           <form action={logout}>
-            <Button variant="outline" size="sm" className="w-full" type="submit">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="submit"
+              className="w-full rounded-full border border-white/20 text-white hover:bg-white/10 hover:text-white"
+            >
               Salir
             </Button>
           </form>
         </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 bg-kora-beige/60 p-8">{children}</main>
     </div>
   );
 }

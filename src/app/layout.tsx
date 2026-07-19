@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Allura, Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Línea gráfica oficial KORA: Manrope (cuerpo y títulos hasta tener la
+// fuente "KORA Custom"), Allura para acentos manuscritos.
+const manrope = Manrope({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const allura = Allura({
+  variable: "--font-accent",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -26,10 +29,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="es" className={`${manrope.variable} ${allura.variable}`}>
+      <body className="antialiased">
         {children}
       </body>
     </html>
