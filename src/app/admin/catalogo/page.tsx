@@ -7,18 +7,16 @@ import { CategoryTile } from "@/modules/catalog/tiles";
 import { ProductSheet } from "./product-sheet";
 import type { ProductDraft } from "./product-form";
 
-function categoryOptions(
-  cats: { id: string; name: string; parentId: string | null }[],
-) {
-  const parents = cats.filter((c) => !c.parentId);
-  const options: { id: string; name: string }[] = [];
-  for (const p of parents) {
-    options.push({ id: p.id, name: p.name });
-    for (const child of cats.filter((c) => c.parentId === p.id)) {
-      options.push({ id: child.id, name: `${p.name} › ${child.name}` });
-    }
-  }
-  return options;
+function categoryTree(cats: { id: string; name: string; parentId: string | null }[]) {
+  return cats
+    .filter((c) => !c.parentId)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      children: cats
+        .filter((c) => c.parentId === p.id)
+        .map((c) => ({ id: c.id, name: c.name })),
+    }));
 }
 
 export default async function CatalogPage({
@@ -34,7 +32,10 @@ export default async function CatalogPage({
 
   const [products, categories] = await Promise.all([
     db.product.findMany({
-      include: { category: true, variants: { orderBy: { createdAt: "asc" } } },
+      include: {
+        category: { include: { parent: true } },
+        variants: { orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "desc" },
     }),
     db.category.findMany({
@@ -117,7 +118,11 @@ export default async function CatalogPage({
                   </div>
                 </div>
               </div>
-              <span className="text-muted-foreground">{p.category.name}</span>
+              <span className="text-muted-foreground">
+                {p.category.parent
+                  ? `${p.category.parent.name} › ${p.category.name}`
+                  : p.category.name}
+              </span>
               <span className="font-bold text-kora-black">
                 {min === max ? formatCop(min) : `${formatCop(min)} – ${formatCop(max)}`}
               </span>
@@ -157,7 +162,7 @@ export default async function CatalogPage({
 
       {sheetOpen && (
         <ProductSheet
-          categories={categoryOptions(categories)}
+          categories={categoryTree(categories)}
           initial={sheetInitial}
         />
       )}

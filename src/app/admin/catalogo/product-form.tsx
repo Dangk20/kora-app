@@ -1,10 +1,17 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Plus, Trash2 } from "lucide-react";
 import { upsertProduct } from "@/modules/catalog/product-actions";
+import { quickCreateCategory } from "@/modules/catalog/category-actions";
 import { Checkbox } from "@/components/ui/checkbox";
+
+export type CategoryNode = {
+  id: string;
+  name: string;
+  children: { id: string; name: string }[];
+};
 
 export type VariantDraft = {
   id?: string;
@@ -50,12 +57,89 @@ const inputCls =
   "w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral";
 const labelCls = "mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]";
 
+/** Crear categoría/subcategoría sin salir del formulario (sin <form> anidado). */
+function QuickCreate({
+  placeholder,
+  parentId,
+  onCreated,
+}: {
+  placeholder: string;
+  parentId?: string;
+  onCreated: (cat: { id: string; name: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-1 text-[11.5px] font-bold text-kora-coral hover:underline"
+      >
+        + Crear nueva
+      </button>
+    );
+  }
+
+  const create = () =>
+    startTransition(async () => {
+      const result = await quickCreateCategory({ name, parentId });
+      if (result.ok) {
+        onCreated({ id: result.id, name: result.name });
+        setOpen(false);
+        setName("");
+        setError(null);
+      } else {
+        setError(result.error);
+      }
+    });
+
+  return (
+    <div className="mt-1.5">
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              create();
+            }
+          }}
+          placeholder={placeholder}
+          autoFocus
+          className="flex-1 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-3 py-2 text-[13px] outline-none focus:border-kora-coral"
+        />
+        <button
+          type="button"
+          onClick={create}
+          disabled={pending || name.trim().length < 2}
+          className="rounded-[9px] bg-[#FFE9DD] px-3 py-2 text-[12px] font-bold text-kora-coral hover:opacity-80 disabled:opacity-50"
+        >
+          {pending ? "…" : "Crear"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-[12px] text-muted-foreground hover:text-foreground"
+        >
+          Cancelar
+        </button>
+      </div>
+      {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export function ProductForm({
   categories,
   initial,
   onDone,
 }: {
-  categories: { id: string; name: string }[];
+  categories: CategoryNode[];
   initial?: ProductDraft;
   onDone: () => void;
 }) {
@@ -72,6 +156,24 @@ export function ProductForm({
       variants: [emptyVariant()],
     },
   );
+
+  // Árbol local: permite agregar categorías recién creadas sin recargar.
+  const [cats, setCats] = useState<CategoryNode[]>(categories);
+
+  // El categoryId guardado puede ser un padre o un hijo — resolver ambos.
+  const resolve = (categoryId: string) => {
+    for (const p of cats) {
+      if (p.id === categoryId) return { parentId: p.id, subId: "" };
+      if (p.children.some((c) => c.id === categoryId)) {
+        return { parentId: p.id, subId: categoryId };
+      }
+    }
+    return { parentId: "", subId: "" };
+  };
+  const [{ parentId, subId }, setCategorySel] = useState(() =>
+    resolve(initial?.categoryId ?? ""),
+  );
+  const parent = cats.find((p) => p.id === parentId);
 
   useEffect(() => {
     if (state?.ok) {
@@ -97,6 +199,8 @@ export function ProductForm({
 
   const payload = JSON.stringify({
     ...product,
+    // La subcategoría manda; si no hay, el producto cuelga de la categoría padre.
+    categoryId: subId || parentId,
     variants: product.variants.map((v) => ({ ...v, stockActual: undefined })),
   });
 
@@ -128,33 +232,82 @@ export function ProductForm({
             required
           />
         </div>
+        <div>
+          <label className={labelCls} htmlFor="p-brand">Marca</label>
+          <input
+            id="p-brand"
+            className={inputCls}
+            value={product.brand}
+            onChange={(e) => setField("brand", e.target.value)}
+            placeholder="Kora"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls} htmlFor="p-brand">Marca</label>
-            <input
-              id="p-brand"
-              className={inputCls}
-              value={product.brand}
-              onChange={(e) => setField("brand", e.target.value)}
-              placeholder="Kora"
-            />
-          </div>
           <div>
             <label className={labelCls} htmlFor="p-cat">Categoría</label>
             <select
               id="p-cat"
               className={`${inputCls} bg-white`}
-              value={product.categoryId}
-              onChange={(e) => setField("categoryId", e.target.value)}
+              value={parentId}
+              onChange={(e) => setCategorySel({ parentId: e.target.value, subId: "" })}
               required
             >
               <option value="">Selecciona…</option>
-              {categories.map((c) => (
+              {cats.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
+            <QuickCreate
+              placeholder="Nombre de la categoría"
+              onCreated={(cat) => {
+                setCats((prev) => [...prev, { ...cat, children: [] }]);
+                setCategorySel({ parentId: cat.id, subId: "" });
+                router.refresh();
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="p-sub">Subcategoría</label>
+            <select
+              id="p-sub"
+              className={`${inputCls} bg-white`}
+              value={subId}
+              onChange={(e) => setCategorySel({ parentId, subId: e.target.value })}
+              disabled={!parent}
+            >
+              <option value="">
+                {parent ? "Sin subcategoría" : "Elige categoría primero"}
+              </option>
+              {parent?.children.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {parent && parent.children.length === 0 && (
+              <p className="mt-1 text-[11px] text-kora-coral">
+                Esta categoría no tiene subcategorías.
+              </p>
+            )}
+            {parent && (
+              <QuickCreate
+                placeholder={`Nueva subcategoría de ${parent.name}`}
+                parentId={parent.id}
+                onCreated={(cat) => {
+                  setCats((prev) =>
+                    prev.map((p) =>
+                      p.id === parent.id
+                        ? { ...p, children: [...p.children, cat] }
+                        : p,
+                    ),
+                  );
+                  setCategorySel({ parentId: parent.id, subId: cat.id });
+                  router.refresh();
+                }}
+              />
+            )}
           </div>
         </div>
         <div>

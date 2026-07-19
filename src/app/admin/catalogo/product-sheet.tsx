@@ -2,14 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { ProductForm, type ProductDraft } from "./product-form";
+import { ProductForm, type CategoryNode, type ProductDraft } from "./product-form";
 
 /** Slide-over de 480px desde la derecha, como el formulario del prototipo. */
 export function ProductSheet({
   categories,
   initial,
 }: {
-  categories: { id: string; name: string }[];
+  categories: CategoryNode[];
   initial?: ProductDraft;
 }) {
   const router = useRouter();

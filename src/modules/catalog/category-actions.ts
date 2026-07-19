@@ -71,6 +71,46 @@ export async function createCategory(
   return { ok: true };
 }
 
+/**
+ * Creación rápida desde el formulario de producto (sin salir del slide-over).
+ * Hereda color/ícono del padre; las categorías raíz salen con el default y
+ * se personalizan después en Categorías.
+ */
+export async function quickCreateCategory(input: {
+  name: string;
+  parentId?: string;
+}): Promise<{ ok: true; id: string; name: string } | { ok: false; error: string }> {
+  await requirePermission("catalog:create");
+  const parsed = nameSchema.safeParse(input.name);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  let inherited: { color: string; icon: string } | undefined;
+  if (input.parentId) {
+    const parent = await db.category.findUnique({ where: { id: input.parentId } });
+    if (!parent) return { ok: false, error: "La categoría padre no existe" };
+    if (parent.parentId) return { ok: false, error: "Solo hay un nivel de subcategorías" };
+    inherited = { color: parent.color, icon: parent.icon };
+  }
+
+  const last = await db.category.findFirst({
+    where: { parentId: input.parentId ?? null },
+    orderBy: { position: "desc" },
+  });
+  const created = await db.category.create({
+    data: {
+      name: parsed.data,
+      slug: await uniqueSlug(parsed.data, categoryExists),
+      position: (last?.position ?? -1) + 1,
+      parentId: input.parentId,
+      color: inherited?.color ?? "#FBE3D3",
+      icon: inherited?.icon ?? "package",
+    },
+  });
+  revalidatePath(CATEGORIES_PATH);
+  revalidatePath("/admin/catalogo");
+  return { ok: true, id: created.id, name: created.name };
+}
+
 export async function updateCategory(
   _prev: ActionResult,
   formData: FormData,
