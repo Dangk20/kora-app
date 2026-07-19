@@ -1,10 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { Button } from "@/components/ui/button";
-import { CategoriesTable } from "./categories-table";
+import { CategoryManager } from "./category-manager";
 
 export default async function CategoriesPage() {
   const session = await auth();
@@ -12,31 +9,32 @@ export default async function CategoriesPage() {
 
   const categories = await db.category.findMany({
     include: { _count: { select: { products: true } } },
-    orderBy: { position: "asc" },
+    orderBy: [{ position: "asc" }],
   });
 
+  const parents = categories
+    .filter((c) => !c.parentId)
+    .map((parent) => ({
+      id: parent.id,
+      name: parent.name,
+      color: parent.color,
+      icon: parent.icon,
+      productCount: parent._count.products,
+      children: categories
+        .filter((c) => c.parentId === parent.id)
+        .map((child) => ({
+          id: child.id,
+          name: child.name,
+          productCount: child._count.products,
+        })),
+    }));
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/admin/catalogo" aria-label="Volver al catálogo">
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-semibold">Categorías</h1>
-      </div>
-      <CategoriesTable
-        categories={categories.map((c) => ({
-          id: c.id,
-          name: c.name,
-          slug: c.slug,
-          active: c.active,
-          productCount: c._count.products,
-        }))}
-        canCreate={session.user.permissions.includes("catalog:create")}
-        canEdit={session.user.permissions.includes("catalog:edit")}
-        canDelete={session.user.permissions.includes("catalog:delete")}
-      />
-    </div>
+    <CategoryManager
+      parents={parents}
+      canCreate={session.user.permissions.includes("catalog:create")}
+      canEdit={session.user.permissions.includes("catalog:edit")}
+      canDelete={session.user.permissions.includes("catalog:delete")}
+    />
   );
 }

@@ -26,7 +26,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", permission: "dashboard:view", icon: LayoutDashboard },
-  { href: "/admin/catalogo", label: "Catálogo", permission: "catalog:view", icon: Package },
+  { href: "/admin/catalogo", label: "Productos", permission: "catalog:view", icon: Package },
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart, soon: "S8" },
   { href: "/admin/clientes", label: "Clientes", permission: "crm:view", icon: UsersRound, soon: "S10" },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
@@ -51,14 +51,14 @@ export function NavLinks({ permissions }: { permissions: string[] }) {
             href={soon ? "#" : href}
             aria-disabled={Boolean(soon)}
             className={cn(
-              "flex items-center gap-2.5 rounded-full px-4 py-2 text-sm transition-colors",
+              "flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-semibold transition-colors",
               active
-                ? "bg-kora-gradient font-semibold text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white",
+                ? "bg-kora-coral/15 text-kora-coral"
+                : "text-[#A0A4AD] hover:bg-white/5 hover:text-white",
               soon && "pointer-events-none opacity-40",
             )}
           >
-            <Icon className="size-4" />
+            <Icon className="size-[19px]" strokeWidth={1.8} />
             {label}
             {soon && (
               <Badge

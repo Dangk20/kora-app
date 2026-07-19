@@ -85,6 +85,11 @@ model Category {
   children Category[] @relation("CategoryTree")
   position Int        @default(0)
   active   Boolean    @default(true)
+  // Identidad visual de la categoría (patrón del prototipo aprobado):
+  // fondo pastel del tile + ícono lucide. Los tiles de producto la heredan
+  // mientras no haya fotos reales.
+  color    String     @default("#FBE3D3")
+  icon     String     @default("package")
   products Product[]
 
   @@map("categories")

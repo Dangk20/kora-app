@@ -1,9 +1,10 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LogOut, Store } from "lucide-react";
 import { auth, signOut } from "@/auth";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { NavLinks } from "./nav-links";
+import { Topbar } from "./topbar";
 
 async function logout() {
   "use server";
@@ -17,44 +18,52 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  const permissions = session.user.permissions ?? [];
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar sobre negro oficial: la combinación de mayor contraste del manual */}
-      <aside className="flex w-64 flex-col bg-kora-black p-4 text-white">
-        <div className="px-2 py-1">
-          {/* Logo oficial (fondo transparente, wordmark blanco): para superficies oscuras */}
+    <div className="bg-kora-beige flex min-h-screen">
+      {/* Sidebar del prototipo (236px, oscura, sticky) con el negro oficial */}
+      <aside className="bg-kora-black sticky top-0 flex h-screen w-[236px] shrink-0 flex-col px-4 py-6">
+        <div className="mb-2 flex items-center gap-2.5 border-b border-white/10 px-2 pb-6">
           <Image
             src="/logo-kora.png"
             alt="KORA"
-            width={140}
-            height={36}
+            width={110}
+            height={29}
             priority
-            className="h-9 w-auto"
+            className="h-7 w-auto"
           />
-          <p className="mt-1 px-1 text-xs text-white/50">Panel administrativo</p>
+          <span className="text-[10px] tracking-[1px] text-white/40">ADMIN</span>
         </div>
-        <div className="my-4 h-px bg-white/10" />
-        <NavLinks permissions={session.user.permissions ?? []} />
-        <div className="my-4 h-px bg-white/10" />
-        <div className="space-y-2 px-2">
-          <p className="truncate text-sm">{session.user.name}</p>
-          <Badge className="bg-kora-gradient border-0 text-white">
-            {session.user.role}
-          </Badge>
+        <NavLinks permissions={permissions} />
+        <div className="flex flex-col gap-2 border-t border-white/10 pt-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-[10px] bg-white/5 px-3 py-2.5 text-[13px] font-semibold text-[#A0A4AD] hover:text-white"
+          >
+            <Store className="size-[17px]" strokeWidth={1.8} /> Ver tienda
+          </Link>
           <form action={logout}>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               type="submit"
-              className="w-full rounded-full border border-white/20 text-white hover:bg-white/10 hover:text-white"
+              className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-semibold text-white/40 hover:bg-white/5 hover:text-white"
             >
-              Salir
-            </Button>
+              <LogOut className="size-[17px]" strokeWidth={1.8} /> Cerrar sesión
+            </button>
           </form>
+          <div className="px-3 pt-1">
+            <p className="truncate text-xs text-white/60">{session.user.name}</p>
+            <p className="text-[10px] tracking-wide text-white/35 uppercase">
+              {session.user.role}
+            </p>
+          </div>
         </div>
       </aside>
-      <main className="flex-1 bg-kora-beige/60 p-8">{children}</main>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar userName={session.user.name ?? "KORA"} permissions={permissions} />
+        <main className="flex-1 px-8 pt-7 pb-14">{children}</main>
+      </div>
     </div>
   );
 }

@@ -17,7 +17,6 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Usuarios</h1>
       <UsersTable
         users={users.map((u) => ({
           id: u.id,

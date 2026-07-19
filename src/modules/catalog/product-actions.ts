@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/auth";
@@ -155,5 +154,5 @@ export async function upsertProduct(
   }
 
   revalidatePath("/admin/catalogo");
-  redirect("/admin/catalogo");
+  return { ok: true };
 }

@@ -55,7 +55,13 @@ type DemoProduct = {
   variants: { name: string; attrs?: Record<string, string>; cop: number; usd: number; stock: number }[];
 };
 
-const CATEGORIES = ["Tecnología", "Hogar", "Belleza", "Accesorios"];
+// Paleta de tiles del prototipo aprobado (pastel bg + ícono lucide)
+const CATEGORIES: { name: string; color: string; icon: string }[] = [
+  { name: "Tecnología", color: "#FBE3D3", icon: "smartphone" },
+  { name: "Hogar", color: "#FBEFD6", icon: "lamp" },
+  { name: "Belleza", color: "#ECE0F5", icon: "sparkles" },
+  { name: "Accesorios", color: "#F8D7DD", icon: "watch" },
+];
 
 const PRODUCTS: DemoProduct[] = [
   { name: "[DEMO] Audífonos inalámbricos Ultra", category: "Tecnología", brand: "SoundMax", variants: [
@@ -154,13 +160,19 @@ async function main() {
 
   // Categorías
   const catIds = new Map<string, string>();
-  for (const [i, name] of CATEGORIES.entries()) {
+  for (const [i, cat] of CATEGORIES.entries()) {
     const c = await db.category.upsert({
-      where: { slug: slugify(name) },
-      update: {},
-      create: { name, slug: slugify(name), position: i },
+      where: { slug: slugify(cat.name) },
+      update: { color: cat.color, icon: cat.icon },
+      create: {
+        name: cat.name,
+        slug: slugify(cat.name),
+        position: i,
+        color: cat.color,
+        icon: cat.icon,
+      },
     });
-    catIds.set(name, c.id);
+    catIds.set(cat.name, c.id);
   }
 
   // Productos + variantes + stock inicial vía libro contable
