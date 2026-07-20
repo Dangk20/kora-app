@@ -47,3 +47,6 @@ next-env.d.ts
 
 # Entorno local (plantilla en .env.example)
 !.env.example
+
+# Imágenes subidas en desarrollo (driver de disco). En producción van a R2.
+/.uploads

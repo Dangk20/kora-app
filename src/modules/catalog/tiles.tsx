@@ -34,16 +34,20 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   paw: PawPrint,
 };
 
-// Paleta de tiles del prototipo: fondo pastel → tinta
+// Paleta de tiles de categoría: pasteles derivados del gradiente oficial
+// (naranja → coral → rosa → magenta → morado) más el beige del manual.
+// El prototipo traía verdes y azules; se reemplazaron para no salirse de la
+// línea gráfica. El orden recorre el gradiente, así que categorías contiguas
+// se distinguen entre sí.
 export const TILE_PALETTE: { bg: string; ink: string }[] = [
-  { bg: "#FBE3D3", ink: "#b5571e" },
-  { bg: "#FBEFD6", ink: "#a87a1e" },
-  { bg: "#F8D7DD", ink: "#c0506a" },
-  { bg: "#ECE0F5", ink: "#8a5cb0" },
-  { bg: "#D9EFE6", ink: "#2f9c72" },
-  { bg: "#DDEBFB", ink: "#2a6fdb" },
-  { bg: "#FCE4EC", ink: "#c2185b" },
-  { bg: "#E6F0D9", ink: "#5a7d2a" },
+  { bg: "#FFE9DD", ink: "#D95A00" }, // naranja
+  { bg: "#FFDECE", ink: "#C4551A" }, // coral
+  { bg: "#FBDCE9", ink: "#D81B60" }, // rosa
+  { bg: "#F9D5E4", ink: "#F2357E" }, // rosa marca
+  { bg: "#F3DAF8", ink: "#C026D3" }, // magenta
+  { bg: "#EFE6F7", ink: "#7A3DB8" }, // morado marca
+  { bg: "#E7DEF5", ink: "#5E2E93" }, // morado profundo
+  { bg: "#F9F3EE", ink: "#3C3C3C" }, // beige del manual
 ];
 
 export function inkFor(bg: string): string {

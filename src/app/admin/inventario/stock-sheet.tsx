@@ -192,7 +192,9 @@ export function StockSheet({
                 >
                   <span
                     className="w-12 shrink-0 text-center text-sm font-extrabold"
-                    style={{ color: m.delta > 0 ? "#1FB57A" : "#E5484D" }}
+                    // Entradas en morado de marca, salidas en gris oscuro:
+                    // el kardex no necesita semáforo, necesita distinguirse.
+                    style={{ color: m.delta > 0 ? "#7A3DB8" : "#3C3C3C" }}
                   >
                     {m.delta > 0 ? `+${m.delta}` : m.delta}
                   </span>

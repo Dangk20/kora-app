@@ -38,4 +38,20 @@ Login dev: `admin@kora.local` / `kora-dev-2026` · cajero: `caja@kora.local` / `
 
 ## Estado y pendientes
 
-El detalle vivo está en `../bitacora-sprints-kora.md`. Resumen al 19 jul 2026: S1–S2 cerradas, S3 casi completa (falta **importador Excel + plantilla** e **imágenes** — abstracción storage con driver local en dev y R2 en prod), S4 (motor de inventario) **cerrada y testeada**. Staging bloqueado por accesos SSH/DNS del cliente. 21 tests verdes.
+El detalle vivo está en `../bitacora-sprints-kora.md`. Resumen al 19 jul 2026: **S1–S5 cerradas** (S5 = tienda pública: catálogo, adelantada). Staging bloqueado por accesos SSH/DNS del cliente. 56 tests verdes.
+
+**Importador de catálogo** (`src/modules/catalog/import/`): las columnas del Excel se definen UNA vez en `columns.ts` — plantilla, parser y validación salen de ahí; si cambia una columna, cambia solo ese archivo. La importación valida todo el archivo antes de escribir (todo-o-nada) y el stock inicial entra por `receiveStock()` del motor, nunca por fuera. Un SKU que ya existe actualiza precios pero **jamás** vuelve a sumar stock.
+
+**Almacenamiento** (`src/modules/storage/`): interfaz con dos drivers — disco local en dev (`.uploads/`, servido por `/media/[...key]`, solo dev) y R2 en producción. Se elige por variables de entorno; en producción, sin R2 configurado la app **falla al arrancar** (el VPS nunca sirve imágenes). El tipo de archivo se valida por magic numbers, no por el content-type del navegador.
+
+**Precios** (`src/modules/pricing/`): `resolvePrice()` es la ÚNICA fuente de precio de tienda, carrito, checkout y snapshot del pedido (CAT_HU001 §3). Ninguna vista calcula precios. Reglas que no se negocian: cada divisa usa **su precio cargado** (nunca conversión por tasa), y el tachado + badge "Precio especial online" solo aparecen si el precio online es **realmente menor** que el de tienda en la misma moneda.
+
+**Tienda pública** (`src/app/(tienda)/` + `src/modules/storefront/`): home, `/catalogo`, `/producto/[slug]`, `/carrito` y `/checkout`. "Disponible" = `onlineUnits > 0` (cupo online), no el stock total. Las cards del catálogo **no llevan botón**: la compra se decide en la ficha. No publicar promesas comerciales que el negocio no sostiene (cuotas, compra protegida, envío gratis, devoluciones): ver `../notas-tecnicas-privado.md` §Tienda pública.
+
+**Vitrina** (`src/modules/showcase/` + `src/app/admin/vitrina/`): administra la portada de la tienda. Las secciones son **fijas** (`sections.ts` es la fuente de verdad); el operador decide contenido, no estructura. La página del panel renderiza **el mismo `StoreHomeLayout` que la tienda** con un `editControl` que superpone los lápices — no duplicar la maqueta, o se desincronizan. En la tienda una sección vacía se oculta; en Vitrina **siempre se ven todas** para poder llenarlas. `limit` = cuántos se ven a la vez, no cuántos caben (el resto rota en `AutoCarousel`); **Productos destacados es parrilla a propósito**, sin carrusel.
+
+**Carrito** (`src/modules/cart/`): vive en localStorage y guarda SOLO `variantId` + `qty`. Los precios se resuelven en servidor (`resolveCart`) al pintar el carrito y otra vez al crear el pedido — nunca se confía en un precio que venga del navegador.
+
+**Pedidos** (`src/modules/orders/`): `createOrder()` crea el pedido en una transacción con snapshot inmutable, cliente silencioso por match de email/teléfono E.164, vigencia 2 h e idempotencia por `checkoutToken` único. **No toca stock**. El enlace de WhatsApp usa `api.whatsapp.com/send`, **nunca `wa.me`**: su redirección rompe el emoji del saludo.
+
+**`confirmOrder()` es el evento central del sistema**: en UNA transacción descuenta stock por `applyStockMovement`, cambia el estado y escribe `order.confirmed` en `domain_events`. Es idempotente (segundo clic no duplica). El estado se mueve solo por `canTransition()` (`modules/orders/status.ts`): nunca retrocede. Expiración de pendientes: `pnpm orders:expire` (cron cada 5 min en prod). **El worker que consume la outbox todavía no existe** — los eventos se acumulan en PENDING a propósito.

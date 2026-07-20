@@ -6,6 +6,7 @@ import { Check, ImagePlus, Plus, Trash2 } from "lucide-react";
 import { upsertProduct } from "@/modules/catalog/product-actions";
 import { quickCreateCategory } from "@/modules/catalog/category-actions";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ImageUploader, type ProductImage } from "./image-uploader";
 
 export type CategoryNode = {
   id: string;
@@ -37,6 +38,7 @@ export type ProductDraft = {
   active: boolean;
   featured: boolean;
   variants: VariantDraft[];
+  images?: ProductImage[];
 };
 
 const emptyVariant = (): VariantDraft => ({
@@ -204,16 +206,20 @@ export function ProductForm({
       {product.id && <input type="hidden" name="id" value={product.id} />}
 
       <div className="flex-1 space-y-4 px-7 py-6">
-        {/* Uploader del prototipo — se habilita con el módulo de imágenes (esta semana) */}
-        <div className="flex gap-3">
-          <div className="flex size-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-[#d9d4cc] text-[#b3b8c0]">
-            <ImagePlus className="size-6" />
+        {/* Galería (uploader del prototipo). Necesita un producto ya creado:
+            las fotos cuelgan de su id. */}
+        {product.id ? (
+          <ImageUploader productId={product.id} initial={product.images ?? []} />
+        ) : (
+          <div className="flex gap-3">
+            <div className="flex size-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-[#d9d4cc] text-[#b3b8c0]">
+              <ImagePlus className="size-6" />
+            </div>
+            <div className="flex flex-1 items-center rounded-xl border-[1.6px] border-dashed border-[#e2ddd6] p-3 text-[12.5px] leading-relaxed text-[#8a8f98]">
+              Guarda el producto y podrás agregarle fotos.
+            </div>
           </div>
-          <div className="flex flex-1 items-center rounded-xl border-[1.6px] border-dashed border-[#e2ddd6] p-3 text-[12.5px] leading-relaxed text-[#8a8f98]">
-            Las imágenes del producto se habilitan esta semana, junto con la
-            carga del catálogo real.
-          </div>
-        </div>
+        )}
 
         <div>
           <label className={labelCls} htmlFor="p-name">Nombre del producto</label>

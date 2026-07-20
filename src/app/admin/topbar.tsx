@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, Tags } from "lucide-react";
+import { FileSpreadsheet, Plus, Tags } from "lucide-react";
 
 // Título + subtítulo por vista, como la topbar del prototipo aprobado.
 const VIEWS: { prefix: string; title: string; subtitle: string }[] = [
+  { prefix: "/admin/vitrina", title: "Vitrina", subtitle: "Arma la página de inicio de tu tienda" },
   { prefix: "/admin/catalogo/categorias", title: "Categorías y subcategorías", subtitle: "Organiza tu catálogo" },
   { prefix: "/admin/catalogo", title: "Productos", subtitle: "Tu catálogo, con variantes y 4 precios" },
   { prefix: "/admin/inventario", title: "Inventario unificado", subtitle: "Mismo stock para tienda online y física" },
@@ -40,6 +41,14 @@ export function Topbar({
             className="flex items-center gap-2 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-kora-black hover:bg-muted"
           >
             <Tags className="size-4" /> Gestionar categorías
+          </Link>
+        )}
+        {isProducts && permissions.includes("catalog:create") && (
+          <Link
+            href="/admin/catalogo?importar=1"
+            className="flex items-center gap-2 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-kora-black hover:bg-muted"
+          >
+            <FileSpreadsheet className="size-4" /> Importar Excel
           </Link>
         )}
         {isProducts && permissions.includes("catalog:create") && (

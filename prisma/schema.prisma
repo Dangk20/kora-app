@@ -107,6 +107,8 @@ model Product {
   featured    Boolean        @default(false)
   images      ProductImage[]
   variants    Variant[]
+  showcaseItems ShowcaseItem[]
+  banners       Banner[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -274,6 +276,31 @@ model Order {
   couponRedemption CouponRedemption?
   whatsappMessage  String? // mensaje pre-armado enviado por wa.me
   note             String?
+
+  // ── Snapshot del comprador y la entrega (PED_HU001/002) ──
+  // Viven en el pedido, no solo en el cliente: si el cliente cambia de
+  // dirección después, el pedido despachado conserva la suya.
+  contactName     String?
+  contactPhone    String? // E.164: +57… / +1…
+  contactEmail    String?
+  contactDocument String? // CC/CE/NIT — lo exigen las transportadoras (solo CO)
+
+  shipCountry    String? @default("CO") // CO | US
+  shipState      String? // departamento (CO) | estado (US)
+  shipCity       String?
+  shipAddress    String?
+  shipAddress2   String? // apto/torre/conjunto | Apt/Suite
+  shipNeighborhood String? // barrio (solo CO)
+  shipZip        String? // ZIP (solo US)
+  shipNotes      String?
+
+  paymentPreference String? // Nequi, Zelle… (administrable a futuro)
+
+  // Vigencia del pedido pendiente (PED_HU003: expira a las 2 h).
+  expiresAt DateTime?
+
+  // Idempotencia del checkout (PED_HU002): doble clic no crea dos pedidos.
+  checkoutToken String? @unique
 
   confirmedAt   DateTime?
   confirmedById String?
@@ -455,16 +482,83 @@ model CampaignRecipient {
 // CONTENIDO DE TIENDA
 // ─────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────
+// VITRINA — la página de inicio de la tienda, administrable
+//
+// Las secciones son FIJAS (las del prototipo aprobado): el operador elige
+// qué va en cada una, puede ocultarlas, pero no crear ni reordenar. Cada
+// sección se llena a mano o sola con una regla.
+// ─────────────────────────────────────────────────────────────
+
+enum ShowcaseMode {
+  MANUAL // el operador elige los productos uno a uno
+  AUTO // se llena sola con `autoRule`
+}
+
+enum ShowcaseRule {
+  BEST_SELLERS // más vendidos (por unidades confirmadas)
+  NEWEST // agregados recientemente
+  ONLINE_DEAL // con precio especial online activo
+  FEATURED // marcados como destacados en el catálogo
+}
+
+model ShowcaseSection {
+  /** Clave estable de la sección; la UI conoce estas claves. */
+  key      String       @id
+  title    String
+  subtitle String?
+  active   Boolean      @default(true)
+  mode     ShowcaseMode @default(MANUAL)
+  autoRule ShowcaseRule @default(NEWEST)
+  /** Cuántos productos muestra la sección. */
+  limit    Int          @default(4)
+
+  items     ShowcaseItem[]
+  updatedAt DateTime       @updatedAt
+
+  @@map("showcase_sections")
+}
+
+model ShowcaseItem {
+  id         String          @id @default(cuid())
+  sectionKey String
+  section    ShowcaseSection @relation(fields: [sectionKey], references: [key], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position   Int             @default(0)
+
+  @@unique([sectionKey, productId])
+  @@index([sectionKey, position])
+  @@map("showcase_items")
+}
+
+/**
+ * Pieza publicitaria de la vitrina. La imagen viene ya diseñada con su texto
+ * (decisión 19 jul 2026): el sistema solo la muestra y la enlaza.
+ *
+ * `slot` la ancla a su lugar en la página (hero principal, hero lateral…).
+ * Un mismo slot admite VARIAS piezas: la tienda las rota automáticamente en
+ * el orden de `position`.
+ */
 model Banner {
   id       String    @id @default(cuid())
+  slot     String
   title    String
-  imageUrl String
+  /** Key en el storage (R2 en prod, disco en dev) — nunca una URL absoluta. */
+  imageUrl String?
+  /** Producto al que lleva el banner. */
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /** Enlace libre, si no apunta a un producto. */
   linkUrl  String?
   position Int       @default(0)
   active   Boolean   @default(true)
   startsAt DateTime?
   endsAt   DateTime?
+  updatedAt DateTime @updatedAt
 
+  @@index([slot, position])
+  @@index([productId])
   @@map("banners")
 }
 

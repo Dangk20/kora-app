@@ -52,6 +52,28 @@ const productSchema = z.object({
 const productSlugExists = (slug: string) =>
   db.product.findUnique({ where: { slug } }).then(Boolean);
 
+/**
+ * Activa/desactiva el producto desde el switch del listado.
+ * Un producto inactivo desaparece de la tienda pero conserva su historial:
+ * nunca se borra nada que tenga ventas asociadas.
+ */
+export async function toggleProductActive(
+  productId: string,
+  active: boolean,
+): Promise<{ ok: true; active: boolean } | { ok: false; error: string }> {
+  await requirePermission("catalog:edit");
+  if (typeof productId !== "string" || !productId) {
+    return { ok: false, error: "Producto inválido" };
+  }
+  const updated = await db.product.update({
+    where: { id: productId },
+    data: { active },
+    select: { active: true },
+  });
+  revalidatePath("/admin/catalogo");
+  return { ok: true, active: updated.active };
+}
+
 export async function upsertProduct(
   _prev: ActionResult,
   formData: FormData,

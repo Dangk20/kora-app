@@ -94,9 +94,9 @@ export default async function AdminPage() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-        <MetricCard label="Ventas hoy" value={formatCop(Number(ventasHoy._sum.total ?? 0))} icon={BarChart3} iconBg="#e1f6ee" iconColor="#1FB57A" />
+        <MetricCard label="Ventas hoy" value={formatCop(Number(ventasHoy._sum.total ?? 0))} icon={BarChart3} iconBg="#EFE6F7" iconColor="#7A3DB8" />
         <MetricCard label="Ventas del mes" value={formatCop(mesTotal)} icon={Tag} iconBg="#FFE9DD" iconColor="#FF5A1F" />
-        <MetricCard label="Pedidos pendientes" value={String(pendientes)} icon={ClipboardList} iconBg="#dde9fb" iconColor="#2a6fdb" />
+        <MetricCard label="Pedidos pendientes" value={String(pendientes)} icon={ClipboardList} iconBg="#FBDCE9" iconColor="#D81B60" />
         <MetricCard label="Ticket promedio" value={formatCop(ticket)} icon={ShoppingCart} iconBg="#ECE0F5" iconColor="#8a5cb0" />
         {/* La card oscura del prototipo: stock bajo */}
         <div className="bg-kora-black rounded-2xl p-5">

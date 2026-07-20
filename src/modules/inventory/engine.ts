@@ -97,6 +97,44 @@ export async function applyStockMovement(
 }
 
 /**
+ * Entrada de mercancía dentro de una transacción abierta (importador Excel,
+ * compras futuras). Por defecto las unidades nuevas quedan publicadas online
+ * — el mismo default que la creación de producto; la asignación se afina
+ * después en Inventario.
+ */
+export async function receiveStock(
+  tx: Tx,
+  params: {
+    variantId: string;
+    qty: number;
+    reason?: StockReason; // default COMPRA_INICIAL
+    actorId?: string;
+    note?: string;
+    /** Si es false, el cupo online se queda como estaba (con clamp). */
+    allOnline?: boolean;
+  },
+): Promise<number> {
+  if (!Number.isInteger(params.qty) || params.qty <= 0) {
+    throw new Error(`Cantidad inválida: ${params.qty}`);
+  }
+  const next = await applyStockMovement(tx, {
+    variantId: params.variantId,
+    delta: params.qty,
+    reason: params.reason ?? "COMPRA_INICIAL",
+    channel: "ADMIN",
+    actorId: params.actorId,
+    note: params.note,
+  });
+  if (params.allOnline !== false) {
+    await tx.variant.update({
+      where: { id: params.variantId },
+      data: { onlineUnits: next },
+    });
+  }
+  return next;
+}
+
+/**
  * Venta multi-ítem atómica (web o POS): o se descuenta todo, o nada.
  * Los ítems se bloquean en orden estable (variantId) para evitar deadlocks
  * entre ventas concurrentes con ítems cruzados.

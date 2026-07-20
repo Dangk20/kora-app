@@ -1,11 +1,21 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PackageSearch } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { formatCop } from "@/lib/format";
+import { storage } from "@/modules/storage";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { ProductSheet } from "./product-sheet";
+import { ImportSheet } from "./import-sheet";
+import { CatalogToolbar } from "./catalog-toolbar";
+import { StatusSwitch } from "./status-switch";
+import { Pagination } from "../_components/pagination";
 import type { ProductDraft } from "./product-form";
+
+const PER_PAGE_OPTIONS = [20, 50, 100];
+const DEFAULT_PER_PAGE = 20;
 
 function categoryTree(cats: { id: string; name: string; parentId: string | null }[]) {
   return cats
@@ -19,35 +29,91 @@ function categoryTree(cats: { id: string; name: string; parentId: string | null 
     }));
 }
 
+const GRID =
+  "grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_1fr_0.6fr] items-center gap-3.5 px-6";
+
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nuevo?: string; editar?: string }>;
+  searchParams: Promise<{
+    nuevo?: string;
+    editar?: string;
+    importar?: string;
+    q?: string;
+    categoria?: string;
+    estado?: string;
+    por?: string;
+    pagina?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user.permissions.includes("catalog:view")) redirect("/admin");
   const canEdit = session.user.permissions.includes("catalog:edit");
   const canCreate = session.user.permissions.includes("catalog:create");
-  const { nuevo, editar } = await searchParams;
+  const sp = await searchParams;
+  const { nuevo, editar, importar, q, categoria, estado } = sp;
 
-  const [products, categories] = await Promise.all([
+  const perPage = PER_PAGE_OPTIONS.includes(Number(sp.por))
+    ? Number(sp.por)
+    : DEFAULT_PER_PAGE;
+  const page = Math.max(1, Number(sp.pagina) || 1);
+
+  // Filtros del listado. El estado "agotado" se resuelve sobre las variantes
+  // activas: un producto está agotado si ninguna tiene stock.
+  const where: Record<string, unknown> = {};
+  if (q?.trim()) {
+    const term = q.trim();
+    where.OR = [
+      { name: { contains: term, mode: "insensitive" } },
+      { brand: { contains: term, mode: "insensitive" } },
+      { variants: { some: { sku: { contains: term, mode: "insensitive" } } } },
+    ];
+  }
+  if (categoria) where.categoryId = categoria;
+  if (estado === "activo") where.active = true;
+  if (estado === "inactivo") where.active = false;
+  if (estado === "agotado") {
+    where.variants = { every: { OR: [{ active: false }, { stockActual: 0 }] } };
+  }
+
+  const [total, products, categories] = await Promise.all([
+    db.product.count({ where }),
     db.product.findMany({
+      where,
       include: {
         category: { include: { parent: true } },
         variants: { orderBy: { createdAt: "asc" } },
+        images: { orderBy: { position: "asc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
+      skip: (page - 1) * perPage,
+      take: perPage,
     }),
     db.category.findMany({
       where: { active: true },
       orderBy: { position: "asc" },
-      select: { id: true, name: true, parentId: true },
+      select: {
+        id: true,
+        name: true,
+        parentId: true,
+        parent: { select: { name: true } },
+      },
     }),
   ]);
 
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+
   // Slide-over controlado por URL: ?nuevo=1 / ?editar=<id>
   let sheetInitial: ProductDraft | undefined;
-  const editing = editar ? products.find((p) => p.id === editar) : undefined;
+  const editing = editar
+    ? await db.product.findUnique({
+        where: { id: editar },
+        include: {
+          variants: { orderBy: { createdAt: "asc" } },
+          images: { orderBy: { position: "asc" } },
+        },
+      })
+    : null;
   if (editing) {
     sheetInitial = {
       id: editing.id,
@@ -57,6 +123,11 @@ export default async function CatalogPage({
       description: editing.description ?? "",
       active: editing.active,
       featured: editing.featured,
+      images: editing.images.map((img) => ({
+        id: img.id,
+        url: storage().urlFor(img.url),
+        alt: img.alt,
+      })),
       variants: editing.variants
         .filter((v) => v.active)
         .map((v) => ({
@@ -79,37 +150,59 @@ export default async function CatalogPage({
 
   return (
     <>
+      <CatalogToolbar
+        total={total}
+        categories={categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          parentName: c.parent?.name ?? null,
+        }))}
+      />
+
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
-        <div className="grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_0.8fr_0.6fr] gap-3.5 border-b border-[#f0ece6] px-6 py-4 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase">
+        <div
+          className={`${GRID} border-b border-[#f0ece6] py-4 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase`}
+        >
           <span>Producto</span>
           <span>Categoría</span>
-          <span>Precio online</span>
+          <span>Precio</span>
           <span>Stock</span>
           <span>Estado</span>
           <span />
         </div>
+
         {products.map((p) => {
           const activeVariants = p.variants.filter((v) => v.active);
           const stock = activeVariants.reduce((s, v) => s + v.stockActual, 0);
           const low = activeVariants.some((v) => v.stockActual <= v.stockMin);
-          const soldOut = stock === 0;
           const prices = activeVariants.map((v) => Number(v.priceCopOnline));
           const min = prices.length ? Math.min(...prices) : 0;
-          const max = prices.length ? Math.max(...prices) : 0;
+          // Con varios precios se muestra "Desde <el menor>": el rango obligaba
+          // a leer dos cifras para entender desde cuánto arranca el producto.
+          const variesPrice = new Set(prices).size > 1;
           const firstSku = activeVariants[0]?.sku ?? "—";
-          const estado = !p.active
-            ? { label: "Inactivo", bg: "#f0ece6", color: "#8a8f98" }
-            : soldOut
-              ? { label: "Agotado", bg: "#fce8e8", color: "#E5484D" }
-              : { label: "Activo", bg: "#e1f6ee", color: "#1FB57A" };
+          const image = p.images[0];
 
           return (
             <div
               key={p.id}
-              className="grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_0.8fr_0.6fr] items-center gap-3.5 border-b border-[#f7f4f0] px-6 py-3.5 text-[13px] hover:bg-[#faf8f5]"
+              className={`${GRID} border-b border-[#f7f4f0] py-3.5 text-[13px] last:border-0 hover:bg-[#faf8f5]`}
             >
               <div className="flex min-w-0 items-center gap-3">
-                <CategoryTile color={p.category.color} icon={p.category.icon} size={42} />
+                {image ? (
+                  <div className="relative size-[42px] shrink-0 overflow-hidden rounded-[10px]">
+                    <Image
+                      src={storage().urlFor(image.url)}
+                      alt={image.alt ?? p.name}
+                      fill
+                      sizes="42px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <CategoryTile color={p.category.color} icon={p.category.icon} size={42} />
+                )}
                 <div className="min-w-0">
                   <div className="truncate font-semibold text-kora-black">{p.name}</div>
                   <div className="text-[11.5px] text-[#9aa0ab]">
@@ -118,28 +211,43 @@ export default async function CatalogPage({
                   </div>
                 </div>
               </div>
+
               <span className="text-muted-foreground">
                 {p.category.parent
                   ? `${p.category.parent.name} › ${p.category.name}`
                   : p.category.name}
               </span>
+
               <span className="font-bold text-kora-black">
-                {min === max ? formatCop(min) : `${formatCop(min)} – ${formatCop(max)}`}
+                {variesPrice && (
+                  <span className="mr-1 text-[11.5px] font-medium text-[#9aa0ab]">
+                    Desde
+                  </span>
+                )}
+                {formatCop(min)}
               </span>
-              <span
-                className="font-bold"
-                style={{ color: low ? "#E5484D" : "#16181D" }}
-              >
+
+              <span className="font-bold" style={{ color: low ? "#E5484D" : "#16181D" }}>
                 {stock}
               </span>
+
               <span>
-                <span
-                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                  style={{ background: estado.bg, color: estado.color }}
-                >
-                  {estado.label}
-                </span>
+                {canEdit ? (
+                  <StatusSwitch productId={p.id} active={p.active} />
+                ) : (
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={
+                      p.active
+                        ? { background: "#FFE9DD", color: "#FF5A1F" }
+                        : { background: "#f0ece6", color: "#8a8f98" }
+                    }
+                  >
+                    {p.active ? "Activo" : "Inactivo"}
+                  </span>
+                )}
               </span>
+
               {canEdit ? (
                 <Link
                   href={`/admin/catalogo?editar=${p.id}`}
@@ -153,19 +261,38 @@ export default async function CatalogPage({
             </div>
           );
         })}
+
         {products.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            Aún no hay productos. Usa “Nuevo producto” arriba para crear el primero.
-          </p>
+          <div className="py-16 text-center">
+            <PackageSearch className="mx-auto size-12 text-[#e2ddd6]" />
+            <p className="mt-3 text-[15px] font-semibold text-kora-black">
+              {total === 0 && !q && !categoria && !estado
+                ? "Aún no hay productos"
+                : "Ningún producto coincide"}
+            </p>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              {total === 0 && !q && !categoria && !estado
+                ? "Usa “Nuevo producto” o “Importar Excel” para crear el primero."
+                : "Prueba con otra búsqueda o quita los filtros."}
+            </p>
+          </div>
         )}
       </div>
 
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        perPage={perPage}
+        params={{ q, categoria, estado, por: sp.por }}
+        basePath="/admin/catalogo"
+      />
+
       {sheetOpen && (
-        <ProductSheet
-          categories={categoryTree(categories)}
-          initial={sheetInitial}
-        />
+        <ProductSheet categories={categoryTree(categories)} initial={sheetInitial} />
       )}
+
+      {Boolean(importar) && canCreate && <ImportSheet />}
     </>
   );
 }

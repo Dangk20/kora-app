@@ -11,5 +11,8 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // Base desechable que Prisma usa para calcular migraciones
+    // (`prisma migrate diff --from-migrations`). Solo desarrollo.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
