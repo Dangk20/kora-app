@@ -28,7 +28,16 @@ const labelCls = "mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]";
 
 type Country = "CO" | "US";
 
-export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
+/** Datos del comprador con sesión, para no hacerle escribir lo que ya sabemos. */
+export type BuyerDefaults = { name: string; email: string; phone: string } | null;
+
+export function CheckoutView({
+  initialCountry,
+  buyer,
+}: {
+  initialCountry: Country;
+  buyer?: BuyerDefaults;
+}) {
   const { lines, ready, clear } = useCart();
   const [cart, setCart] = useState<ResolvedCart | null>(null);
   const [loading, startLoading] = useTransition();
@@ -177,6 +186,7 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
                   {isCO ? "Nombre completo" : "Full name"}
                 </label>
                 <input id="name" name="name" required className={inputCls}
+                  defaultValue={buyer?.name ?? ""}
                   placeholder={isCO ? "Ej. Laura Gómez" : "Ex. John Smith"} />
                 {fieldError("name")}
               </div>
@@ -191,6 +201,7 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
                   </span>
                   <input id="phone" name="phone" required inputMode="tel"
                     className={inputCls}
+                    defaultValue={buyer?.phone ?? ""}
                     placeholder={isCO ? "300 123 4567" : "(305) 555-0123"} />
                 </div>
                 {fieldError("phone")}
@@ -201,7 +212,16 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
                   {isCO ? "Correo electrónico" : "Email"}
                 </label>
                 <input id="email" name="email" type="email" required className={inputCls}
+                  defaultValue={buyer?.email ?? ""}
+                  readOnly={Boolean(buyer)}
                   placeholder="correo@ejemplo.com" />
+                {/* Con sesión el correo es la credencial de acceso: se cambia
+                    desde la cuenta, no aquí. */}
+                {buyer && (
+                  <p className="mt-1 text-[11.5px] text-[#9aa0ab]">
+                    Es el correo de tu cuenta. Para cambiarlo, entra a Mi cuenta.
+                  </p>
+                )}
                 {fieldError("email")}
               </div>
 

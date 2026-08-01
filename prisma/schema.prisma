@@ -237,8 +237,18 @@ model Customer {
   cashbackCop Decimal @default(0) @db.Decimal(12, 2)
   cashbackUsd Decimal @default(0) @db.Decimal(12, 2)
 
+  // ── Cuenta de la tienda ──
+  // La credencial cuelga del cliente y no de una tabla aparte: así,
+  // registrarse con un correo que ya compró como invitado es PONERLE
+  // CONTRASEÑA a un cliente que ya existe, y su historial y su cashback
+  // aparecen solos. Nulo = compró como invitado y nunca creó cuenta.
+  passwordHash   String?
+  accountActive  Boolean   @default(true)
+  accountCreated DateTime?
+
   orders             Order[]
   cashbackMovements  CashbackMovement[]
+  sessions           BuyerSession[]
   couponRedemptions  CouponRedemption[]
   campaignRecipients CampaignRecipient[]
   createdAt          DateTime            @default(now())
@@ -466,6 +476,42 @@ model CouponRedemption {
 
   @@index([couponId])
   @@map("coupon_redemptions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// SESIÓN DEL COMPRADOR — deliberadamente NO es Auth.js
+//
+// Los operadores se autentican con Auth.js contra `users`. El comprador NO,
+// y la separación es el punto: si compartieran mecanismo, la protección del
+// panel dependería de que toda ruta futura se acordara de mirar una marca en
+// el token, y una que se olvide es un comprador confirmando pedidos. Con
+// cookie y camino de verificación distintos, la ruta nueva del panel es
+// segura por omisión.
+//
+// Opaca y en la base porque un JWT no se puede retirar: cerrar sesión debe
+// surtir efecto YA, y detrás de esta cuenta hay saldo gastable. Es la misma
+// decisión que rige requirePermission(), que verifica contra la base.
+// ─────────────────────────────────────────────────────────────
+
+model BuyerSession {
+  id String @id @default(cuid())
+
+  // El HASH del identificador que viaja en la cookie, nunca el identificador.
+  // Quien pueda leer esta tabla no puede suplantar a nadie con lo que ve —
+  // mismo criterio que las contraseñas, y por el mismo motivo.
+  tokenHash String @unique
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  userAgent  String? // solo diagnóstico
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@index([expiresAt]) // barrido de caducadas
+  @@map("buyer_sessions")
 }
 
 // ─────────────────────────────────────────────────────────────

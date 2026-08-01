@@ -21,6 +21,8 @@ import {
 } from "./message";
 import { whatsappNumberFor } from "./settings";
 import { toE164 } from "@/modules/customers/phone";
+import { currentBuyer } from "@/modules/buyer/session-cookie";
+import { resolveOrderCustomer } from "./customer-link";
 import { validateCoupon } from "@/modules/coupons/validate";
 
 /**
@@ -129,6 +131,9 @@ export async function createOrder(
   const phone = toE164(data.phone, data.country);
   const subtotal = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
 
+  // Si hay sesión de comprador, su pedido se ata a SU cliente por identidad.
+  const buyer = await currentBuyer();
+
   // ── Cupón ──
   // Se REVALIDA por completo aquí, aunque ya se validara al aplicarlo: entre
   // una cosa y otra el cupón pudo agotarse por otro comprador o pausarse desde
@@ -175,38 +180,17 @@ export async function createOrder(
 
   try {
     const order = await db.$transaction(async (tx) => {
-      // Cliente silencioso (PED_HU001 §4): match por email o teléfono.
-      const found = await tx.customer.findFirst({
-        where: { OR: [{ email: data.email }, { phone }] },
+      const customer = await resolveOrderCustomer(tx, {
+        buyerCustomerId: buyer?.customerId ?? null,
+        name: data.name,
+        email: data.email,
+        phone,
+        document: data.document,
+        country: data.country,
+        city: data.city,
+        address,
+        acceptsMarketing: data.acceptsMarketing,
       });
-      const customer = found
-        ? await tx.customer.update({
-            where: { id: found.id },
-            data: {
-              name: data.name,
-              phone,
-              email: data.email,
-              document: data.document ?? found.document,
-              country: data.country,
-              city: data.city,
-              address,
-              // El opt-in nunca se revoca solo: si ya aceptó, sigue aceptado.
-              acceptsMarketing: found.acceptsMarketing || data.acceptsMarketing,
-            },
-          })
-        : await tx.customer.create({
-            data: {
-              name: data.name,
-              phone,
-              email: data.email,
-              document: data.document,
-              country: data.country,
-              city: data.city,
-              address,
-              source: "WEB",
-              acceptsMarketing: data.acceptsMarketing,
-            },
-          });
 
       // Consumo del uso, con ESCRITURA CONDICIONAL: solo incrementa si sigue
       // activo y por debajo de su máximo. Leer, comprobar y luego escribir

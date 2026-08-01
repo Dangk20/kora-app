@@ -6,6 +6,7 @@ import { MessageCircle, Search, User } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import { listCategories } from "@/modules/storefront/queries";
 import { CartProvider } from "@/modules/cart/cart-context";
+import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
@@ -25,9 +26,10 @@ export default async function StoreLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [currency, categories] = await Promise.all([
+  const [currency, categories, buyer] = await Promise.all([
     activeCurrency(),
     listCategories(),
+    currentBuyer(),
   ]);
 
   // Misma fuente que los pedidos: si cambia el destino, cambia en todas partes.
@@ -75,17 +77,18 @@ export default async function StoreLayout({
 
           <CurrencySwitch current={currency} />
 
-          {/* La cuenta de comprador llega con el módulo ACC. */}
-          <div
-            className="hidden items-center gap-2.5 text-[#6b7078] lg:flex"
-            title="Disponible próximamente"
+          <Link
+            href={buyer ? "/cuenta" : "/cuenta/entrar"}
+            className="hidden items-center gap-2.5 text-[#A0A4AD] hover:text-white lg:flex"
           >
             <User className="size-[21px]" aria-hidden />
             <div className="text-[11px] leading-tight">
-              <p>Mi cuenta</p>
-              <p className="font-semibold text-[#A0A4AD]">Próximamente</p>
+              <p>{buyer ? "Mi cuenta" : "Entrar"}</p>
+              <p className="font-semibold text-[#F5F5F7]">
+                {buyer ? buyer.name.split(" ")[0] : "Crear cuenta"}
+              </p>
             </div>
-          </div>
+          </Link>
           <CartButton />
         </div>
 

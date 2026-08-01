@@ -10,6 +10,7 @@
 // Los comandos de package.json siguen existiendo para ejecución manual: llaman
 // a estas mismas funciones, así que la lógica no está duplicada.
 
+import { pruneExpiredSessions } from "@/modules/buyer/session";
 import { expireCashback } from "@/modules/cashback/ledger";
 import { describeVerification, verifyCashbackLedger } from "@/modules/cashback/verify";
 import { findLedgerMismatches } from "@/modules/inventory/engine";
@@ -108,6 +109,18 @@ export const JOBS: readonly JobDefinition[] = [
         throw new Error(describeVerification(v));
       }
       return { summary: "el libro de cashback cuadra en todos los clientes" };
+    },
+  },
+  {
+    name: "sessions:prune",
+    description: "Borra las sesiones de compradores ya caducadas",
+    // No es seguridad —una sesión caducada ya no autentica— sino higiene: sin
+    // barrido, la tabla crece con cada sesión que alguien abrió y nunca cerró.
+    everyMs: 24 * HORA,
+    timeoutMs: 5 * MINUTO,
+    async run() {
+      const n = await pruneExpiredSessions();
+      return { summary: n === 0 ? "sin sesiones caducadas" : `${n} sesión(es) borradas` };
     },
   },
   {
