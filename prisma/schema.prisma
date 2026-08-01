@@ -230,11 +230,15 @@ model Customer {
   acceptsMarketing Boolean        @default(false) // Habeas Data: opt-in explícito
   unsubscribedAt   DateTime?
 
-  // Materializado desde points_movements (mismo patrón que el stock)
-  pointsBalance Int @default(0)
+  // Saldo de Kora Cashback materializado desde cashback_movements (mismo patrón
+  // que el stock): es la CONSECUENCIA del libro, no un número que se edite.
+  // Dos bolsas separadas porque no existe tasa de cambio en KORA y es deliberado:
+  // sumarlas daría un número sin significado que además parecería correcto.
+  cashbackCop Decimal @default(0) @db.Decimal(12, 2)
+  cashbackUsd Decimal @default(0) @db.Decimal(12, 2)
 
   orders             Order[]
-  pointsMovements    PointsMovement[]
+  cashbackMovements  CashbackMovement[]
   couponRedemptions  CouponRedemption[]
   campaignRecipients CampaignRecipient[]
   createdAt          DateTime            @default(now())
@@ -277,7 +281,7 @@ model Order {
   total         Decimal @db.Decimal(12, 2)
 
   couponRedemption CouponRedemption?
-  whatsappMessage  String? // mensaje pre-armado enviado por wa.me
+  whatsappMessage  String? // mensaje pre-armado (se envía por api.whatsapp.com/send)
   note             String?
 
   // ── Snapshot del comprador y la entrega (PED_HU001/002) ──
@@ -309,10 +313,10 @@ model Order {
   confirmedById String?
   confirmedBy   User?     @relation("OrderConfirmedBy", fields: [confirmedById], references: [id])
 
-  items           OrderItem[]
-  stockMovements  StockMovement[]
-  statusHistory   OrderStatusHistory[]
-  pointsMovements PointsMovement[]
+  items             OrderItem[]
+  stockMovements    StockMovement[]
+  statusHistory     OrderStatusHistory[]
+  cashbackMovements CashbackMovement[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -465,29 +469,55 @@ model CouponRedemption {
 }
 
 // ─────────────────────────────────────────────────────────────
-// KORAPUNTOS — mismo patrón contable que el inventario
+// KORA CASHBACK — mismo patrón contable que el inventario, pero con DINERO
+//
+// Un libro por LOTES: cada acreditación nace con su moneda, su pedido de
+// origen, su vencimiento a 12 meses y su remanente. Consumos y vencimientos
+// son movimientos negativos que apuntan al lote que agotan. Sin lotes no
+// habría forma de saber qué parte del saldo caduca el mes que viene.
 // ─────────────────────────────────────────────────────────────
 
-enum PointsReason {
-  EARN_ORDER // acredita sobre order.confirmed
-  REDEEM
-  ADJUST
-  EXPIRE
+enum CashbackType {
+  EARN // acredita sobre order.confirmed — es el único que abre lote
+  REDEEM // gasta saldo en una compra
+  EXPIRE // el lote cumplió 12 meses
+  ADJUST // corrección manual, siempre con nota
 }
 
-model PointsMovement {
-  id         String       @id @default(cuid())
+model CashbackMovement {
+  id         String   @id @default(cuid())
   customerId String
-  customer   Customer     @relation(fields: [customerId], references: [id])
-  delta      Int // positivo acredita, negativo canjea/expira
-  reason     PointsReason
-  orderId    String?
-  order      Order?       @relation(fields: [orderId], references: [id])
-  note       String?
-  createdAt  DateTime     @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  @@index([customerId, createdAt])
-  @@map("points_movements")
+  delta    Decimal      @db.Decimal(12, 2) // positivo acredita, negativo consume/vence
+  currency Currency // las dos bolsas nunca se suman ni se convierten
+  type     CashbackType
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  // Solo en los lotes (type = EARN): cuánto queda sin gastar y cuándo caduca.
+  // Se baja al consumir; vencer lo lleva a cero mediante un movimiento EXPIRE,
+  // nunca borrando el lote: el libro tiene que seguir explicando el saldo.
+  remaining Decimal?  @db.Decimal(12, 2)
+  expiresAt DateTime?
+
+  // A qué lote agota este consumo o vencimiento.
+  sourceMovementId String?
+  sourceMovement   CashbackMovement?  @relation("CashbackLote", fields: [sourceMovementId], references: [id])
+  consumptions     CashbackMovement[] @relation("CashbackLote")
+
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([customerId, currency, createdAt])
+  @@index([currency, expiresAt]) // barrido del vencimiento
+  @@index([orderId, type]) // idempotencia: ¿ya hay lote de este pedido?
+  // Además, en migración: índice único PARCIAL `cashback_un_lote_por_pedido`
+  // sobre (orderId) WHERE type = 'EARN'. No se puede expresar aquí, pero es la
+  // garantía real de que un pedido no acredita dos veces: la comprobación del
+  // manejador no es atómica y lo que se duplicaría es dinero.
+  @@map("cashback_movements")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -635,7 +665,7 @@ model Banner {
   @@map("banners")
 }
 
-// Configuración operable (reglas KoraPuntos, WhatsApp de la tienda, etc.)
+// Configuración operable (WhatsApp de la tienda, reglas de negocio, etc.)
 model Setting {
   key       String   @id
   value     Json

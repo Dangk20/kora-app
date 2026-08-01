@@ -45,11 +45,17 @@ context: |
 
   NOMENCLATURA DE DOMINIO:
   - "Módulo de clientes" — NUNCA llamarlo "CRM" en documentos, specs, tasks ni UI.
-  - KoraPuntos: 1 punto por cada $1.000 COP, acreditados al confirmar el pedido. El CANJE
-    (tasa, caducidad, interacción con cupones, USD) sigue SIN DEFINIR: no proponer redención.
+  - "Kora Cashback" — NUNCA "KoraPuntos" ni "puntos": ese producto quedó sin efecto el 1 ago
+    2026 y era otra cosa (un contador abstracto, sin canje). Cashback es DINERO: 3 % del valor
+    efectivamente pagado con dinero (después de cupones, promociones y del propio cashback),
+    acreditado al confirmar el pedido, con vigencia de 12 meses por lote.
+  - El saldo de cashback SOLO cambia dentro de src/modules/cashback/ledger.ts, con movimiento
+    en el libro y materialización en LA MISMA transacción — la regla 1 aplicada a dinero.
+    Las bolsas de COP y USD NUNCA se suman ni se convierten. El canje en el checkout (con su
+    exclusión mutua con cupones) todavía no está construido: es un change aparte.
 
   FUENTE DE REQUISITOS: las historias de usuario ya escritas viven en ../hus-<área>.md
-  (pedidos, clientes, cupones, catalogo, tienda, email, korapuntos) y están espejadas en el
+  (pedidos, clientes, cupones, catalogo, tienda, email) y están espejadas en el
   tablero Notion "Kora Project". Antes de escribir specs, buscar la HU correspondiente y trazar
   contra su código (p. ej. PED_HU003, CAT_HU001). Si no existe HU para lo pedido, decirlo en el
   proposal en vez de inventar requisitos.
@@ -71,7 +77,7 @@ rules:
   proposal:
     - Empezar declarando a qué semana del plan (S1–S18) y a qué HU(s) pertenece el cambio; si no mapea a ninguna, decirlo explícitamente.
     - Incluir siempre una sección "Fuera de alcance" — el proyecto tiene fecha fija y el alcance se defiende.
-    - Si el cambio depende de un insumo pendiente del cliente (accesos SSH/DNS, catálogo Excel, fotos, número de WhatsApp comercial, modelo de canje de KoraPuntos), declararlo como bloqueo antes de proponer construirlo.
+    - Si el cambio depende de un insumo pendiente del cliente (accesos SSH/DNS, catálogo Excel, fotos, número de WhatsApp comercial, política de cambios de producto), declararlo como bloqueo antes de proponer construirlo.
   specs:
     - Escribir requisitos observables y verificables, trazados al código de HU cuando exista.
     - Todo requisito que toque stock, precios, permisos o estados de pedido debe declarar su invariante, no solo el camino feliz.

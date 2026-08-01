@@ -6,6 +6,7 @@
 import { useRouter } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
 import { KoraFlame } from "@/components/kora-flame";
+import type { CashbackSummary } from "@/modules/cashback/balance";
 import type { CustomerMetrics, TopCategory } from "@/modules/customers/profile";
 
 function iniciales(nombre: string): string {
@@ -30,6 +31,95 @@ function Metrica({ label, value, hint }: { label: string; value: string; hint?: 
   );
 }
 
+const fecha = (d: Date) =>
+  new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", year: "numeric" }).format(
+    new Date(d),
+  );
+
+const ETIQUETA_MOVIMIENTO = {
+  EARN: "Ganado",
+  REDEEM: "Usado",
+  EXPIRE: "Vencido",
+  ADJUST: "Ajuste",
+} as const;
+
+/**
+ * Kora Cashback del cliente.
+ *
+ * Las dos monedas se muestran por separado y NUNCA se suman: no existe tasa de
+ * cambio en KORA y es deliberado. Un total que las mezclara sería un número sin
+ * significado que además parecería correcto.
+ */
+function Cashback({ resumen }: { resumen: CashbackSummary }) {
+  const bolsas = (
+    [
+      { currency: "COP" as const, saldo: resumen.available.cop, pendiente: resumen.pending.cop, vence: resumen.nextExpiry.cop },
+      { currency: "USD" as const, saldo: resumen.available.usd, pendiente: resumen.pending.usd, vence: resumen.nextExpiry.usd },
+    ]
+  ).filter((b) => b.saldo > 0 || b.pendiente > 0);
+
+  return (
+    <div className="rounded-[12px] border border-[#ffd9c7] bg-[linear-gradient(120deg,#FFF4EF,#fff)] px-4 py-3.5">
+      <div className="flex items-center gap-2.5">
+        <KoraFlame className="size-6" />
+        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Kora Cashback
+        </div>
+      </div>
+
+      {bolsas.length === 0 ? (
+        // Un cero sin explicación se lee como un error. El cashback se acredita
+        // al CONFIRMAR el pedido: mientras nadie confirme, no hay nada que ver.
+        <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+          Todavía sin saldo. El cashback se acredita al confirmar un pedido: el 3 % de lo que el
+          cliente paga con dinero.
+        </p>
+      ) : (
+        <div className="mt-2.5 space-y-2.5">
+          {bolsas.map((b) => (
+            <div key={b.currency}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[17px] font-extrabold text-kora-black">
+                  {money(b.saldo, b.currency)}
+                </span>
+                <span className="text-[11px] text-muted-foreground">{b.currency}</span>
+              </div>
+              <div className="text-[11.5px] text-muted-foreground">
+                {b.pendiente > 0 && (
+                  <span>
+                    {money(b.pendiente, b.currency)} pendiente de confirmar
+                    {b.vence ? " · " : ""}
+                  </span>
+                )}
+                {b.vence && <span>vence el {fecha(b.vence)}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {resumen.history.length > 0 && (
+        <div className="mt-3 border-t border-[#ffd9c7] pt-2.5">
+          {resumen.history.map((m) => (
+            <div key={m.id} className="flex items-baseline justify-between gap-3 py-1 text-[12px]">
+              <span className="text-muted-foreground">
+                {ETIQUETA_MOVIMIENTO[m.type]}
+                {m.orderNumber ? ` · pedido ${m.orderNumber}` : ""}
+              </span>
+              <span
+                className={m.delta > 0 ? "font-semibold text-kora-black" : "text-muted-foreground"}
+              >
+                {m.delta > 0 ? "+" : "−"}
+                {money(Math.abs(m.delta), m.currency)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Dato({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex justify-between gap-3 py-1.5 text-sm">
@@ -44,6 +134,7 @@ function Dato({ label, value }: { label: string; value: string | null }) {
 export function CustomerSheet({
   customer,
   metrics,
+  cashback,
   top,
   whatsapp,
   backTo,
@@ -56,9 +147,9 @@ export function CustomerSheet({
     country: string;
     city: string | null;
     address: string | null;
-    pointsBalance: number;
   };
   metrics: CustomerMetrics;
+  cashback: CashbackSummary;
   top: TopCategory[];
   whatsapp: string | null;
   backTo: string;
@@ -144,19 +235,7 @@ export function CustomerSheet({
             />
           </div>
 
-          {/* Saldo de fidelización. Mientras Kora Cashback no exista muestra 0
-              sin error, como pide CLI_HU002 — el hueco queda listo. */}
-          <div className="flex items-center gap-2.5 rounded-[12px] border border-[#ffd9c7] bg-[linear-gradient(120deg,#FFF4EF,#fff)] px-4 py-3.5">
-            <KoraFlame className="size-6" />
-            <div>
-              <div className="text-[17px] font-extrabold text-kora-black">
-                {customer.pointsBalance}
-              </div>
-              <div className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                Saldo de fidelización
-              </div>
-            </div>
-          </div>
+          <Cashback resumen={cashback} />
 
           {whatsapp ? (
             <a

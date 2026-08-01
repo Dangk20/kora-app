@@ -40,7 +40,8 @@ pnpm db:seed        # roles, permisos, admin dev, catálogo demo
 pnpm dev            # desarrollo · pnpm start = build de producción
 pnpm test           # Vitest (integración contra el Postgres local — debe estar arriba)
 pnpm typecheck && pnpm lint && pnpm build   # lo que corre el CI
-pnpm ledger:verify  # verificación del libro contable (futuro cron nocturno)
+pnpm ledger:verify  # verificación del libro de inventario (corre también en el worker)
+pnpm cashback:verify # verificación del libro de Kora Cashback — avisa, no corrige
 ```
 
 Login dev: `admin@kora.local` / `kora-dev-2026` · cajero: `caja@kora.local` / `caja-dev-2026`.
@@ -72,5 +73,7 @@ El detalle vivo está en `../bitacora-sprints-kora.md`. Resumen al 19 jul 2026: 
 **Carrito** (`src/modules/cart/`): vive en localStorage y guarda SOLO `variantId` + `qty`. Los precios se resuelven en servidor (`resolveCart`) al pintar el carrito y otra vez al crear el pedido — nunca se confía en un precio que venga del navegador.
 
 **Pedidos** (`src/modules/orders/`): `createOrder()` crea el pedido en una transacción con snapshot inmutable, cliente silencioso por match de email/teléfono E.164, vigencia 2 h e idempotencia por `checkoutToken` único. **No toca stock**. El enlace de WhatsApp usa `api.whatsapp.com/send`, **nunca `wa.me`**: su redirección rompe el emoji del saludo.
+
+**Kora Cashback** (`src/modules/cashback/`): sustituye a KoraPuntos, que quedó sin efecto el 1 ago 2026 — **la palabra "puntos" no vuelve a aparecer**, igual que "CRM". El 3 % de lo pagado **con dinero** (después de cupones y del propio cashback) se acredita al confirmar el pedido, en **lotes** con vigencia de 12 meses. Reglas que no se negocian: el saldo **solo cambia dentro de `ledger.ts`** —movimiento en el libro y materialización en la MISMA transacción, la regla 1 aplicada a dinero—; las bolsas de COP y USD **nunca se suman ni se convierten**; el consumo va del lote **más próximo a vencer**; vencer **registra un movimiento, no borra**. Acreditar dos veces lo impide el índice único parcial `cashback_un_lote_por_pedido`, no solo la comprobación del manejador: leer no es reservar y lo que se duplicaría es dinero. `pnpm cashback:verify` **avisa y no corrige**. **El canje en el checkout todavía no existe** — `consumeCashback()` está construido y probado, pero nada lo llama: conectarlo toca `createOrder()` e implica la exclusión mutua con cupones.
 
 **`confirmOrder()` es el evento central del sistema**: en UNA transacción descuenta stock por `applyStockMovement`, cambia el estado y escribe `order.confirmed` en `domain_events`. Es idempotente (segundo clic no duplica). El estado se mueve solo por `canTransition()` (`modules/orders/status.ts`): nunca retrocede. Expiración de pendientes: `pnpm orders:expire` (cron cada 5 min en prod). **El worker que consume la outbox todavía no existe** — los eventos se acumulan en PENDING a propósito.

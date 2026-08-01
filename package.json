@@ -14,6 +14,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "ledger:verify": "tsx scripts/verify-ledger.ts",
+    "cashback:verify": "tsx scripts/verify-cashback.ts",
     "whatsapp:set": "tsx scripts/set-whatsapp.ts",
     "orders:expire": "tsx scripts/expire-orders.ts",
     "spec": "openspec",

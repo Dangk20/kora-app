@@ -4,7 +4,7 @@
 //
 // `confirmOrder` es EL evento central del sistema: en una sola transacción
 // descuenta stock por el motor de inventario, cambia el estado y escribe
-// `order.confirmed` en la outbox. De ese evento cuelgan cliente, KoraPuntos,
+// `order.confirmed` en la outbox. De ese evento cuelgan cliente, Kora Cashback,
 // ventas y remarketing.
 import { revalidatePath } from "next/cache";
 import type { OrderStatus } from "@/generated/prisma/client";

@@ -10,6 +10,8 @@
 // Los comandos de package.json siguen existiendo para ejecución manual: llaman
 // a estas mismas funciones, así que la lógica no está duplicada.
 
+import { expireCashback } from "@/modules/cashback/ledger";
+import { describeVerification, verifyCashbackLedger } from "@/modules/cashback/verify";
 import { findLedgerMismatches } from "@/modules/inventory/engine";
 import { expireStaleOrders } from "@/modules/orders/expire";
 import { outboxHealth } from "@/modules/events/health";
@@ -71,6 +73,41 @@ export const JOBS: readonly JobDefinition[] = [
         throw new Error(`${mismatches.length} variante(s) no cuadran: ${detalle}`);
       }
       return { summary: "el libro contable cuadra en todas las variantes" };
+    },
+  },
+  {
+    name: "cashback:expire",
+    description: "Vence los lotes de Kora Cashback que cumplieron 12 meses",
+    // Un lote vive 12 meses: revisar a diario acota el error a un día, que
+    // frente a esa ventana es despreciable. Si no corriera, el cashback viviría
+    // para siempre — dinero que el negocio creía haber recuperado.
+    everyMs: 24 * HORA,
+    timeoutMs: 15 * MINUTO,
+    async run() {
+      const r = await expireCashback();
+      if (r.lots === 0) return { summary: "sin lotes de cashback por vencer" };
+      // Los importes por moneda se informan por separado: no existe tasa de
+      // cambio en KORA y sumarlos daría un número sin significado.
+      const montos = [r.cop > 0 ? `${r.cop} COP` : null, r.usd > 0 ? `${r.usd} USD` : null]
+        .filter(Boolean)
+        .join(" + ");
+      return { summary: `${r.lots} lote(s) vencidos por ${montos}` };
+    },
+  },
+  {
+    name: "cashback:verify",
+    description: "Comprueba que los saldos de cashback cuadran con su libro",
+    // Recorre todos los clientes: de madrugada, como la del inventario.
+    everyMs: 24 * HORA,
+    timeoutMs: 15 * MINUTO,
+    async run() {
+      const v = await verifyCashbackLedger();
+      if (!v.ok) {
+        // AVISA, NO CORRIGE — igual que el libro del inventario, y con más
+        // razón: aquí lo descuadrado es dinero que alguien puede gastar.
+        throw new Error(describeVerification(v));
+      }
+      return { summary: "el libro de cashback cuadra en todos los clientes" };
     },
   },
   {
