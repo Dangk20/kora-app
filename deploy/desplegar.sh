@@ -50,11 +50,23 @@ restaurar() {
   exit 1
 }
 
+# Sustituye la línea si existe y la AÑADE si no. Con `sed` a secas, una
+# variable que todavía no está en el archivo se ignoraba en silencio: el
+# servicio arrancaba con el valor por defecto del compose —una imagen local
+# inexistente— y fallaba sin que el despliegue se enterara.
+fijar_var() {
+  local clave="$1" valor="$2"
+  if grep -q "^${clave}=" "$ENVFILE"; then
+    sed -i "s|^${clave}=.*|${clave}=${valor}|" "$ENVFILE"
+  else
+    printf '%s=%s\n' "$clave" "$valor" >> "$ENVFILE"
+  fi
+}
+
 escribir_etiquetas() {
-  local app="$1" mig="$2" wrk="$3"
-  sed -i "s|^KORA_IMAGE=.*|KORA_IMAGE=${app}|"                   "$ENVFILE"
-  sed -i "s|^KORA_MIGRATOR_IMAGE=.*|KORA_MIGRATOR_IMAGE=${mig}|" "$ENVFILE"
-  sed -i "s|^KORA_WORKER_IMAGE=.*|KORA_WORKER_IMAGE=${wrk}|"     "$ENVFILE"
+  fijar_var KORA_IMAGE          "$1"
+  fijar_var KORA_MIGRATOR_IMAGE "$2"
+  fijar_var KORA_WORKER_IMAGE   "$3"
 }
 
 cp "$ENVFILE" "$ENVFILE.bak"
