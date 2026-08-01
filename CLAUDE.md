@@ -8,6 +8,25 @@ Documentos rectores (leer antes de decidir):
 - `../../business/hitos-semanales-kora.md` — cronograma cara al cliente (no tocar sin razón).
 - Prototipo aprobado: `../design-handoff/Kora.dc.html` + `HANDOFF.md`.
 
+## Metodología de trabajo: OpenSpec (obligatoria desde el 30 jul 2026)
+
+**Nada se construye sin spec.** Cada semana del plan y cada plan de acción se ejecuta como un *change* de OpenSpec (`@fission-ai/openspec`, schema `spec-driven`): se escribe primero **qué** y **por qué**, luego **cómo**, luego se implementa contra esa spec.
+
+Ciclo por cada pieza de trabajo (comandos de Claude Code):
+
+| Paso | Comando | Qué produce |
+|---|---|---|
+| 1. Proponer | `/opsx:propose "<idea>"` | `proposal.md` (qué y por qué) → `specs/<capacidad>/spec.md` (requisitos verificables) → `design.md` (cómo) → `tasks.md` (pasos) |
+| 2. Revisar | `pnpm spec status --change <nombre>` · `pnpm spec show <nombre>` | Estado de artefactos antes de tocar código |
+| 3. Implementar | `/opsx:apply` | Código contra las tareas, con evidencia por tarea |
+| 4. Ajustar | `/opsx:update` | Cambios de alcance a mitad de camino, en la spec — no en la cabeza |
+| 5. Cerrar | `/opsx:archive` | Archiva el change y **actualiza la bitácora de sprints** |
+
+- **Un change por semana del plan o por módulo** (`s06-busqueda-movil`, `outbox-worker`, `modulo-clientes`, …), en kebab-case y en inglés/código; el contenido va en español.
+- **El contexto del proyecto vive en `openspec/config.yaml`** — reglas innegociables, nomenclatura, fuente de requisitos y guía por artefacto. Se inyecta automáticamente en cada artefacto que se genera. Si cambia una regla del proyecto, se cambia **ahí** además de aquí.
+- **Las HUs siguen siendo la fuente de requisitos** (`../hus-<área>.md` + Notion). Las specs de OpenSpec trazan contra ellas (`PED_HU003`, `CAT_HU001`, …); no las reemplazan ni las duplican.
+- El CLI local está fijado en `devDependencies`: `pnpm spec <subcomando>` (equivale a `openspec`). Los comandos y skills versionados viven en `.claude/`; `settings.local.json` no se versiona.
+
 ## Stack
 
 Next.js 15 (App Router) + TypeScript · Tailwind 4 + shadcn/ui · PostgreSQL 16 + Prisma 7 (adapter pg, config en `prisma.config.ts`) · Redis (futuro: caché/colas) · Auth.js v5 (JWT 12h) · Vitest · CI en GitHub Actions (`Dangk20/kora-app`).

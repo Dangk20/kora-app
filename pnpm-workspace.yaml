@@ -5,3 +5,5 @@ allowBuilds:
   "@prisma/client": true
   "@prisma/engines": true
   esbuild: true
+  # Su postinstall solo imprime un tip de autocompletado del shell: no hace falta ejecutarlo.
+  "@fission-ai/openspec": false

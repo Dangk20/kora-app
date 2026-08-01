@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "ledger:verify": "tsx scripts/verify-ledger.ts",
     "whatsapp:set": "tsx scripts/set-whatsapp.ts",
-    "orders:expire": "tsx scripts/expire-orders.ts"
+    "orders:expire": "tsx scripts/expire-orders.ts",
+    "spec": "openspec"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1090.0",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@fission-ai/openspec": "1.7.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",

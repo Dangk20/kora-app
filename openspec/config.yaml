@@ -1,0 +1,97 @@
+schema: spec-driven
+
+context: |
+  IDIOMA: todos los artefactos (proposal, specs, design, tasks) se escriben en ESPAÑOL (es_CO).
+  Los identificadores de código, nombres de archivo y nombres de change van en inglés/kebab-case.
+
+  PRODUCTO: KORA — e-commerce a la medida (tienda online + POS físico), mercados Colombia y
+  EE.UU. Venta cerrada, 18 semanas (11 jul → 13 nov 2026). Cliente real, no prototipo.
+
+  STACK: Next.js 15 App Router + TypeScript · Tailwind 4 + shadcn/ui · PostgreSQL 16 + Prisma 7
+  (adapter pg, config en prisma.config.ts) · Redis · Auth.js v5 (JWT 12 h) · Vitest ·
+  CI en GitHub Actions (Dangk20/kora-app). Monolito modular: microservicios/K8s/serverless
+  fueron descartados a propósito.
+
+  RIESGO CENTRAL DEL PROYECTO: no es escala, es CORRECTITUD BAJO CONCURRENCIA — la web y el POS
+  compiten por el mismo stock. Diseñar para eso, no para tráfico.
+
+  REGLAS INNEGOCIABLES (violarlas invalida la propuesta):
+  1. stockActual y onlineUnits SOLO cambian dentro de src/modules/inventory/engine.ts
+     (transacción con SELECT ... FOR UPDATE + movimiento en stock_movements + materialización).
+     Ni seeds, ni importadores, ni server actions se lo saltan. El test de aceptación
+     (50 compras concurrentes sobre stock=1 → exactamente 1 gana) vive en tests/inventory.test.ts
+     y no es negociable.
+  2. El stock es UN pool. onlineUnits es asignación de canal, no un segundo stock: la web vende
+     hasta su cupo; el POS nunca se bloquea (clamp automático del cupo).
+  3. No hay pasarela de pago (decisión del cliente): el checkout es pedido → WhatsApp.
+     confirmOrder() es el EVENTO CENTRAL del sistema: en UNA transacción descuenta stock,
+     cambia estado y escribe order.confirmed en la outbox domain_events. El stock solo se
+     descuenta al confirmar, sin reserva. Los enlaces de WhatsApp usan api.whatsapp.com/send,
+     nunca wa.me (su redirección rompe el emoji del saludo).
+  4. Toda Server Action protegida usa requirePermission("modulo:accion"), que verifica contra
+     la BASE de datos, no contra el JWT (revocación inmediata). La matriz de permisos está
+     fijada por tests en tests/rbac.test.ts.
+  5. Fidelidad de diseño: toda pantalla nueva se construye mirando su equivalente en el
+     prototipo aprobado (../design-handoff/Kora.dc.html) — layout y patrones del prototipo;
+     color y tipografía del manual de marca (tokens en src/app/globals.css: gradiente
+     bg-kora-gradient 135°, neutros kora-*, Manrope/Allura). Botón principal = variant "brand".
+     Solo la paleta oficial; la única excepción viva es el rojo destructivo.
+  6. La lógica vive en src/modules/<dominio>/; las rutas de src/app/ son delgadas.
+     Slide-overs controlados por URL (?nuevo=1, ?editar=id, ?ajustar=id).
+  7. Migraciones Prisma versionadas siempre (nunca cambios de esquema a mano); ningún secreto
+     en el repo. resolvePrice() de src/modules/pricing/ es la ÚNICA fuente de precio en tienda,
+     carrito, checkout y snapshot del pedido: ninguna vista calcula precios. Cada divisa usa su
+     precio cargado, nunca conversión por tasa.
+
+  NOMENCLATURA DE DOMINIO:
+  - "Módulo de clientes" — NUNCA llamarlo "CRM" en documentos, specs, tasks ni UI.
+  - KoraPuntos: 1 punto por cada $1.000 COP, acreditados al confirmar el pedido. El CANJE
+    (tasa, caducidad, interacción con cupones, USD) sigue SIN DEFINIR: no proponer redención.
+
+  FUENTE DE REQUISITOS: las historias de usuario ya escritas viven en ../hus-<área>.md
+  (pedidos, clientes, cupones, catalogo, tienda, email, korapuntos) y están espejadas en el
+  tablero Notion "Kora Project". Antes de escribir specs, buscar la HU correspondiente y trazar
+  contra su código (p. ej. PED_HU003, CAT_HU001). Si no existe HU para lo pedido, decirlo en el
+  proposal en vez de inventar requisitos.
+
+  DOCUMENTOS RECTORES: ../plan-tecnico-ejecucion-kora.md (arquitectura, DoD por semana),
+  ../bitacora-sprints-kora.md (estado real de ejecución — leerla antes de proponer),
+  ../notas-tecnicas-privado.md (capa de verdad privada: deudas y riesgos aceptados),
+  ../../business/hitos-semanales-kora.md (cronograma cara al cliente).
+
+  CAPA PRIVADA: los entregables compartibles se escriben limpios y con confianza. Las verdades
+  duras, la deuda técnica asumida y lo provisional van en ../notas-tecnicas-privado.md,
+  nunca inline en el artefacto que leerá el cliente o un dev nuevo.
+
+  VERIFICACIÓN: pnpm typecheck && pnpm lint && pnpm build && pnpm test (Vitest corre integración
+  contra el Postgres local en el puerto 5433 — pnpm db:up debe estar arriba).
+  Login dev: admin@kora.local / kora-dev-2026 · cajero: caja@kora.local / caja-dev-2026.
+
+rules:
+  proposal:
+    - Empezar declarando a qué semana del plan (S1–S18) y a qué HU(s) pertenece el cambio; si no mapea a ninguna, decirlo explícitamente.
+    - Incluir siempre una sección "Fuera de alcance" — el proyecto tiene fecha fija y el alcance se defiende.
+    - Si el cambio depende de un insumo pendiente del cliente (accesos SSH/DNS, catálogo Excel, fotos, número de WhatsApp comercial, modelo de canje de KoraPuntos), declararlo como bloqueo antes de proponer construirlo.
+  specs:
+    - Escribir requisitos observables y verificables, trazados al código de HU cuando exista.
+    - Todo requisito que toque stock, precios, permisos o estados de pedido debe declarar su invariante, no solo el camino feliz.
+    - Incluir el escenario de concurrencia cuando el cambio toque inventario (web y POS compiten por el mismo pool).
+  design:
+    - Indicar en qué src/modules/<dominio>/ vive la lógica y por qué; las rutas de src/app/ quedan delgadas.
+    - Declarar si hay migración Prisma y si el cambio emite o consume eventos de domain_events.
+    - Para pantallas, nombrar la sección equivalente del prototipo Kora.dc.html que se está replicando.
+  tasks:
+    - Tareas en bloques de máximo 2 horas, cada una verificable por sí sola.
+    - La última tarea de todo change es correr pnpm typecheck && pnpm lint && pnpm build && pnpm test y dejarlos en verde.
+    - Incluir una tarea de tests para cada invariante nueva; ningún change que toque inventario, RBAC o precios se cierra sin test.
+
+operations:
+  apply:
+    guidance:
+      - No marcar una tarea como hecha sin evidencia (test verde, verificación E2E en la app real, o salida de comando).
+      - Si aparece un bug real durante la implementación, corregirlo y registrarlo — los bugs encontrados en el camino se reportan, no se silencian.
+  archive:
+    guidance:
+      - Al archivar, actualizar ../bitacora-sprints-kora.md con lo cerrado, la evidencia y las deudas nuevas; es el estado real de ejecución del proyecto.
+      - Las deudas o riesgos aceptados se anotan en ../notas-tecnicas-privado.md, no en el artefacto compartible.
+      - Si el change corresponde a HUs del tablero Notion, recordar la doble sincronización (Notion + espejo ../hus-<área>.md).
