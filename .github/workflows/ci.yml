@@ -20,7 +20,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   # ─────────────────────────────────────────────────────────────
@@ -78,11 +77,16 @@ jobs:
       packages: write
     outputs:
       etiqueta: ${{ steps.meta.outputs.etiqueta }}
+      imagen: ${{ steps.meta.outputs.imagen }}
     steps:
       - uses: actions/checkout@v4
 
       - id: meta
-        run: echo "etiqueta=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "etiqueta=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          # ghcr.io EXIGE minúsculas y el usuario del repo es "Dangk20":
+          # ghcr.io/Dangk20/... es un nombre inválido y el push falla.
+          echo "imagen=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -101,8 +105,8 @@ jobs:
           target: runner
           push: true
           tags: |
-            ${{ env.IMAGE }}/app:${{ steps.meta.outputs.etiqueta }}
-            ${{ env.IMAGE }}/app:latest
+            ${{ steps.meta.outputs.imagen }}/app:${{ steps.meta.outputs.etiqueta }}
+            ${{ steps.meta.outputs.imagen }}/app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -113,8 +117,8 @@ jobs:
           target: migrator
           push: true
           tags: |
-            ${{ env.IMAGE }}/migrator:${{ steps.meta.outputs.etiqueta }}
-            ${{ env.IMAGE }}/migrator:latest
+            ${{ steps.meta.outputs.imagen }}/migrator:${{ steps.meta.outputs.etiqueta }}
+            ${{ steps.meta.outputs.imagen }}/migrator:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -141,7 +145,7 @@ jobs:
             bash ~/kora/deploy/desplegar.sh staging "$IMAGEN_BASE" "$ETIQUETA" "$GHCR_USER" "$GHCR_TOKEN"
         env:
           ETIQUETA: ${{ needs.imagen.outputs.etiqueta }}
-          IMAGEN_BASE: ${{ env.IMAGE }}
+          IMAGEN_BASE: ${{ needs.imagen.outputs.imagen }}
           GHCR_USER: ${{ github.actor }}
           # Token efímero del propio flujo: no queda ninguna credencial
           # permanente del registro guardada en el servidor.
@@ -183,6 +187,6 @@ jobs:
             bash ~/kora/deploy/desplegar.sh production "$IMAGEN_BASE" "$ETIQUETA" "$GHCR_USER" "$GHCR_TOKEN"
         env:
           ETIQUETA: ${{ needs.imagen.outputs.etiqueta }}
-          IMAGEN_BASE: ${{ env.IMAGE }}
+          IMAGEN_BASE: ${{ needs.imagen.outputs.imagen }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
