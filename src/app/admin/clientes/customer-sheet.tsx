@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
 import { KoraFlame } from "@/components/kora-flame";
 import type { CashbackSummary } from "@/modules/cashback/balance";
+import type { SubscriptionState } from "@/modules/consent/subscription";
 import type { CustomerMetrics, TopCategory } from "@/modules/customers/profile";
 
 function iniciales(nombre: string): string {
@@ -135,6 +136,7 @@ export function CustomerSheet({
   customer,
   metrics,
   cashback,
+  suscripcion,
   top,
   whatsapp,
   backTo,
@@ -147,9 +149,12 @@ export function CustomerSheet({
     country: string;
     city: string | null;
     address: string | null;
+    /** Tiene contraseña en la tienda: compró con cuenta, no como invitado. */
+    hasAccount: boolean;
   };
   metrics: CustomerMetrics;
   cashback: CashbackSummary;
+  suscripcion: SubscriptionState;
   top: TopCategory[];
   whatsapp: string | null;
   backTo: string;
@@ -158,9 +163,7 @@ export function CustomerSheet({
   const close = () => router.push(backTo);
 
   const moneda = metrics.primary?.currency ?? (customer.country === "US" ? "USD" : "COP");
-  // La cuenta del comprador (módulo ACC) todavía no existe: hoy todos son
-  // invitados. Se muestra igual para que el dato exista desde el día uno.
-  const tieneCuenta = false;
+  const tieneCuenta = customer.hasAccount;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-[rgba(14,15,18,0.5)]" onClick={close}>
@@ -211,6 +214,38 @@ export function CustomerSheet({
               label="País · moneda"
               value={`${customer.country} · ${customer.country === "US" ? "USD" : "COP"}`}
             />
+          </div>
+
+          {/* Suscripción: SOLO LECTURA a propósito. El panel no puede
+              re-suscribir a quien se dio de baja — si pudiera, el registro de
+              consentimiento dejaría de valer como prueba ante la SIC. Solo el
+              propio cliente puede reactivarse, desde el enlace de su correo. */}
+          <div className="rounded-[12px] border border-[#eee9e2] px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                Email marketing
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                  suscripcion.reachable
+                    ? "bg-[#e8f6ec] text-[#1f7a3d]"
+                    : "bg-[#f4f2ef] text-[#8a8f98]"
+                }`}
+              >
+                {!suscripcion.emailUsable
+                  ? "Correo con rebote"
+                  : suscripcion.subscribed
+                    ? "Suscrito"
+                    : "Dado de baja"}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
+              {!suscripcion.emailUsable
+                ? "Su correo rebotó y quedó excluido de las campañas. Corrígelo para volver a incluirlo."
+                : suscripcion.subscribed
+                  ? "Recibe campañas. Solo el cliente puede darse de baja, desde el enlace del correo."
+                  : "No recibe campañas. Solo el cliente puede volver a suscribirse; el panel no puede hacerlo por él."}
+            </p>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5">

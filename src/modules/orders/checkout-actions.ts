@@ -23,6 +23,7 @@ import { whatsappNumberFor } from "./settings";
 import { toE164 } from "@/modules/customers/phone";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { resolveOrderCustomer } from "./customer-link";
+import { subscribeFromCheckout } from "@/modules/consent/subscription";
 import { consumeCashback, CashbackError } from "@/modules/cashback/ledger";
 import { resolveRedemption } from "@/modules/cashback/redemption";
 import { validateCoupon } from "@/modules/coupons/validate";
@@ -331,8 +332,18 @@ export async function createOrder(
       return tx.order.update({
         where: { id: created.id },
         data: { whatsappMessage: message },
+        include: { customer: { select: { id: true } } },
       });
     });
+
+    // El consentimiento se registra DESPUÉS del pedido y fuera de su
+    // transacción, a propósito: no forma parte de la atomicidad de la venta
+    // —si fallara, el pedido sigue siendo válido— y `subscribeFromCheckout`
+    // abre la suya. Respeta a quien se dio de baja: volver a comprar NO
+    // re-suscribe.
+    if (order.customer) {
+      await subscribeFromCheckout(order.customer.id, data.acceptsMarketing);
+    }
 
     return orderResult(order);
   } catch (e) {

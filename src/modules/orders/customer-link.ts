@@ -71,8 +71,12 @@ export async function resolveOrderCustomer(tx: Tx, input: OrderCustomerInput) {
       country: input.country,
       city: input.city,
       address: input.address,
-      // El opt-in nunca se revoca solo: si ya aceptó, sigue aceptado.
-      acceptsMarketing: found.acceptsMarketing || input.acceptsMarketing,
+      // ⚠️ `acceptsMarketing` NO se toca aquí para un cliente que ya existe.
+      // Antes se hacía con `found.acceptsMarketing || input.acceptsMarketing`,
+      // y eso RE-SUSCRIBÍA a quien se había dado de baja con solo volver a
+      // comprar: la baja dejaba de significar nada, que es exactamente lo que
+      // la Ley 1581 prohíbe. La suscripción la decide `subscribeFromCheckout()`
+      // después de crear el pedido, que respeta la baja y deja constancia.
     },
   });
 }

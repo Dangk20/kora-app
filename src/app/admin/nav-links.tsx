@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Layers,
   LayoutTemplate,
+  Mail,
   Package,
   ShoppingCart,
   Store,
@@ -35,6 +36,7 @@ const NAV: NavItem[] = [
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
   { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
+  { href: "/admin/campanas", label: "Email marketing", permission: "marketing:view", icon: Mail },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
   { href: "/admin/usuarios", label: "Usuarios", permission: "users:view", icon: Users },
 ];

@@ -11,6 +11,8 @@
 // a estas mismas funciones, así que la lógica no está duplicada.
 
 import { pruneExpiredSessions } from "@/modules/buyer/session";
+import { dispatchOnce } from "@/modules/campaigns/dispatch";
+import { startDueCampaigns } from "@/modules/campaigns/send";
 import { expireCashback } from "@/modules/cashback/ledger";
 import { describeVerification, verifyCashbackLedger } from "@/modules/cashback/verify";
 import { findLedgerMismatches } from "@/modules/inventory/engine";
@@ -109,6 +111,43 @@ export const JOBS: readonly JobDefinition[] = [
         throw new Error(describeVerification(v));
       }
       return { summary: "el libro de cashback cuadra en todos los clientes" };
+    },
+  },
+  {
+    name: "campaigns:dispatch",
+    description: "Envía por lotes la campaña de correo en curso",
+    // Un minuto: con lotes de 50 son 3.000 correos por hora, de sobra para una
+    // tienda que envía promociones. Aquí no hay cola aparte a propósito — el
+    // plan técnico proponía BullMQ, pero cuando se escribió no existía este
+    // programador. Dos sistemas de cola conviviendo serían dos formas de
+    // fallar y más memoria en un VPS que ya va justo.
+    everyMs: MINUTO,
+    timeoutMs: 5 * MINUTO,
+    async run() {
+      const r = await dispatchOnce();
+      if (!r.campaignId) return { summary: "sin campañas en curso" };
+      if (r.finished) return { summary: `campaña "${r.campaignName}" terminada` };
+      if (r.sent + r.failed + r.skipped === 0) {
+        return { summary: `campaña "${r.campaignName}": lote vacío` };
+      }
+      const partes = [`${r.sent} enviado(s)`];
+      if (r.failed > 0) partes.push(`${r.failed} fallido(s)`);
+      if (r.skipped > 0) partes.push(`${r.skipped} omitido(s) por baja`);
+      return { summary: `campaña "${r.campaignName}": ${partes.join(", ")}` };
+    },
+  },
+  {
+    name: "campaigns:schedule",
+    description: "Dispara las campañas programadas cuya hora llegó",
+    // Un minuto de margen sobre la hora elegida por el operador es invisible
+    // para una promoción y evita un sondeo más agresivo.
+    everyMs: MINUTO,
+    timeoutMs: 5 * MINUTO,
+    async run() {
+      const r = await startDueCampaigns();
+      return {
+        summary: r.started === 0 ? "sin campañas por disparar" : `${r.started} iniciada(s): ${r.names.join(", ")}`,
+      };
     },
   },
   {

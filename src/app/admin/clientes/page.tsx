@@ -4,6 +4,7 @@ import { Eye, Pencil, Plus, Search, UsersRound } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cashbackSummary } from "@/modules/cashback/balance";
+import { subscriptionState } from "@/modules/consent/subscription";
 import { customerMetrics, topCategories, whatsappLink } from "@/modules/customers/profile";
 import { customerSummary, listCustomers, PAGE_SIZE } from "@/modules/customers/queries";
 import { CustomerForm } from "./customer-form";
@@ -69,6 +70,7 @@ export default async function ClientesPage({
     ? {
         metrics: await customerMetrics(verCliente.id),
         cashback: await cashbackSummary(verCliente.id),
+        suscripcion: await subscriptionState(verCliente.id),
         top: await topCategories(verCliente.id),
         whatsapp: whatsappLink(verCliente.phone),
       }
@@ -233,9 +235,11 @@ export default async function ClientesPage({
             country: verCliente.country,
             city: verCliente.city,
             address: verCliente.address,
+            hasAccount: verCliente.passwordHash !== null,
           }}
           metrics={perfil.metrics}
           cashback={perfil.cashback}
+          suscripcion={perfil.suscripcion}
           top={perfil.top}
           whatsapp={perfil.whatsapp}
           backTo={`/admin/clientes${q ? `?q=${encodeURIComponent(q)}` : ""}`}

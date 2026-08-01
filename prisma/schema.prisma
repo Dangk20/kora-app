@@ -230,6 +230,11 @@ model Customer {
   acceptsMarketing Boolean        @default(false) // Habeas Data: opt-in explícito
   unsubscribedAt   DateTime?
 
+  // Correo utilizable. Un rebote duro lo pone en false: seguir escribiendo a
+  // direcciones que rebotan es la forma más rápida de que un proveedor
+  // clasifique el dominio como spam.
+  emailUsable Boolean @default(true)
+
   // Saldo de Kora Cashback materializado desde cashback_movements (mismo patrón
   // que el stock): es la CONSECUENCIA del libro, no un número que se edite.
   // Dos bolsas separadas porque no existe tasa de cambio en KORA y es deliberado:
@@ -251,6 +256,7 @@ model Customer {
   sessions           BuyerSession[]
   couponRedemptions  CouponRedemption[]
   campaignRecipients CampaignRecipient[]
+  consentEvents      ConsentEvent[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -333,8 +339,8 @@ model Order {
   stockMovements    StockMovement[]
   statusHistory     OrderStatusHistory[]
   cashbackMovements CashbackMovement[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@index([status, createdAt])
   @@index([customerId])
@@ -585,43 +591,114 @@ enum CampaignStatus {
 }
 
 model Campaign {
-  id          String         @id @default(cuid())
-  name        String
-  subject     String
-  htmlBody    String?
-  segment     Json? // criterios de segmentación serializados
-  status      CampaignStatus @default(DRAFT)
-  scheduledAt DateTime?
-  sentAt      DateTime?
+  id     String         @id @default(cuid())
+  name   String // interno: solo lo ve el panel
+  status CampaignStatus @default(DRAFT)
+
+  // ── Contenido (bloques editables mientras es borrador) ──
+  // Sin HTML libre: decisión del cliente del 19 jul 2026. Solo plantilla de
+  // marca, que es también la única forma de que un correo no se rompa.
+  subject    String
+  preheader  String?
+  title      String
+  body       String   @db.Text
+  imageKey   String? // en R2: un cliente de correo pide la imagen desde fuera
+  ctaLabel   String?
+  ctaUrl     String?
+  productIds String[] // 0–6 destacados, resueltos al renderizar
+
+  // ── Audiencia ──
+  segment Json // filtros combinables; se recalculan si la campaña está programada
+
+  // ── Copia inmutable ──
+  // Al enviar se renderiza UNA vez y se guarda el resultado. Enviado, lo que
+  // hace falta no son los campos sino lo que se mandó, tal cual: un producto
+  // que cambia de precio no puede alterar un correo que ya salió.
+  sentHtml String? @db.Text
+  sentText String? @db.Text
+
+  scheduledAt   DateTime?
+  sendStartedAt DateTime?
+  sentAt        DateTime?
+
+  // Contadores materializados: el detalle no cuenta filas en caliente.
+  sentCount        Int @default(0)
+  failedCount      Int @default(0)
+  unsubscribeCount Int @default(0)
+
   createdById String
-  createdBy   User           @relation(fields: [createdById], references: [id])
+  createdBy   User   @relation(fields: [createdById], references: [id])
 
   recipients CampaignRecipient[]
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
+  @@index([status, createdAt])
   @@map("campaigns")
 }
 
 enum RecipientStatus {
-  QUEUED
+  PENDING // en la lista congelada, todavía sin tocar
+  SENDING // RESERVADO por un despachador, antes de llamar al proveedor
   SENT
-  BOUNCED
   FAILED
+  SKIPPED // se dio de baja o su correo dejó de ser utilizable a mitad del envío
 }
 
 model CampaignRecipient {
-  id         String          @id @default(cuid())
+  id         String   @id @default(cuid())
   campaignId String
-  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   customerId String
-  customer   Customer        @relation(fields: [customerId], references: [id])
-  email      String // snapshot del email al momento del envío
-  status     RecipientStatus @default(QUEUED)
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  // Copia del correo al congelar la lista: el cliente puede corregirlo después
+  // y el registro tiene que decir a dónde se envió de verdad.
+  email  String
+  name   String
+  status RecipientStatus @default(PENDING)
+
+  // La reserva ocurre ANTES de llamar al proveedor: si el proceso muere entre
+  // reservar y enviar, el peor caso es que alguien NO reciba el correo. Al
+  // revés, el peor caso sería que lo reciba dos veces — y eso no se deshace.
+  reservedAt DateTime?
   sentAt     DateTime?
+  attempts   Int       @default(0)
+  error      String?
+  providerId String? // identificador del mensaje en el proveedor
 
   @@unique([campaignId, customerId])
+  @@index([campaignId, status])
   @@map("campaign_recipients")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CONSENTIMIENTO — Ley 1581 (CO) y CAN-SPAM (US)
+//
+// Un booleano no responde "¿con qué autorización le escribieron?". Cada
+// cambio deja su fila con fecha y origen, y nunca se sobrescribe en silencio.
+// ─────────────────────────────────────────────────────────────
+
+enum ConsentSource {
+  CHECKOUT // aceptó al hacer un pedido
+  MANUAL // alta desde el panel
+  UNSUBSCRIBE_LINK // se dio de baja desde el correo
+  RESUBSCRIBE // volvió a suscribirse, por decisión propia
+  SPAM_COMPLAINT // queja: baja inmediata
+  BOUNCE // rebote duro: el correo deja de ser utilizable
+}
+
+model ConsentEvent {
+  id         String        @id @default(cuid())
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  subscribed Boolean // el estado al que se pasó
+  source     ConsentSource
+  note       String?
+  createdAt  DateTime      @default(now())
+
+  @@index([customerId, createdAt])
+  @@map("consent_events")
 }
 
 // ─────────────────────────────────────────────────────────────

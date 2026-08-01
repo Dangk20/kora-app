@@ -23,4 +23,11 @@ export async function register(): Promise<void> {
 
   const { assertStorageConfiguredOrExit } = await import("./modules/storage/config");
   assertStorageConfiguredOrExit();
+
+  // Mismo criterio para el correo: sin proveedor, en producción el módulo de
+  // campañas está roto y el contenedor no debería reportarse sano. El fallo
+  // aparecería si no cuando alguien lanza la primera campaña — delante del
+  // cliente.
+  const { assertEmailConfiguredOrExit } = await import("./modules/email/config");
+  assertEmailConfiguredOrExit();
 }

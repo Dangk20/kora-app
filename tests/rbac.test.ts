@@ -58,6 +58,30 @@ describe("matriz de permisos por rol", () => {
     expect(keys.some((k) => k.startsWith("users:"))).toBe(false);
   });
 
+  it("MARKETING puede enviar campañas; el operador NO", async () => {
+    // `marketing:send` está separado de `marketing:create` a propósito:
+    // componer una campaña y dispararle un correo a toda la base de clientes no
+    // son el mismo nivel de responsabilidad. Un envío no se puede deshacer.
+    const claves = async (rol: string) => {
+      const grants = await db.rolePermission.findMany({
+        where: { role: { name: rol } },
+        include: { permission: true },
+      });
+      return grants.map((g) => `${g.permission.module}:${g.permission.action}`);
+    };
+
+    const marketing = await claves("marketing");
+    expect(marketing).toContain("marketing:view");
+    expect(marketing).toContain("marketing:create");
+    expect(marketing).toContain("marketing:send");
+
+    const operador = await claves("operador");
+    expect(operador.some((k) => k.startsWith("marketing:"))).toBe(false);
+
+    const cajero = await claves("cajero");
+    expect(cajero.some((k) => k.startsWith("marketing:"))).toBe(false);
+  });
+
   it("operador puede confirmar pedidos (el evento central del negocio)", async () => {
     const grant = await db.rolePermission.findFirst({
       where: {
