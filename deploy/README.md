@@ -87,8 +87,12 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm mi
 Automático desde GitHub Actions. `main` despliega a **pruebas** sin intervención; **producción** exige aprobación humana (`environment: production`).
 
 ```
-verificación → imagen → pruebas (automático) → producción (aprobación)
+verificación → imagen → sincronizar configuración → pruebas (automático) → producción (aprobación)
 ```
+
+**El despliegue lleva imágenes Y configuración.** Los archivos de este directorio se copian al servidor en cada despliegue, así que una corrección del compose o del `Caddyfile` llega sola. Los `.env.*` y `auth.caddy` reales **no se tocan**: viven únicamente en el servidor.
+
+> ⚠️ Durante el montaje inicial esto no era así y costó un rato entenderlo: el flujo solo llevaba imágenes, la configuración se había subido a mano, y las correcciones del repositorio no tenían ningún efecto en el servidor. Un servidor que no recibe su configuración desde el repositorio **no es reconstruible desde el repositorio**, por mucho que los archivos estén versionados.
 
 Secretos del repositorio: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`. La credencial del registro es **efímera**, del propio flujo: no queda ninguna permanente en el servidor.
 

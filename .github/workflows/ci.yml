@@ -147,6 +147,37 @@ jobs:
       name: staging
       url: https://test.korashopp.com
     steps:
+      # La configuración del servidor viaja con cada despliegue.
+      # Sin esto el flujo solo llevaría IMÁGENES: cualquier corrección del
+      # compose, del Caddyfile o del propio guion de despliegue se quedaría en
+      # el repositorio, y el servidor seguiría corriendo la versión con la que
+      # se montó a mano. Es lo contrario de "el servidor se reconstruye desde el
+      # repositorio", que es la única vía de recuperación que tenemos.
+      #
+      # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
+      # reales viven únicamente en el servidor y no se tocan.
+      - name: Sincronizar configuración de despliegue
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy/*.yml,deploy/Caddyfile,deploy/desplegar.sh,deploy/*.example,deploy/README.md,deploy/holding/**"
+          target: "~/kora-sync"
+          overwrite: true
+
+      - name: Aplicar configuración
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            cp -r ~/kora-sync/deploy/. ~/kora/deploy/
+            chmod +x ~/kora/deploy/desplegar.sh
+            rm -rf ~/kora-sync
+
       - name: Desplegar
         uses: appleboy/ssh-action@v1
         with:
@@ -189,6 +220,37 @@ jobs:
       name: production
       url: https://korashopp.com
     steps:
+      # La configuración del servidor viaja con cada despliegue.
+      # Sin esto el flujo solo llevaría IMÁGENES: cualquier corrección del
+      # compose, del Caddyfile o del propio guion de despliegue se quedaría en
+      # el repositorio, y el servidor seguiría corriendo la versión con la que
+      # se montó a mano. Es lo contrario de "el servidor se reconstruye desde el
+      # repositorio", que es la única vía de recuperación que tenemos.
+      #
+      # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
+      # reales viven únicamente en el servidor y no se tocan.
+      - name: Sincronizar configuración de despliegue
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy/*.yml,deploy/Caddyfile,deploy/desplegar.sh,deploy/*.example,deploy/README.md,deploy/holding/**"
+          target: "~/kora-sync"
+          overwrite: true
+
+      - name: Aplicar configuración
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            cp -r ~/kora-sync/deploy/. ~/kora/deploy/
+            chmod +x ~/kora/deploy/desplegar.sh
+            rm -rf ~/kora-sync
+
       - name: Desplegar
         uses: appleboy/ssh-action@v1
         with:
