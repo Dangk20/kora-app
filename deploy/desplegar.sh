@@ -29,6 +29,7 @@ DC=(docker compose --env-file "$ENVFILE" -f "$COMPOSE")
 
 IMG_APP="${IMAGEN_BASE}/app:${ETIQUETA}"
 IMG_MIG="${IMAGEN_BASE}/migrator:${ETIQUETA}"
+IMG_WRK="${IMAGEN_BASE}/worker:${ETIQUETA}"
 
 echo "▸ entorno   : $ENTORNO"
 echo "▸ etiqueta  : $ETIQUETA"
@@ -40,17 +41,20 @@ echo "▸ anterior  : ${ANTERIOR:-(ninguna)}"
 restaurar() {
   echo "✖ el despliegue falló — restaurando la versión anterior"
   if [ -n "$ANTERIOR" ]; then
-    escribir_etiquetas "$ANTERIOR" "$(grep -E '^KORA_MIGRATOR_IMAGE=' "$ENVFILE.bak" | cut -d= -f2- || true)"
-    "${DC[@]}" up -d --no-deps app >/dev/null 2>&1 || true
+    escribir_etiquetas "$ANTERIOR" \
+      "$(grep -E '^KORA_MIGRATOR_IMAGE=' "$ENVFILE.bak" | cut -d= -f2- || true)" \
+      "$(grep -E '^KORA_WORKER_IMAGE=' "$ENVFILE.bak" | cut -d= -f2- || true)"
+    "${DC[@]}" up -d --no-deps app worker >/dev/null 2>&1 || true
   fi
   docker logout ghcr.io >/dev/null 2>&1 || true
   exit 1
 }
 
 escribir_etiquetas() {
-  local app="$1" mig="$2"
-  sed -i "s|^KORA_IMAGE=.*|KORA_IMAGE=${app}|"           "$ENVFILE"
+  local app="$1" mig="$2" wrk="$3"
+  sed -i "s|^KORA_IMAGE=.*|KORA_IMAGE=${app}|"                   "$ENVFILE"
   sed -i "s|^KORA_MIGRATOR_IMAGE=.*|KORA_MIGRATOR_IMAGE=${mig}|" "$ENVFILE"
+  sed -i "s|^KORA_WORKER_IMAGE=.*|KORA_WORKER_IMAGE=${wrk}|"     "$ENVFILE"
 }
 
 cp "$ENVFILE" "$ENVFILE.bak"
@@ -64,8 +68,9 @@ trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 echo "▸ descargando imágenes"
 docker pull -q "$IMG_APP" || restaurar
 docker pull -q "$IMG_MIG" || restaurar
+docker pull -q "$IMG_WRK" || restaurar
 
-escribir_etiquetas "$IMG_APP" "$IMG_MIG"
+escribir_etiquetas "$IMG_APP" "$IMG_MIG" "$IMG_WRK"
 
 # ── 2. Migraciones ANTES de tocar la aplicación ──────────────
 # Si fallan, el despliegue se detiene aquí y la versión anterior sigue
@@ -76,8 +81,8 @@ if ! "${DC[@]}" run --rm migrate; then
 fi
 
 # ── 3. Recrear la aplicación ─────────────────────────────────
-echo "▸ recreando la aplicación"
-"${DC[@]}" up -d --no-deps --force-recreate app || restaurar
+echo "▸ recreando la aplicación y el worker"
+"${DC[@]}" up -d --no-deps --force-recreate app worker || restaurar
 
 # ── 4. Comprobar que arrancó de verdad ───────────────────────
 # No basta con que el contenedor exista: la guarda de arranque puede tumbarlo

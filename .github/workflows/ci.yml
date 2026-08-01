@@ -96,8 +96,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Dos imágenes desde el mismo Dockerfile: la aplicación y el contenedor
-      # efímero que aplica migraciones antes de recrearla.
+      # Tres imágenes desde el mismo Dockerfile: la aplicación, el contenedor
+      # efímero que aplica migraciones, y el consumidor de eventos.
       - name: Aplicación
         uses: docker/build-push-action@v6
         with:
@@ -119,6 +119,20 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.imagen }}/migrator:${{ steps.meta.outputs.etiqueta }}
             ${{ steps.meta.outputs.imagen }}/migrator:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # El worker NO puede salir de `runner`: esa imagen es la salida standalone
+      # de Next, sin `tsx` ni `scripts/`. Objetivo propio en el mismo Dockerfile.
+      - name: Worker de eventos
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.imagen }}/worker:${{ steps.meta.outputs.etiqueta }}
+            ${{ steps.meta.outputs.imagen }}/worker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

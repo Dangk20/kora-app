@@ -575,6 +575,13 @@ model Setting {
 // OUTBOX — nada que cuelgue de order.confirmed se pierde
 // ─────────────────────────────────────────────────────────────
 
+// PENDING    esperando; se toma cuando llega su nextAttemptAt
+// PROCESSING tomado por un trabajador (claimedAt marca desde cuándo)
+// PROCESSED  terminado con éxito
+// FAILED     MUERTO: agotó sus intentos. Terminal, no se vuelve a tomar.
+//            Un fallo intermedio NO deja el evento aquí: vuelve a PENDING con
+//            el contador aumentado. FAILED significa únicamente "muerto", que
+//            es lo que la observabilidad necesita poder distinguir.
 enum EventStatus {
   PENDING
   PROCESSING
@@ -583,15 +590,30 @@ enum EventStatus {
 }
 
 model DomainEvent {
-  id          String      @id @default(cuid())
-  type        String // "order.confirmed", ...
-  payload     Json
-  status      EventStatus @default(PENDING)
-  attempts    Int         @default(0)
+  id      String      @id @default(cuid())
+  type    String // "order.confirmed", ...
+  payload Json
+  status  EventStatus @default(PENDING)
+
+  // Cuándo puede volver a tomarse. Sin esto, un evento que falla se retoma en
+  // el ciclo siguiente sin ninguna espera: un bucle cerrado contra una
+  // dependencia caída. La espera crece con cada intento.
+  nextAttemptAt DateTime @default(now())
+
+  // Cuándo lo tomó un trabajador. Si supera el umbral se considera huérfano de
+  // un proceso muerto y vuelve a PENDING — sin esto, un evento tomado por un
+  // proceso que murió se queda en PROCESSING para siempre.
+  claimedAt DateTime?
+
+  attempts    Int       @default(0)
   lastError   String?
   processedAt DateTime?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime  @default(now())
 
+  // Índice de la consulta de toma: filtra por estado y por si ya llegó su turno.
+  @@index([status, nextAttemptAt])
+  // Para recuperar huérfanos y para el diagnóstico.
+  @@index([status, claimedAt])
   @@index([status, createdAt])
   @@map("domain_events")
 }

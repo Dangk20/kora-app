@@ -83,6 +83,24 @@ USER node
 CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 # ─────────────────────────────────────────────────────────────
+# worker — consumidor de la bandeja de salida de eventos
+# ─────────────────────────────────────────────────────────────
+# NO puede salir de `runner`: esa imagen es la salida *standalone* de Next, que
+# solo lleva `server.js` y un node_modules podado — sin `tsx`, sin `scripts/` y
+# sin `src/`. El worker necesita el código fuente y el ejecutor de TypeScript,
+# igual que los demás trabajos del proyecto (`orders:expire`, `ledger:verify`).
+FROM base AS worker
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json prisma.config.ts ./
+COPY prisma ./prisma
+COPY scripts ./scripts
+COPY src ./src
+COPY --from=builder /app/src/generated ./src/generated
+USER node
+CMD ["node_modules/.bin/tsx", "scripts/outbox-worker.ts"]
+
+# ─────────────────────────────────────────────────────────────
 # runner — la imagen que se publica
 # ─────────────────────────────────────────────────────────────
 FROM base AS runner

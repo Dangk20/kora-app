@@ -31,17 +31,21 @@ Dos entornos sobre **una sola máquina**. Este directorio contiene todo lo neces
 
 Servidor: 2 vCPU · 7.940 MB.
 
+Tres imágenes salen del mismo `Dockerfile`, por objetivos distintos: `runner` (la aplicación), `migrator` (aplica migraciones y termina) y `worker` (consume la bandeja de salida de eventos). El worker **no puede** salir de `runner`: esa es la salida *standalone* de Next y no lleva `tsx` ni `scripts/`.
+
 | Servicio | Memoria | CPU |
 |---|---:|---|
 | `kora-caddy` | 128 MB | 0.5 |
 | `kora-prod-app` | 1.536 MB | sin tope |
 | `kora-prod-postgres` | 1.536 MB | sin tope |
 | `kora-prod-redis` | 256 MB | sin tope |
+| `kora-prod-worker` | 384 MB | sin tope |
 | `kora-staging-app` | 1.024 MB | 1.0 |
 | `kora-staging-postgres` | 768 MB | 1.0 |
 | `kora-staging-redis` | 128 MB | 0.5 |
-| **Comprometido** | **5.376 MB** | |
-| **Margen libre** | **2.564 MB** | |
+| `kora-staging-worker` | 256 MB | 1.0 |
+| **Comprometido** | **6.016 MB** | |
+| **Margen libre** | **1.924 MB** | |
 
 **Producción no lleva tope de CPU a propósito:** con solo 2 núcleos, un tope le impediría usar la capacidad que pruebas deja ociosa. El reparto lo impone el tope de pruebas. El margen libre no sobra: PostgreSQL depende del caché de disco del sistema operativo para su rendimiento de lectura.
 

@@ -82,6 +82,27 @@ services:
     networks:
       - interna
 
+  # Consumidor de la bandeja de salida de eventos de dominio.
+  # Proceso aparte y no un hilo del servidor web: dentro de la aplicación
+  # competiría por memoria con las peticiones de los compradores, se
+  # multiplicaría al escalar réplicas y no podría reiniciarse sin cortar el
+  # tráfico.
+  #
+  # Imagen PROPIA y no la de la aplicación: `runner` es la salida standalone de
+  # Next, sin `tsx` ni `scripts/`. Sale del mismo Dockerfile, objetivo `worker`.
+  worker:
+    image: ${KORA_WORKER_IMAGE:-kora-worker:latest}
+    container_name: kora-prod-worker
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 384m
+    networks:
+      - interna
+
   # Contenedor efímero: aplica migraciones y termina. Se ejecuta como PASO PREVIO
   # del despliegue, nunca al arrancar la aplicación — si falla, el despliegue se
   # detiene y la versión anterior sigue sirviendo
