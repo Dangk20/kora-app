@@ -1,14 +1,31 @@
-# KORA — CI
-# Cada push valida: install → generate → migrate → seed → lint → typecheck → test → build.
-# El job de deploy a staging queda deshabilitado hasta tener accesos SSH al VPS (deuda #1).
+# KORA — integración y despliegue continuos
+#
+# Ver openspec/changes/vps-two-stack-deploy — specs/continuous-deployment.
+#
+# Cadena: verificación → imagen → pruebas (automático) → producción (aprobación manual).
+# Ninguna imagen se construye si la verificación no pasó: si falla, el entorno
+# conserva la versión anterior.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      desplegar_produccion:
+        description: "Desplegar a PRODUCCIÓN (exige aprobación del entorno)"
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Verificación — la compuerta. Nada se despliega si esto falla.
+  # ─────────────────────────────────────────────────────────────
   ci:
     runs-on: ubuntu-latest
     services:
@@ -45,10 +62,127 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  # deploy-staging:
-  #   needs: ci
-  #   if: github.ref == 'refs/heads/main'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - TODO(S2): build de imagen Docker → registry → ssh al VPS → docker compose up.
-  #       Bloqueado por accesos SSH/DNS del cliente (bitacora-sprints-kora.md, deuda #1).
+  # ─────────────────────────────────────────────────────────────
+  # 2. Imagen — etiquetada con el hash del commit
+  # ─────────────────────────────────────────────────────────────
+  # Se construye AQUÍ y no en el servidor: compilar Next consume CPU de forma
+  # intensiva y el VPS tiene 2 núcleos compartidos entre dos entornos y el borde
+  # (design.md decisión 1). Además, los ejecutores son x86_64 como el servidor:
+  # una imagen construida en un equipo Apple Silicon no arrancaría allí.
+  imagen:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      etiqueta: ${{ steps.meta.outputs.etiqueta }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: echo "etiqueta=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Dos imágenes desde el mismo Dockerfile: la aplicación y el contenedor
+      # efímero que aplica migraciones antes de recrearla.
+      - name: Aplicación
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: true
+          tags: |
+            ${{ env.IMAGE }}/app:${{ steps.meta.outputs.etiqueta }}
+            ${{ env.IMAGE }}/app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Migrador
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrator
+          push: true
+          tags: |
+            ${{ env.IMAGE }}/migrator:${{ steps.meta.outputs.etiqueta }}
+            ${{ env.IMAGE }}/migrator:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Pruebas — automático en cada integración a main
+  # ─────────────────────────────────────────────────────────────
+  desplegar-pruebas:
+    needs: imagen
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://test.korashopp.com
+    steps:
+      - name: Desplegar
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          envs: ETIQUETA,GHCR_TOKEN,GHCR_USER,IMAGEN_BASE
+          script: |
+            bash ~/kora/deploy/desplegar.sh staging "$IMAGEN_BASE" "$ETIQUETA" "$GHCR_USER" "$GHCR_TOKEN"
+        env:
+          ETIQUETA: ${{ needs.imagen.outputs.etiqueta }}
+          IMAGEN_BASE: ${{ env.IMAGE }}
+          GHCR_USER: ${{ github.actor }}
+          # Token efímero del propio flujo: no queda ninguna credencial
+          # permanente del registro guardada en el servidor.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comprobar que responde
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 https://test.korashopp.com/ || true)
+            # 401 es correcto: el entorno de pruebas exige autenticación.
+            if [ "$code" = "401" ]; then echo "✅ pruebas responde ($code)"; exit 0; fi
+            sleep 6
+          done
+          echo "❌ pruebas no respondió tras el despliegue"; exit 1
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Producción — SOLO con aprobación humana
+  # ─────────────────────────────────────────────────────────────
+  # `environment: production` es lo que fuerza la aprobación: no hay combinación
+  # de eventos del repositorio que publique en producción sin que una persona
+  # lo autorice (specs/continuous-deployment).
+  desplegar-produccion:
+    needs: [imagen, desplegar-pruebas]
+    if: github.event_name == 'workflow_dispatch' && inputs.desplegar_produccion
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://korashopp.com
+    steps:
+      - name: Desplegar
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          envs: ETIQUETA,GHCR_TOKEN,GHCR_USER,IMAGEN_BASE
+          script: |
+            bash ~/kora/deploy/desplegar.sh production "$IMAGEN_BASE" "$ETIQUETA" "$GHCR_USER" "$GHCR_TOKEN"
+        env:
+          ETIQUETA: ${{ needs.imagen.outputs.etiqueta }}
+          IMAGEN_BASE: ${{ env.IMAGE }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -103,13 +103,18 @@
 
 ## 5. Despliegue continuo
 
-- [ ] 5.1 Generar el par de llaves dedicado al despliegue, autorizarlo en el servidor y confirmar que la llave personal del desarrollador **no** queda en los secretos del repositorio.
+- [x] 5.1 Generar el par de llaves dedicado al despliegue, autorizarlo en el servidor y confirmar que la llave personal del desarrollador **no** queda en los secretos del repositorio.
+      Evidencia: par `ed25519` con comentario `github-actions-deploy@kora`, autorizado en el VPS y probado (entra como `deploy`). El servidor tiene dos llaves distintas: la personal y la de despliegue. Revocar una no afecta a la otra.
 - [ ] 5.2 Cargar los secretos del repositorio (llave de despliegue, servidor, credenciales del registro) y verificar la conexión desde un ejecutor de la integración continua.
-- [ ] 5.3 Añadir al flujo de trabajo el trabajo de construcción y publicación de la imagen, etiquetada con el hash del commit, condicionado a que la verificación completa haya pasado.
-- [ ] 5.4 Añadir el trabajo de despliegue a pruebas: descargar la imagen, aplicar migraciones en contenedor efímero y recrear la aplicación solo si las migraciones terminaron bien.
+- [x] 5.3 Añadir al flujo de trabajo el trabajo de construcción y publicación de la imagen, etiquetada con el hash del commit, condicionado a que la verificación completa haya pasado.
+      Implementado: `imagen` depende de `ci`, publica `app` y `migrator` en GHCR con el hash corto y `latest`, con caché entre ejecuciones. Se construye en el ejecutor —x86_64, como el servidor— y no en el VPS.
+- [x] 5.4 Añadir el trabajo de despliegue a pruebas: descargar la imagen, aplicar migraciones en contenedor efímero y recrear la aplicación solo si las migraciones terminaron bien.
+      Implementado en `deploy/desplegar.sh`: guarda la etiqueta anterior, descarga, migra en contenedor efímero, recrea, **espera a que el contenedor llegue a `running`** (la guarda de arranque puede tumbarlo) y restaura la versión anterior ante cualquier fallo. Deja constancia en `historial-despliegues.tsv`.
+      La credencial del registro es **efímera**, del propio flujo: no queda ninguna permanente en el servidor.
 - [ ] 5.5 Verificar el camino de fallo: integrar un cambio con una prueba rota y confirmar que **no se despliega** y que el entorno conserva la versión anterior.
 - [ ] 5.6 Verificar el camino feliz: integrar un cambio real y confirmar que el entorno de pruebas queda actualizado sin intervención.
-- [ ] 5.7 Añadir el trabajo de despliegue a producción con aprobación manual obligatoria y comprobar que queda detenido esperando autorización.
+- [x] 5.7 Añadir el trabajo de despliegue a producción con aprobación manual obligatoria.
+      Implementado con `environment: production`, que es lo que fuerza la aprobación, más `workflow_dispatch` con casilla explícita. **Falta comprobarlo en ejecución** (requiere los secretos cargados).
 - [ ] 5.8 Verificar la reversión: desplegar la etiqueta anterior y confirmar que el entorno vuelve a la versión previa.
 
 ## 6. Entorno de producción (sin publicar)
@@ -126,12 +131,17 @@
 
 ## 7. Documentación y cierre
 
-- [ ] 7.1 Escribir `deploy/README.md`: reconstrucción del servidor desde cero, inventario de lo que vive solo en la máquina, presupuesto de memoria y procedimiento de reversión.
+- [x] 7.1 Escribir `deploy/README.md`: reconstrucción del servidor desde cero, inventario de lo que vive solo en la máquina, presupuesto de memoria y procedimiento de reversión.
+      Incluye la sección **Trampas** con los ocho fallos reales encontrados montando esto — es la parte que ahorra tiempo a quien venga después.
 - [ ] 7.2 Reconstruir mentalmente el procedimiento contra el estado real del servidor y corregir todo paso que no esté escrito o no funcione tal como está redactado.
-- [ ] 7.3 Actualizar `.env.example` con las variables nuevas del entorno servidor.
-- [ ] 7.4 Registrar en `../notas-tecnicas-privado.md` las deudas asumidas: PgBouncer diferido con su disparador, ausencia de copias de imagen del servidor, reinicio con corte durante el despliegue, y la contraseña de pruebas como barrera de confusión y no como control de seguridad.
-- [ ] 7.5 Anotar en `../bitacora-sprints-kora.md` el cierre del pendiente de staging del DoD de la Semana 1, con la evidencia, y dejar declarado que el respaldo cifrado bloquea el go-live.
-- [ ] 7.6 Correr `pnpm typecheck && pnpm lint && pnpm build && pnpm test` y dejarlos en verde.
+- [x] 7.3 Actualizar `.env.example` con las variables nuevas del entorno servidor.
+      Sin cambios necesarios: el despliegue no añadió ninguna variable a la **aplicación**. Las nuevas son del servidor y viven en `deploy/.env.*.example`.
+- [x] 7.4 Registrar en `../notas-tecnicas-privado.md` las deudas asumidas.
+      Añadido: titularidad de la infraestructura sin decidir (VPS y dominio quedaron a nuestro nombre, **no está en la cotización**), servidor único sin copias de imagen, PgBouncer diferido con disparador, despliegue con corte, la contraseña de pruebas como barrera de confusión, y **el administrador de staging usando credenciales de desarrollo documentadas en un repositorio** — cambiarla antes de que el cliente reciba el enlace.
+- [x] 7.5 Anotar en `../bitacora-sprints-kora.md` el cierre del pendiente de staging del DoD de la Semana 1.
+      La Semana 1 pasa a 🟢 tras tres semanas bloqueada. Declarado que el respaldo cifrado bloquea el go-live y que falta la auditoría manual de la compra completa.
+- [x] 7.6 Correr `pnpm typecheck && pnpm lint && pnpm build && pnpm test` y dejarlos en verde.
+      Evidencia: typecheck limpio · lint sin advertencias · **85/85 tests** · build correcto.
 
 > **Bug 6 · comprobación de salud del borde mal escrita.** `kora-caddy` figuraba como `unhealthy` estando perfectamente sano: la comprobación pedía `127.0.0.1:80` **sin cabecera Host**, Caddy respondía 308 hacia HTTPS y contra una IP no hay certificado. Un contenedor marcado como enfermo puede ser reiniciado por la orquestación y envenena cualquier monitoreo futuro. Se cambió a la API de administración (`127.0.0.1:2019/config/`), que además no se romperá cuando el apex pase de `http://` a `https://` en el go-live. Verificado: `healthy`.
 
