@@ -1,0 +1,115 @@
+# Entorno de PRODUCCIÓN. Ver openspec/changes/vps-two-stack-deploy.
+#
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# El `--env-file` es necesario para que se resuelvan las ETIQUETAS DE IMAGEN
+# (KORA_IMAGE, KORA_MIGRATOR_IMAGE) que escribe el despliegue automático. El
+# resto de servicios funciona con o sin él: sus variables entran por `env_file`,
+# que es cosa distinta y sí lee del archivo indicado.
+#
+# El aislamiento respecto a pruebas es ESTRUCTURAL, no una convención: la base
+# y la caché viven solo en `interna`, una red que pruebas no comparte y que no
+# publica ningún puerto al servidor. Desde un contenedor de pruebas el nombre
+# `postgres` de este entorno sencillamente no resuelve — el fallo es de red, no
+# de credenciales (specs/environment-isolation).
+#
+# Sin tope duro de CPU a propósito: con solo 2 núcleos, un tope haría que
+# producción no pudiera usar la capacidad que pruebas está dejando ociosa. El
+# reparto lo hace el tope de pruebas, que sí lo tiene.
+#
+# La aplicación toca DOS redes: la interna, para hablar con su base, y la de
+# frontera, para que el borde la alcance. Nunca la del otro entorno.
+
+name: kora-prod
+
+services:
+  app:
+    image: ${KORA_IMAGE:-kora-app:latest}
+    # Nombre fijo: es el que resuelve el `reverse_proxy` del Caddyfile.
+    container_name: kora-prod-app
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 1536m
+    networks:
+      - interna
+      - frontera
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kora-prod-postgres
+    restart: unless-stopped
+    # `env_file` y NO `environment: ${POSTGRES_PASSWORD}`: la sustitución
+    # `${VAR}` dentro de un compose NO lee de `env_file` —lee del shell o de un
+    # archivo llamado exactamente `.env`—, así que la contraseña llegaba vacía y
+    # PostgreSQL se negaba a inicializar. Con `env_file` las variables entran
+    # directamente al contenedor, sin depender de recordar ningún flag.
+    env_file:
+      - .env.production
+    # Sin `ports`: la base NO se expone al servidor ni a internet. Se llega a
+    # ella únicamente desde la red interna de este entorno.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `$$` escapa el signo para que lo resuelva el shell DENTRO del contenedor
+      # y no la sustitución de compose, que aquí tampoco tendría los valores.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 1536m
+    networks:
+      - interna
+
+  redis:
+    image: redis:7-alpine
+    container_name: kora-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 256m
+    networks:
+      - interna
+
+  # Contenedor efímero: aplica migraciones y termina. Se ejecuta como PASO PREVIO
+  # del despliegue, nunca al arrancar la aplicación — si falla, el despliegue se
+  # detiene y la versión anterior sigue sirviendo
+  # (specs/continuous-deployment).
+  #
+  #   docker compose -f docker-compose.prod.yml run --rm migrate
+  migrate:
+    image: ${KORA_MIGRATOR_IMAGE:-kora-migrator:latest}
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+    mem_limit: 512m
+    networks:
+      - interna
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  # `internal: true` corta el acceso a internet de esta red: la base y la caché
+  # no salen a ningún lado, ni aunque alguien lo intente.
+  interna:
+    name: kora-prod-interna
+    internal: true
+  frontera:
+    external: true
+    name: kora-edge-prod

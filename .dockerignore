@@ -1,0 +1,48 @@
+# Contexto de construcción de la imagen.
+#
+# Regla de oro: si un archivo no es necesario para COMPILAR, no entra.
+# Dos exclusiones no son opcionales y por eso van primero:
+#   - `.env*`: `next build` con output standalone COPIA el .env de la raíz dentro de
+#     .next/standalone/. Si el .env llegara al contexto, AUTH_SECRET y DATABASE_URL
+#     quedarían dentro de la imagen publicada. Verificado en la tarea 1.4 del change.
+#   - `.uploads`: son las imágenes del driver de disco de desarrollo (megabytes de fotos
+#     de prueba) y `next build` también las arrastra al standalone.
+
+.env
+.env.*
+!.env.example
+.uploads
+
+# Dependencias y artefactos: se reconstruyen dentro de la imagen
+node_modules
+.next
+out
+build
+coverage
+*.tsbuildinfo
+
+# El cliente de Prisma se genera dentro de la imagen (`pnpm prisma generate`)
+src/generated
+
+# Control de versiones y metadatos
+.git
+.gitignore
+.github
+
+# Herramientas de desarrollo y documentación: no intervienen en la compilación
+.claude
+openspec
+.vscode
+.idea
+README.md
+docker-compose.dev.yml
+deploy
+
+# Ruido del sistema operativo y registros
+.DS_Store
+*.pem
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

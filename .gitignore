@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# ...pero las PLANTILLAS sí se versionan: son la documentación de qué variables
+# necesita cada entorno. Cubre .env.example, deploy/.env.edge.example,
+# .env.staging.example y .env.production.example.
+!.env*.example
+
 # vercel
 .vercel
 
@@ -50,3 +55,10 @@ next-env.d.ts
 
 # Imágenes subidas en desarrollo (driver de disco). En producción van a R2.
 /.uploads
+
+# Claude Code: ajustes locales de la máquina (los comandos y skills de OpenSpec SÍ se versionan)
+.claude/settings.local.json
+
+# Credencial del entorno de pruebas: el archivo real vive solo en el servidor
+# (plantilla versionada: deploy/auth.caddy.example)
+deploy/auth.caddy

@@ -1,0 +1,72 @@
+# Borde compartido: el único contenedor que escucha en 80/443.
+# Ver openspec/changes/vps-two-stack-deploy — design.md decisión 5.
+#
+#   docker compose -f docker-compose.edge.yml up -d
+#
+# Vive aparte de los stacks de cada entorno a propósito: debe seguir sirviendo
+# aunque uno de los dos —o los dos— estén caídos. Un despliegue fallido en
+# pruebas no puede sacar del aire el dominio comercial.
+
+name: kora-edge
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: kora-caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+
+    env_file:
+      - .env.edge
+
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Credencial del entorno de pruebas, fuera de las variables de entorno:
+      # Docker Compose mutila los `$` de un hash bcrypt. Ver auth.caddy.example.
+      - ./auth.caddy:/etc/caddy/auth.caddy:ro
+      - ./holding:/srv/holding:ro
+      # Los certificados persisten entre recreaciones del contenedor. Sin esto
+      # se volverían a solicitar en cada despliegue y se agotaría la cuota de
+      # emisión de la autoridad certificadora.
+      - caddy_data:/data
+      - caddy_config:/config
+
+    # Presupuesto de recursos (design.md decisión 3).
+    mem_limit: 128m
+    cpus: 0.5
+
+    networks:
+      - edge-staging
+      - edge-prod
+
+    healthcheck:
+      # Contra la API de administración, no contra el puerto 80. Una petición a
+      # 127.0.0.1:80 no lleva cabecera Host válida: Caddy responde 308 hacia
+      # HTTPS, y contra una IP no hay certificado — el contenedor se marcaba
+      # `unhealthy` estando perfectamente sano. Esta comprobación además no se
+      # rompe cuando el apex pase de http:// a https:// en el go-live.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+# Redes externas: se crean una sola vez con `docker network create` y las
+# comparten el borde y el stack correspondiente. Que sean DOS y no una es lo que
+# impide que las aplicaciones de ambos entornos puedan siquiera hablarse
+# (specs/environment-isolation).
+networks:
+  edge-staging:
+    external: true
+    name: kora-edge-staging
+  edge-prod:
+    external: true
+    name: kora-edge-prod

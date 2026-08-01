@@ -1,0 +1,19 @@
+# Credencial del entorno de pruebas. Plantilla: copiar a `auth.caddy` EN EL
+# SERVIDOR y rellenar con el hash real. El archivo real no se versiona.
+#
+# Por qué vive aquí y no en .env.edge: un hash bcrypt empieza por `$2a$14$` y
+# Docker Compose interpreta esos `$` como referencias a variables, entregando el
+# hash truncado sin emitir ningún aviso. En un Caddyfile el `$` es un carácter
+# corriente: Caddy solo sustituye la forma `{$VARIABLE}`.
+#
+# Generar el hash (la contraseña en claro va al gestor de contraseñas, nunca a
+# un archivo):
+#
+#   docker run --rm caddy:2-alpine caddy hash-password --plaintext '<contraseña>'
+#
+# Es una barrera contra indexación y confusión, no un control de seguridad
+# fuerte: el entorno de pruebas nunca debe contener datos reales de clientes.
+
+basic_auth {
+	kora <pegar-aquí-el-hash-bcrypt-de-60-caracteres>
+}

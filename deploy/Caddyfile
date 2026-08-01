@@ -1,0 +1,87 @@
+# Borde HTTP de KORA — un solo proxy para los dos entornos.
+# Ver openspec/changes/vps-two-stack-deploy — specs/edge-routing.
+#
+# Este archivo se versiona; los valores sensibles entran por variables de entorno
+# desde deploy/.env.edge, que vive SOLO en el servidor.
+
+{
+	# Dirección para avisos de vencimiento de certificados. Si la emisión falla
+	# de forma silenciosa, este correo es el único que se entera.
+	email {$KORA_ACME_EMAIL}
+
+	# Autoridad certificadora. Por defecto la real; se apunta a la de pruebas
+	# mientras se ajusta el enrutamiento, para no gastar la cuota de emisión
+	# —cinco certificados por dominio a la semana— en ensayo y error.
+	acme_ca {$KORA_ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+}
+
+# Cabeceras comunes a todo lo que servimos.
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+}
+
+# ─────────────────────────────────────────────────────────────
+# ENTORNO DE PRUEBAS — cerrado al público y a los buscadores
+# ─────────────────────────────────────────────────────────────
+# Contiene datos de demostración y funcionalidad a medio construir. Que aparezca
+# en un buscador, o que un cliente lo confunda con la tienda real, es un daño de
+# marca — no un detalle técnico. La contraseña es una barrera contra indexación
+# y confusión, NO un control de seguridad: aquí nunca deben vivir datos reales
+# de clientes.
+test.korashopp.com {
+	# Un ÚNICO bloque `header`, no `import seguridad` + otra directiva `header`:
+	# con dos en el mismo sitio, la segunda desplaza a la primera y las cabeceras
+	# de seguridad desaparecen en silencio (comprobado contra el servidor).
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		X-Robots-Tag "noindex, nofollow, noarchive"
+	}
+
+	# La credencial NO pasa por variables de entorno: un hash bcrypt empieza por
+	# `$2a$14$...` y Docker Compose interpreta esos `$` como variables, entregando
+	# el hash mutilado (48 caracteres en vez de 60) sin avisar de nada — la
+	# autenticación simplemente rechaza siempre, incluso con la contraseña buena.
+	# El archivo importado vive SOLO en el servidor; su plantilla es auth.caddy.example.
+	import /etc/caddy/auth.caddy
+
+	encode zstd gzip
+	reverse_proxy kora-staging-app:3000
+}
+
+# ─────────────────────────────────────────────────────────────
+# DOMINIO COMERCIAL
+# ─────────────────────────────────────────────────────────────
+# DNS repuntado al VPS el 1 ago 2026. Hasta ese momento estos dos bloques iban
+# declarados como `http://` a propósito: mientras el apex apuntaba al parking del
+# proveedor, la autoridad certificadora validaba el dominio contra ESA máquina y
+# Caddy reintentaba cada 60 s indefinidamente, gastando cuota de emisión sin
+# conseguir ningún certificado.
+
+# `www` no sirve contenido: redirige al apex, para no tener la misma página
+# viva bajo dos direcciones (specs/edge-routing).
+www.korashopp.com {
+	import seguridad
+	redir https://korashopp.com{uri} permanent
+}
+
+korashopp.com {
+	import seguridad
+	encode zstd gzip
+
+	# La página de espera, servida como archivo estático desde el propio borde.
+	# Que NO pase por Next.js es lo que la mantiene en pie aunque la aplicación
+	# esté caída o todavía no exista.
+	root * /srv/holding
+	file_server
+
+	# ▼▼▼ GO-LIVE (30 oct): sustituir las dos líneas anteriores por esta ▼▼▼
+	# reverse_proxy kora-prod-app:3000
+}

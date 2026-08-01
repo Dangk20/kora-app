@@ -1,12 +1,19 @@
 // Punto de entrada del almacenamiento: elige el driver por entorno y expone
 // las utilidades de validación e identidad de archivos.
 import { randomUUID } from "node:crypto";
+import { assertStorageConfigured, missingR2Vars } from "./config";
 import type { StorageDriver } from "./driver";
 import { LocalStorageDriver } from "./local-driver";
 import { R2StorageDriver } from "./r2-driver";
 
 export type { StorageDriver, StoredObject } from "./driver";
 export { resolveUploadPath, UPLOADS_DIR } from "./local-driver";
+export {
+  assertStorageConfigured,
+  missingR2Vars,
+  R2_REQUIRED_VARS,
+  StorageConfigError,
+} from "./config";
 
 /** Formatos que aceptamos para foto de producto. */
 export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
@@ -24,32 +31,28 @@ let cached: StorageDriver | undefined;
 
 /**
  * R2 si están todas sus variables; disco local en cualquier otro caso.
- * Configuración incompleta en producción es un error explícito: preferimos
- * fallar al arrancar antes que servir imágenes desde el VPS sin darnos cuenta.
+ *
+ * En producción una configuración incompleta es un error. La comprobación de
+ * verdad ocurre AL ARRANCAR (`src/instrumentation.ts`), no aquí: para cuando
+ * alguien llama a esta función ya hay tráfico y el proceso no debería estar
+ * vivo. El `assertStorageConfigured` de abajo es la segunda línea de defensa,
+ * por si se invoca desde un contexto que no pasó por el arranque del servidor
+ * (un script, una tarea programada, una prueba).
  */
 export function storage(): StorageDriver {
   if (cached) return cached;
 
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucket = process.env.R2_BUCKET;
-  const publicUrl = process.env.R2_PUBLIC_URL;
+  assertStorageConfigured();
 
-  if (accountId && accessKeyId && secretAccessKey && bucket && publicUrl) {
+  if (missingR2Vars().length === 0) {
     cached = new R2StorageDriver({
-      accountId,
-      accessKeyId,
-      secretAccessKey,
-      bucket,
-      publicUrl: publicUrl.replace(/\/$/, ""),
+      accountId: process.env.R2_ACCOUNT_ID!,
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      bucket: process.env.R2_BUCKET!,
+      publicUrl: process.env.R2_PUBLIC_URL!.replace(/\/$/, ""),
     });
   } else {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "Falta configurar R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_URL). En producción las imágenes no se sirven desde el VPS.",
-      );
-    }
     cached = new LocalStorageDriver();
   }
   return cached;

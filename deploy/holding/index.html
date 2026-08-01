@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KORA — Todo lo que buscas, en un solo lugar</title>
+<meta name="description" content="KORA está preparando su tienda en línea. Pequeños detalles, grandes recuerdos. Colombia y Estados Unidos.">
+<meta name="theme-color" content="#121212">
+<link rel="icon" href="/logo-kora.png" type="image/png">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="KORA — Todo lo que buscas, en un solo lugar">
+<meta property="og:description" content="Estamos preparando cada detalle para abrir nuestra tienda en línea.">
+<meta property="og:image" content="/logo-kora.png">
+<meta property="og:locale" content="es_CO">
+
+<!--
+  Página de espera del dominio comercial.
+  Change: openspec/changes/vps-two-stack-deploy — specs/holding-page.
+
+  Tres restricciones que no son estéticas y no deben "mejorarse" sin leer la spec:
+
+  1. CERO PETICIONES A TERCEROS. Las fuentes están alojadas en este mismo servidor
+     (fonts/), no enlazadas a Google Fonts. La página debe seguir funcionando aunque
+     no haya red hacia fuera, y no debe filtrar visitas a un tercero.
+
+  2. NI FORMULARIOS NI CANALES DE CONTACTO. No hay campo de correo (exigiría
+     consentimiento, almacenamiento y política de tratamiento de datos que aún no
+     existen) ni número de WhatsApp (el comercial sigue sin confirmar por el cliente:
+     el que aparece en el prototipo es de prueba).
+
+  3. LA VOZ DEL BRAND BOOK. La marca declara por escrito que "nunca presiona, nunca
+     exagera y nunca promete lo que no puede cumplir". Están prohibidas las palabras
+     urgente, última oportunidad, compra ya, oferta imperdible, liquidación, barato,
+     lujo, imposible y exclusivo. Nada de cuentas regresivas ni fechas de apertura.
+
+  Color y tipografía salen de los tokens de src/app/globals.css.
+-->
+
+<style>
+  @font-face {
+    font-family: "Manrope";
+    src: url("/fonts/Manrope-variable.woff2") format("woff2");
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Allura";
+    src: url("/fonts/Allura-400.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  :root {
+    /* Paleta oficial KORA — espejo de los tokens de src/app/globals.css */
+    --kora-orange: #ff6a00;
+    --kora-coral: #ff5a1f;
+    --kora-pink: #f2357e;
+    --kora-magenta: #c026d3;
+    --kora-purple: #7a3db8;
+    --kora-black: #121212;
+    --kora-beige: #f9f3ee;
+
+    --kora-gradient: linear-gradient(
+      135deg,
+      var(--kora-orange) 0%,
+      var(--kora-coral) 25%,
+      var(--kora-pink) 50%,
+      var(--kora-magenta) 75%,
+      var(--kora-purple) 100%
+    );
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+
+  body {
+    background-color: var(--kora-black);
+    color: var(--kora-beige);
+    font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Resplandor de marca: el gradiente insinuado, no estampado.
+     Se dibuja detrás del contenido y no intercepta el cursor. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20% -10% auto -10%;
+    height: 70vh;
+    background:
+      radial-gradient(60% 70% at 22% 0%, rgba(255, 106, 0, 0.28), transparent 70%),
+      radial-gradient(55% 65% at 78% 8%, rgba(192, 38, 211, 0.24), transparent 72%),
+      radial-gradient(50% 60% at 50% 0%, rgba(122, 61, 184, 0.20), transparent 75%);
+    filter: blur(30px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1.5rem 2rem;
+    gap: 2.25rem;
+  }
+
+  .logo {
+    width: min(230px, 62vw);
+    height: auto;
+    display: block;
+  }
+
+  .titular {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(2.25rem, 8.5vw, 4.25rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    max-width: 16ch;
+  }
+
+  /* El gradiente sobre texto solo se usa en tamaños grandes: el manual lo marca
+     de bajo contraste en cuerpos pequeños. */
+  .titular em {
+    font-style: normal;
+    background-image: var(--kora-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  /* Sin `max-width`: las dos líneas de la firma van cada una en UNA sola línea,
+     como en la portada del brand book. Un `max-width` en ch las parte en móvil. */
+  .bajada {
+    margin: 0;
+    max-width: none;
+  }
+
+  .bajada .linea-uno {
+    display: block;
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: clamp(0.8rem, 3.1vw, 1.2rem);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(249, 243, 238, 0.86);
+  }
+
+  /* Allura reproduce el remate manuscrito de la portada del brand book.
+     `nowrap` no es capricho tipográfico: partida en dos, la firma deja de leerse
+     como firma. El tamaño se ajusta al ancho disponible en vez de romperse. */
+  .bajada .linea-dos {
+    display: block;
+    white-space: nowrap;
+    font-family: "Allura", "Manrope", cursive;
+    font-size: clamp(2.4rem, 11vw, 4rem);
+    line-height: 1.25;
+    margin-top: 0.1em;
+    padding-bottom: 0.12em;
+    background-image: var(--kora-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .separador {
+    width: 78px;
+    height: 2px;
+    border: 0;
+    margin: 0;
+    background-image: var(--kora-gradient);
+    opacity: 0.85;
+  }
+
+  .cuerpo {
+    margin: 0;
+    max-width: 34ch;
+    font-size: clamp(1rem, 3.6vw, 1.125rem);
+    line-height: 1.65;
+    color: rgba(249, 243, 238, 0.74);
+    text-wrap: balance;
+  }
+
+  .cierre {
+    margin: 0;
+    font-size: clamp(0.95rem, 3.4vw, 1.05rem);
+    line-height: 1.6;
+    color: rgba(249, 243, 238, 0.92);
+    max-width: 22ch;
+    /* Reparte las líneas en vez de dejar una palabra huérfana al final. */
+    text-wrap: balance;
+  }
+
+  .cierre strong {
+    font-weight: 800;
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    padding: 1.75rem 1.5rem 2.25rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(249, 243, 238, 0.45);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    main > * {
+      animation: entrada 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    }
+    main > *:nth-child(1) { animation-delay: 0.05s; }
+    main > *:nth-child(2) { animation-delay: 0.14s; }
+    main > *:nth-child(3) { animation-delay: 0.23s; }
+    main > *:nth-child(4) { animation-delay: 0.30s; }
+    main > *:nth-child(5) { animation-delay: 0.37s; }
+    main > *:nth-child(6) { animation-delay: 0.44s; }
+
+    @keyframes entrada {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+
+  @media (min-width: 768px) {
+    main { gap: 2.5rem; padding-top: 4rem; }
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <img class="logo" src="/logo-kora.png" alt="KORA" width="1800" height="467">
+
+  <h1 class="titular">Esto apenas <em>comienza.</em></h1>
+
+  <p class="bajada">
+    <span class="linea-uno">Todo lo que buscas,</span>
+    <span class="linea-dos">en un solo lugar.</span>
+  </p>
+
+  <hr class="separador">
+
+  <p class="cuerpo">Estamos preparando cada detalle para abrir nuestra tienda en línea.</p>
+
+  <p class="cierre">Pequeños detalles, <strong>grandes recuerdos.</strong></p>
+</main>
+
+<footer>Colombia · Estados Unidos</footer>
+
+</body>
+</html>

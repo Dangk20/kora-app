@@ -7,10 +7,14 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  assertStorageConfigured,
   imageKey,
+  missingR2Vars,
+  R2_REQUIRED_VARS,
   resetStorage,
   resolveUploadPath,
   sniffImageType,
+  StorageConfigError,
   storage,
   UPLOADS_DIR,
 } from "@/modules/storage";
@@ -116,7 +120,7 @@ describe("selección de driver por entorno", () => {
     try {
       // NODE_ENV es readonly en los tipos de Node; el test necesita simularlo.
       (process.env as Record<string, string>).NODE_ENV = "production";
-      expect(() => storage()).toThrow(/Falta configurar R2/);
+      expect(() => storage()).toThrow(StorageConfigError);
     } finally {
       (process.env as Record<string, string>).NODE_ENV = previous ?? "test";
       resetStorage();
@@ -143,5 +147,70 @@ describe("selección de driver por entorno", () => {
       for (const k of Object.keys(vars)) delete process.env[k];
       resetStorage();
     }
+  });
+});
+
+// La guarda que corre en src/instrumentation.ts al arrancar el servidor.
+//
+// Por qué importa que sea al arrancar y no al primer uso: con la comprobación
+// perezosa el contenedor arrancaba, /login respondía 200 y la tienda solo
+// fallaba cuando alguien abría una página con imágenes. Un proceso así pasa
+// cualquier verificación de salud estando roto, y el fallo lo encuentra el
+// primer cliente en vez del despliegue.
+describe("guarda de arranque del almacenamiento", () => {
+  // Anotado como ProcessEnv a propósito: NODE_ENV es una unión literal
+  // ("development" | "production" | "test"), no un string cualquiera.
+  const COMPLETO: NodeJS.ProcessEnv = {
+    NODE_ENV: "production",
+    R2_ACCOUNT_ID: "cuenta",
+    R2_ACCESS_KEY_ID: "key",
+    R2_SECRET_ACCESS_KEY: "secreto",
+    R2_BUCKET: "kora",
+    R2_PUBLIC_URL: "https://cdn.kora.com",
+  };
+
+  it("en producción sin configuración: lanza", () => {
+    expect(() => assertStorageConfigured({ NODE_ENV: "production" })).toThrow(
+      StorageConfigError,
+    );
+  });
+
+  it("el error nombra TODAS las variables que faltan", () => {
+    try {
+      assertStorageConfigured({ NODE_ENV: "production" });
+      expect.unreachable("debió lanzar");
+    } catch (error) {
+      expect(error).toBeInstanceOf(StorageConfigError);
+      const e = error as StorageConfigError;
+      expect(e.missing).toEqual([...R2_REQUIRED_VARS]);
+      for (const nombre of R2_REQUIRED_VARS) expect(e.message).toContain(nombre);
+    }
+  });
+
+  it("el error nombra solo la variable que falta cuando el resto está", () => {
+    const casiCompleto = { ...COMPLETO };
+    delete casiCompleto.R2_BUCKET;
+    try {
+      assertStorageConfigured(casiCompleto);
+      expect.unreachable("debió lanzar");
+    } catch (error) {
+      const e = error as StorageConfigError;
+      expect(e.missing).toEqual(["R2_BUCKET"]);
+      expect(e.message).not.toContain("R2_ACCOUNT_ID");
+    }
+  });
+
+  it("una variable presente pero vacía cuenta como faltante", () => {
+    // Un `.env` con `R2_BUCKET=` es un error de configuración, no una elección.
+    expect(missingR2Vars({ ...COMPLETO, R2_BUCKET: "   " })).toEqual(["R2_BUCKET"]);
+  });
+
+  it("en producción con configuración completa: no lanza", () => {
+    expect(() => assertStorageConfigured(COMPLETO)).not.toThrow();
+  });
+
+  it("en desarrollo sin configuración: no lanza", () => {
+    // Quien clone el repositorio debe poder arrancar sin credenciales de R2.
+    expect(() => assertStorageConfigured({ NODE_ENV: "development" })).not.toThrow();
   });
 });
