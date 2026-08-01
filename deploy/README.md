@@ -88,6 +88,8 @@ verificación → imagen → pruebas (automático) → producción (aprobación)
 
 Secretos del repositorio: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`. La credencial del registro es **efímera**, del propio flujo: no queda ninguna permanente en el servidor.
 
+> ⚠️ **`environment: production` por sí solo NO exige aprobación.** Sin reglas de protección, GitHub ejecuta el trabajo directo aunque el YAML declare el entorno. La aprobación humana la impone marcar **`Required reviewers`** en `Settings → Environments → production`. Sin ese checkbox el requisito de la spec no se cumple, y nada en el repositorio lo delata.
+
 **Revertir:** volver a levantar la etiqueta anterior. El historial está en `~/kora/deploy/historial-despliegues.tsv`.
 
 ```bash
