@@ -454,16 +454,30 @@ describe("de punta a punta: pedido confirmado → worker → saldo", () => {
    * su turno los hace invisibles para la toma sin borrarlos; al terminar
    * vuelven a su sitio y el worker los procesará cuando toque.
    */
+  // Los eventos `test.*` son de tests/outbox.test.ts, que corre EN PARALELO
+  // sobre esta misma tabla. Apartarlos también hacía que aquel viera su propio
+  // evento con la espera empujada una hora y fallara de forma intermitente —
+  // el peor tipo de prueba rota, la que solo falla a veces.
+  const AJENOS = { type: { not: { startsWith: "test." } } } as const;
+
   async function apartarReales() {
     await db.domainEvent.updateMany({
-      where: { status: { in: ["PENDING", "PROCESSING"] } },
+      where: { ...AJENOS, status: { in: ["PENDING", "PROCESSING"] } },
       data: { status: "PENDING", claimedAt: null, nextAttemptAt: new Date(Date.now() + 3600_000) },
     });
   }
 
   async function devolverReales() {
+    // Los eventos que este bloque creó apuntan a pedidos que `limpiar()` va a
+    // borrar. Si sobrevivieran, la siguiente corrida encontraría eventos
+    // huérfanos que fallan para siempre y ensucian la bandeja para otros tests.
+    await db.$executeRawUnsafe(
+      `DELETE FROM domain_events e
+       WHERE e.status = 'PENDING'
+         AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.id = e.payload->>'orderId')`,
+    );
     await db.domainEvent.updateMany({
-      where: { status: { in: ["PENDING", "PROCESSING"] } },
+      where: { ...AJENOS, status: { in: ["PENDING", "PROCESSING"] } },
       data: { status: "PENDING", claimedAt: null, nextAttemptAt: new Date() },
     });
   }
@@ -483,8 +497,15 @@ describe("de punta a punta: pedido confirmado → worker → saldo", () => {
     const p = await pedido(c.id, { total: 150_000 });
 
     // Lo que escribe `confirmOrder()` en la misma transacción que descuenta stock.
+    // `nextAttemptAt` en el pasado a propósito: lo pone el reloj de la app y
+    // `claimBatch` lo compara con el de la base, que en desarrollo puede ir unos
+    // milisegundos atrasada. Ver la nota en tests/outbox.test.ts.
     await db.domainEvent.create({
-      data: { type: "order.confirmed", payload: { orderId: p.id, orderNumber: p.number } },
+      data: {
+        type: "order.confirmed",
+        payload: { orderId: p.id, orderNumber: p.number },
+        nextAttemptAt: new Date(Date.now() - 1000),
+      },
     });
 
     const outcomes = await runOnce();
@@ -495,8 +516,6 @@ describe("de punta a punta: pedido confirmado → worker → saldo", () => {
     // Volver a correr el worker no vuelve a acreditar.
     await runOnce();
     expect(await saldo(c.id)).toEqual({ cop: 4_500, usd: 0 });
-
-    await db.domainEvent.deleteMany({ where: { payload: { path: ["orderId"], equals: p.id } } });
   });
 });
 

@@ -19,9 +19,28 @@ import { backoffMs, RETRY_POLICY, type EventHandler } from "@/modules/events/typ
 
 const TIPO = "test.evento";
 
+/**
+ * Crea un evento listo para tomarse YA.
+ *
+ * `nextAttemptAt` va explícitamente en el pasado, y no es cosmético: el valor
+ * por defecto lo pone Prisma con el reloj de la APLICACIÓN, mientras que
+ * `claimBatch` lo compara contra `NOW()` de la BASE. Con el contenedor de
+ * Postgres unos milisegundos atrasado —cosa habitual en una VM de desarrollo
+ * que ha estado suspendida— el evento recién creado queda un instante "en el
+ * futuro" y no se puede tomar: la prueba falla de forma intermitente por un
+ * desfase de relojes, no por el código.
+ *
+ * En producción el worker sondea cada 5 s y ese desfase es invisible; queda
+ * anotado en las notas técnicas privadas como deuda conocida de la cola.
+ */
 async function nuevoEvento(overrides: Record<string, unknown> = {}) {
   return db.domainEvent.create({
-    data: { type: TIPO, payload: { n: 1 }, ...overrides },
+    data: {
+      type: TIPO,
+      payload: { n: 1 },
+      nextAttemptAt: new Date(Date.now() - 1000),
+      ...overrides,
+    },
   });
 }
 

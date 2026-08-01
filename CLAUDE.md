@@ -26,6 +26,7 @@ Ciclo por cada pieza de trabajo (comandos de Claude Code):
 - **El contexto del proyecto vive en `openspec/config.yaml`** — reglas innegociables, nomenclatura, fuente de requisitos y guía por artefacto. Se inyecta automáticamente en cada artefacto que se genera. Si cambia una regla del proyecto, se cambia **ahí** además de aquí.
 - **Las HUs siguen siendo la fuente de requisitos** (`../hus-<área>.md` + Notion). Las specs de OpenSpec trazan contra ellas (`PED_HU003`, `CAT_HU001`, …); no las reemplazan ni las duplican.
 - El CLI local está fijado en `devDependencies`: `pnpm spec <subcomando>` (equivale a `openspec`). Los comandos y skills versionados viven en `.claude/`; `settings.local.json` no se versiona.
+- **`openspec/specs/` ya NO está vacío** (desde el 1 ago 2026, con el archivado de `email-marketing`): ahí viven las capacidades publicadas. Los changes anteriores siguen sin archivar, así que una propuesta nueva debe comprobar el estado real con `pnpm spec list` en vez de repetir la frase "specs sigue vacío", que era cierta hasta esa fecha.
 
 ## Stack
 
