@@ -156,6 +156,10 @@ jobs:
       #
       # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
       # reales viven únicamente en el servidor y no se tocan.
+      # Sin esto el runner no tiene los archivos: los trabajos de despliegue no
+      # heredan el espacio de trabajo del trabajo que compiló la imagen.
+      - uses: actions/checkout@v4
+
       - name: Sincronizar configuración de despliegue
         run: |
           set -euo pipefail
@@ -228,6 +232,10 @@ jobs:
       #
       # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
       # reales viven únicamente en el servidor y no se tocan.
+      # Sin esto el runner no tiene los archivos: los trabajos de despliegue no
+      # heredan el espacio de trabajo del trabajo que compiló la imagen.
+      - uses: actions/checkout@v4
+
       - name: Sincronizar configuración de despliegue
         run: |
           set -euo pipefail
