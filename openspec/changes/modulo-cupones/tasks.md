@@ -5,28 +5,28 @@
 
 ## 1. El modelo
 
-- [ ] 1.1 Ampliar `Coupon`: nombre interno, descripción, tipo **producto gratis** con su variante, **dos valores de monto fijo** (uno por moneda), y los interruptores "solo primera compra" y "aplica a productos en oferta". Migración versionada.
-- [ ] 1.2 Añadir el alcance como **relaciones** a categorías y a productos — no como lista de identificadores en un campo de texto: la base debe poder garantizar que no apunta a algo borrado.
-- [ ] 1.3 Añadir los permisos del módulo a la matriz del seed y a `tests/rbac.test.ts`.
+- [x] 1.1 Ampliar `Coupon`: nombre interno, descripción, tipo **producto gratis** con su variante, **dos valores de monto fijo** (uno por moneda), y los interruptores "solo primera compra" y "aplica a productos en oferta". Migración versionada.
+- [x] 1.2 Añadir el alcance como **relaciones** a categorías y a productos — no como lista de identificadores en un campo de texto: la base debe poder garantizar que no apunta a algo borrado.
+- [x] 1.3 Añadir los permisos del módulo a la matriz del seed y a `tests/rbac.test.ts`.
 
 ## 2. Estado, validación y cálculo — antes que ninguna pantalla
 
-- [ ] 2.1 `status.ts`: estado derivado con la precedencia inactivo → vencido → agotado → activo. **Una sola función** para el panel y para el checkout: dos cálculos harían que el panel y el comprador vieran cosas distintas.
-- [ ] 2.2 `messages.ts`: los siete textos exactos de la historia de usuario, en un solo sitio.
-- [ ] 2.3 `validate.ts`: las siete comprobaciones **en su orden**, devolviendo un motivo tipado y no un texto.
-- [ ] 2.4 `discount.ts`: cálculo por tipo sobre el **carrito ya resuelto por el servidor**, sin consultar precios por su cuenta. El total nunca queda negativo.
-- [ ] 2.5 Elegibilidad por alcance y exclusión de los ítems en oferta cuando el interruptor está apagado.
+- [x] 2.1 `status.ts`: estado derivado con la precedencia inactivo → vencido → agotado → activo. **Una sola función** para el panel y para el checkout: dos cálculos harían que el panel y el comprador vieran cosas distintas.
+- [x] 2.2 `messages.ts`: los siete textos exactos de la historia de usuario, en un solo sitio.
+- [x] 2.3 `validate.ts`: las siete comprobaciones **en su orden**, devolviendo un motivo tipado y no un texto.
+- [x] 2.4 `discount.ts`: cálculo por tipo sobre el **carrito ya resuelto por el servidor**, sin consultar precios por su cuenta. El total nunca queda negativo.
+- [x] 2.5 Elegibilidad por alcance y exclusión de los ítems en oferta cuando el interruptor está apagado.
 
 ## 3. Pruebas de las reglas
 
 > Un cupón es dinero que sale. Estas reglas se fijan con prueba, no con revisión visual.
 
-- [ ] 3.1 **Precedencia del estado:** pausado y vencido a la vez → Inactivo; agotado en fecha → Agotado.
-- [ ] 3.2 **Orden de las validaciones:** un cupón pausado *y* vencido devuelve el motivo de la primera comprobación, no el de la segunda.
-- [ ] 3.3 **Moneda:** un cupón solo en pesos se rechaza en un pedido en dólares. Uno "en ambas" aplica el valor de la moneda del pedido, **sin convertir**.
-- [ ] 3.4 **El descuento no deja el total negativo:** un monto fijo mayor que el carrito descuenta como mucho el subtotal elegible.
-- [ ] 3.5 **Alcance:** con un cupón de categoría y un carrito mixto, el descuento sale solo de los ítems de esa categoría.
-- [ ] 3.6 **Productos en oferta:** con el interruptor apagado, los ítems rebajados quedan fuera del cálculo.
+- [x] 3.1 **Precedencia del estado:** pausado y vencido a la vez → Inactivo; agotado en fecha → Agotado.
+- [x] 3.2 **Orden de las validaciones:** un cupón pausado *y* vencido devuelve el motivo de la primera comprobación, no el de la segunda.
+- [x] 3.3 **Moneda:** un cupón solo en pesos se rechaza en un pedido en dólares. Uno "en ambas" aplica el valor de la moneda del pedido, **sin convertir**.
+- [x] 3.4 **El descuento no deja el total negativo:** un monto fijo mayor que el carrito descuenta como mucho el subtotal elegible.
+- [x] 3.5 **Alcance:** con un cupón de categoría y un carrito mixto, el descuento sale solo de los ítems de esa categoría.
+- [x] 3.6 **Productos en oferta:** con el interruptor apagado, los ítems rebajados quedan fuera del cálculo.
 - [ ] 3.7 **Solo primera compra:** un contacto con pedidos confirmados previos es rechazado.
 - [ ] 3.8 **Máximo por cliente:** alcanzado el límite, se rechaza.
 - [ ] 3.9 **El código es inmutable** y se normaliza a mayúsculas; un duplicado en otra caja se detecta.

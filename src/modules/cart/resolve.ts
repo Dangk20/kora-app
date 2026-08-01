@@ -10,6 +10,9 @@ import type { CartLine } from "./cart-context";
 
 export type ResolvedLine = {
   variantId: string;
+  /** El alcance de un cupón se define por producto o por categoría. */
+  productId: string;
+  categoryId: string;
   qty: number;
   /** Cantidad realmente pedible: recortada al cupo online disponible. */
   qtyAvailable: number;
@@ -82,6 +85,8 @@ export async function resolveCart(
 
     resolved.push({
       variantId: variant.id,
+      productId: variant.productId,
+      categoryId: variant.product.categoryId,
       qty: line.qty,
       qtyAvailable,
       productName: variant.product.name,

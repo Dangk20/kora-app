@@ -77,40 +77,42 @@ model RolePermission {
 // ─────────────────────────────────────────────────────────────
 
 model Category {
-  id       String     @id @default(cuid())
-  name     String
-  slug     String     @unique
-  parentId String?
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  position Int        @default(0)
-  active   Boolean    @default(true)
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  parentId     String?
+  parent       Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children     Category[]       @relation("CategoryTree")
+  position     Int              @default(0)
+  active       Boolean          @default(true)
   // Identidad visual de la categoría (patrón del prototipo aprobado):
   // fondo pastel del tile + ícono lucide. Los tiles de producto la heredan
   // mientras no haya fotos reales.
-  color    String     @default("#FBE3D3")
-  icon     String     @default("package")
-  products Product[]
+  color        String           @default("#FBE3D3")
+  icon         String           @default("package")
+  products     Product[]
+  couponScopes CouponCategory[]
 
   @@map("categories")
 }
 
 model Product {
-  id          String         @id @default(cuid())
-  name        String
-  slug        String         @unique
-  description String?
-  brand       String?
-  categoryId  String
-  category    Category       @relation(fields: [categoryId], references: [id])
-  active      Boolean        @default(true)
-  featured    Boolean        @default(false)
-  images      ProductImage[]
-  variants    Variant[]
+  id            String          @id @default(cuid())
+  name          String
+  slug          String          @unique
+  description   String?
+  brand         String?
+  categoryId    String
+  category      Category        @relation(fields: [categoryId], references: [id])
+  active        Boolean         @default(true)
+  featured      Boolean         @default(false)
+  images        ProductImage[]
+  variants      Variant[]
   showcaseItems ShowcaseItem[]
   banners       Banner[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  couponScopes  CouponProduct[]
 
   @@index([categoryId])
   @@map("products")
@@ -157,6 +159,7 @@ model Variant {
   orderItems     OrderItem[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  freeInCoupons  Coupon[]        @relation("CouponFreeVariant")
 
   @@index([productId])
   @@map("variants")
@@ -285,14 +288,14 @@ model Order {
   contactEmail    String?
   contactDocument String? // CC/CE/NIT — lo exigen las transportadoras (solo CO)
 
-  shipCountry    String? @default("CO") // CO | US
-  shipState      String? // departamento (CO) | estado (US)
-  shipCity       String?
-  shipAddress    String?
-  shipAddress2   String? // apto/torre/conjunto | Apt/Suite
+  shipCountry      String? @default("CO") // CO | US
+  shipState        String? // departamento (CO) | estado (US)
+  shipCity         String?
+  shipAddress      String?
+  shipAddress2     String? // apto/torre/conjunto | Apt/Suite
   shipNeighborhood String? // barrio (solo CO)
-  shipZip        String? // ZIP (solo US)
-  shipNotes      String?
+  shipZip          String? // ZIP (solo US)
+  shipNotes        String?
 
   paymentPreference String? // Nequi, Zelle… (administrable a futuro)
 
@@ -361,28 +364,89 @@ model OrderStatusHistory {
 enum CouponType {
   PERCENT
   FIXED
+  FREE_PRODUCT // adaptación KORA del patrón "días gratis" (decisión 19 jul 2026)
+}
+
+// A qué productos aplica el descuento.
+enum CouponScope {
+  ALL
+  CATEGORIES
+  PRODUCTS
 }
 
 model Coupon {
-  id       String     @id @default(cuid())
-  code     String     @unique
-  type     CouponType
-  value    Decimal    @db.Decimal(12, 2) // % si PERCENT, monto si FIXED
-  currency Currency? // requerido si FIXED; null si PERCENT (aplica a ambas)
+  id          String  @id @default(cuid())
+  // Inmutable después de crear: es lo que el comprador escribe y lo que queda
+  // registrado en los pedidos. Cambiarlo dejaría campañas impresas apuntando
+  // a nada y pedidos históricos apuntando a otro significado.
+  code        String  @unique
+  name        String // nombre interno, solo visible en el panel
+  description String?
+
+  type CouponType
+
+  // PERCENT: 1..100
+  percentValue Decimal? @db.Decimal(5, 2)
+
+  // FIXED: un importe POR MONEDA, ambos opcionales. Dos columnas y no una con
+  // moneda porque el cliente pidió cupones aplicables a las dos a la vez, y
+  // porque NO hay conversión: son dos importes decididos por el negocio, no
+  // uno derivado del otro.
+  amountCop Decimal? @db.Decimal(12, 2)
+  amountUsd Decimal? @db.Decimal(12, 2)
+
+  // FREE_PRODUCT: la variante que se regala.
+  freeVariantId String?
+  freeVariant   Variant? @relation("CouponFreeVariant", fields: [freeVariantId], references: [id])
 
   minSubtotal      Decimal?  @db.Decimal(12, 2)
   maxUses          Int? // null = ilimitado
   usedCount        Int       @default(0)
-  perCustomerLimit Int?
+  perCustomerLimit Int?      @default(1)
   validFrom        DateTime?
   validTo          DateTime?
-  active           Boolean   @default(true)
+
+  // Los cupones NO se eliminan (los pedidos los referencian): pausar es la
+  // única forma de sacarlos de circulación.
+  active Boolean @default(true)
+
+  // Solo para clientes sin pedidos confirmados previos.
+  firstPurchaseOnly  Boolean @default(false)
+  // OFF = los ítems ya rebajados quedan FUERA del cálculo del descuento.
+  appliesToSaleItems Boolean @default(true)
+
+  scope      CouponScope      @default(ALL)
+  categories CouponCategory[]
+  products   CouponProduct[]
 
   redemptions CouponRedemption[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
   @@map("coupons")
+}
+
+// El alcance va como RELACIÓN y no como lista de identificadores en un campo
+// de texto: así la base garantiza que un cupón no apunta a algo borrado, y la
+// consulta de elegibilidad es un join en vez de una lista que hay que recorrer.
+model CouponCategory {
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, categoryId])
+  @@map("coupon_categories")
+}
+
+model CouponProduct {
+  couponId  String
+  coupon    Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, productId])
+  @@map("coupon_products")
 }
 
 model CouponRedemption {
@@ -503,14 +567,18 @@ enum ShowcaseRule {
 }
 
 model ShowcaseSection {
-  /** Clave estable de la sección; la UI conoce estas claves. */
+  /**
+   * Clave estable de la sección; la UI conoce estas claves.
+   */
   key      String       @id
   title    String
   subtitle String?
   active   Boolean      @default(true)
   mode     ShowcaseMode @default(MANUAL)
   autoRule ShowcaseRule @default(NEWEST)
-  /** Cuántos productos muestra la sección. */
+  /**
+   * Cuántos productos muestra la sección.
+   */
   limit    Int          @default(4)
 
   items     ShowcaseItem[]
@@ -535,27 +603,32 @@ model ShowcaseItem {
 /**
  * Pieza publicitaria de la vitrina. La imagen viene ya diseñada con su texto
  * (decisión 19 jul 2026): el sistema solo la muestra y la enlaza.
- *
  * `slot` la ancla a su lugar en la página (hero principal, hero lateral…).
  * Un mismo slot admite VARIAS piezas: la tienda las rota automáticamente en
  * el orden de `position`.
  */
 model Banner {
-  id       String    @id @default(cuid())
-  slot     String
-  title    String
-  /** Key en el storage (R2 en prod, disco en dev) — nunca una URL absoluta. */
-  imageUrl String?
-  /** Producto al que lleva el banner. */
+  id        String    @id @default(cuid())
+  slot      String
+  title     String
+  /**
+   * Key en el storage (R2 en prod, disco en dev) — nunca una URL absoluta.
+   */
+  imageUrl  String?
+  /**
+   * Producto al que lleva el banner.
+   */
   productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  /** Enlace libre, si no apunta a un producto. */
-  linkUrl  String?
-  position Int       @default(0)
-  active   Boolean   @default(true)
-  startsAt DateTime?
-  endsAt   DateTime?
-  updatedAt DateTime @updatedAt
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /**
+   * Enlace libre, si no apunta a un producto.
+   */
+  linkUrl   String?
+  position  Int       @default(0)
+  active    Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  updatedAt DateTime  @updatedAt
 
   @@index([slot, position])
   @@index([productId])
