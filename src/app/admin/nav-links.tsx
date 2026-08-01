@@ -11,6 +11,7 @@ import {
   Store,
   Users,
   UsersRound,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { href: "/admin/inventario", label: "Inventario", permission: "inventory:view", icon: Layers },
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
+  { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
   { href: "/admin/usuarios", label: "Usuarios", permission: "users:view", icon: Users },
 ];

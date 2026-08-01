@@ -34,12 +34,12 @@
 
 ## 4. El panel
 
-- [ ] 4.1 Vista `/admin/cupones`: listado con chips de estado y sus contadores, buscador por código o nombre, y el valor del descuento formateado según el tipo (incluida la doble moneda).
-- [ ] 4.2 Formulario de alta en tarjetas: identidad, tipo y valor, restricciones, comportamiento y alcance.
-- [ ] 4.3 Edición con el **código bloqueado** y el aviso de "este cupón ya tiene N usos" cuando corresponda.
-- [ ] 4.4 Pausar y reactivar desde el listado en un clic, con el badge cambiando de inmediato.
-- [ ] 4.5 Confirmar que **no existe** ninguna acción de eliminar, ni en la interfaz ni en el servidor.
-- [ ] 4.6 Entrada en la navegación, visible solo con el permiso.
+- [x] 4.1 Vista `/admin/cupones`: listado con chips de estado y sus contadores, buscador por código o nombre, y el valor del descuento formateado según el tipo (incluida la doble moneda).
+- [x] 4.2 Formulario de alta en tarjetas: identidad, tipo y valor, restricciones, comportamiento y alcance.
+- [x] 4.3 Edición con el **código bloqueado** y el aviso de "este cupón ya tiene N usos" cuando corresponda.
+- [x] 4.4 Pausar y reactivar desde el listado en un clic, con el badge cambiando de inmediato.
+- [x] 4.5 Confirmar que **no existe** ninguna acción de eliminar, ni en la interfaz ni en el servidor.
+- [x] 4.6 Entrada en la navegación, visible solo con el permiso.
 
 ## 5. El checkout
 
