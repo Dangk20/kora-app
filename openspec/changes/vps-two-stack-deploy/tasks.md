@@ -105,14 +105,18 @@
 
 - [x] 5.1 Generar el par de llaves dedicado al despliegue, autorizarlo en el servidor y confirmar que la llave personal del desarrollador **no** queda en los secretos del repositorio.
       Evidencia: par `ed25519` con comentario `github-actions-deploy@kora`, autorizado en el VPS y probado (entra como `deploy`). El servidor tiene dos llaves distintas: la personal y la de despliegue. Revocar una no afecta a la otra.
-- [ ] 5.2 Cargar los secretos del repositorio (llave de despliegue, servidor, credenciales del registro) y verificar la conexión desde un ejecutor de la integración continua.
+- [x] 5.2 Cargar los secretos del repositorio y verificar la conexión desde un ejecutor de la integración continua.
+      Evidencia: `VPS_HOST`, `VPS_USER` y `VPS_SSH_KEY` cargados; el ejecutor se conectó y ejecutó el despliegue. Entornos `staging` (sin reglas) y `production` (con **`Required reviewers`**) creados.
+      ⚠️ Descubierto en el camino: **`environment: production` por sí solo NO exige aprobación** — sin marcar `Required reviewers`, GitHub ejecuta el trabajo directo aunque el YAML declare el entorno. El requisito de la spec lo impone ese checkbox, y nada en el repositorio lo delata. Documentado en `deploy/README.md`.
 - [x] 5.3 Añadir al flujo de trabajo el trabajo de construcción y publicación de la imagen, etiquetada con el hash del commit, condicionado a que la verificación completa haya pasado.
       Implementado: `imagen` depende de `ci`, publica `app` y `migrator` en GHCR con el hash corto y `latest`, con caché entre ejecuciones. Se construye en el ejecutor —x86_64, como el servidor— y no en el VPS.
 - [x] 5.4 Añadir el trabajo de despliegue a pruebas: descargar la imagen, aplicar migraciones en contenedor efímero y recrear la aplicación solo si las migraciones terminaron bien.
       Implementado en `deploy/desplegar.sh`: guarda la etiqueta anterior, descarga, migra en contenedor efímero, recrea, **espera a que el contenedor llegue a `running`** (la guarda de arranque puede tumbarlo) y restaura la versión anterior ante cualquier fallo. Deja constancia en `historial-despliegues.tsv`.
       La credencial del registro es **efímera**, del propio flujo: no queda ninguna permanente en el servidor.
 - [ ] 5.5 Verificar el camino de fallo: integrar un cambio con una prueba rota y confirmar que **no se despliega** y que el entorno conserva la versión anterior.
-- [ ] 5.6 Verificar el camino feliz: integrar un cambio real y confirmar que el entorno de pruebas queda actualizado sin intervención.
+- [x] 5.6 Verificar el camino feliz: integrar un cambio real y confirmar que el entorno de pruebas queda actualizado sin intervención.
+      Evidencia (1 ago 2026, 11:47 UTC): commit `5262374` → imagen `ghcr.io/dangk20/kora-app/app:526237484f4f` publicada, descargada y sirviendo. `test.korashopp.com` responde 401 sin credenciales y 200 con ellas, con datos reales de su base. Registrado en `historial-despliegues.tsv`. **Cero intervención manual.**
+      Verificado además que **no quedó ninguna credencial del registro en el servidor**: la sesión se cierra al terminar el guion.
 - [x] 5.7 Añadir el trabajo de despliegue a producción con aprobación manual obligatoria.
       Implementado con `environment: production`, que es lo que fuerza la aprobación, más `workflow_dispatch` con casilla explícita. **Falta comprobarlo en ejecución** (requiere los secretos cargados).
 - [ ] 5.8 Verificar la reversión: desplegar la etiqueta anterior y confirmar que el entorno vuelve a la versión previa.
@@ -146,3 +150,5 @@
 > **Bug 6 · comprobación de salud del borde mal escrita.** `kora-caddy` figuraba como `unhealthy` estando perfectamente sano: la comprobación pedía `127.0.0.1:80` **sin cabecera Host**, Caddy respondía 308 hacia HTTPS y contra una IP no hay certificado. Un contenedor marcado como enfermo puede ser reiniciado por la orquestación y envenena cualquier monitoreo futuro. Se cambió a la API de administración (`127.0.0.1:2019/config/`), que además no se romperá cuando el apex pase de `http://` a `https://` en el go-live. Verificado: `healthy`.
 
 > **Bug 8 · un bind mount de archivo único apunta al inodo, no a la ruta.** Al subir el `Caddyfile` con `tar`, este **reemplaza** el archivo creando uno nuevo, y el montaje del contenedor siguió apuntando al inodo viejo: `caddy reload` recargó la configuración **anterior** sin error alguno, y el apex se quedó sin HTTPS pareciendo que todo había funcionado. Se detectó comparando el contenido del archivo en el host y dentro del contenedor. Regla que queda: **tras modificar cualquier archivo montado individualmente hay que recrear el contenedor** (`up -d --force-recreate`), no basta con recargar. Debe ir al `deploy/README.md` (tarea 7.1).
+
+> **Bug 9 · `ghcr.io` rechaza nombres con mayúsculas.** `github.repository` devuelve `Dangk20/kora-app` con la D mayúscula del usuario, y el registro rechaza el nombre: la publicación de la imagen fallaba y con ella todo el despliegue. Se diagnosticó por razonamiento, sin acceso a los registros del flujo (`gh` no está instalado en el equipo de desarrollo). El nombre se deriva ahora en tiempo de ejecución con expansión de bash (`${GITHUB_REPOSITORY,,}`) y viaja como salida del trabajo.
