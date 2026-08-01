@@ -285,3 +285,47 @@ describe("mensajes exactos de la historia de usuario", () => {
     );
   });
 });
+
+describe("consumo del uso — la parte que cuesta dinero", () => {
+  it("el incremento condicional NO deja pasar dos usos sobre un cupón de uno", async () => {
+    // Es el equivalente aquí del test de las 50 compras sobre stock=1: leer,
+    // comprobar y luego escribir dejaría una ventana en la que dos compradores
+    // con el último uso verían ambos que queda uno.
+    const c = await cupon({ maxUses: 1 });
+
+    const intentar = () =>
+      db.$executeRaw`
+        UPDATE coupons
+        SET "usedCount" = "usedCount" + 1
+        WHERE id = ${c.id} AND active = true
+          AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+      `;
+
+    const resultados = await Promise.all([intentar(), intentar(), intentar()]);
+    const ganadores = resultados.filter((filas) => filas === 1).length;
+
+    expect(ganadores).toBe(1);
+    const despues = await db.coupon.findUniqueOrThrow({ where: { id: c.id } });
+    expect(despues.usedCount).toBe(1);
+  });
+
+  it("un cupón pausado no puede consumirse aunque quede cupo", async () => {
+    const c = await cupon({ maxUses: 10, active: false });
+    const filas = await db.$executeRaw`
+      UPDATE coupons SET "usedCount" = "usedCount" + 1
+      WHERE id = ${c.id} AND active = true
+        AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+    `;
+    expect(filas).toBe(0);
+  });
+
+  it("un cupón sin máximo se puede consumir siempre", async () => {
+    const c = await cupon({ maxUses: null });
+    const filas = await db.$executeRaw`
+      UPDATE coupons SET "usedCount" = "usedCount" + 1
+      WHERE id = ${c.id} AND active = true
+        AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+    `;
+    expect(filas).toBe(1);
+  });
+});

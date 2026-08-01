@@ -21,12 +21,30 @@ import {
 } from "./message";
 import { whatsappNumberFor } from "./settings";
 import { toE164 } from "@/modules/customers/phone";
+import { validateCoupon } from "@/modules/coupons/validate";
+
+/**
+ * El cupón se agotó o se pausó entre validarlo y crear el pedido.
+ *
+ * Se lanza DENTRO de la transacción para que se deshaga entera: si el cupón ya
+ * no está disponible, el pedido no debe existir con un descuento que nadie
+ * autorizó.
+ */
+class CouponRaceError extends Error {
+  constructor() {
+    super("Este cupón ya alcanzó su límite de usos.");
+    this.name = "CouponRaceError";
+  }
+}
 
 /** Validez del pedido pendiente (PED_HU003). */
 const ORDER_TTL_MS = 2 * 60 * 60 * 1000;
 
 const baseSchema = z.object({
   checkoutToken: z.string().min(10).max(100),
+  // El descuento NUNCA viene del navegador: solo el código. Quien calcula es
+  // quien crea el pedido.
+  couponCode: z.string().trim().toUpperCase().optional().or(z.literal("").transform(() => undefined)),
   country: z.enum(["CO", "US"]),
   name: z.string().trim().min(3, "Escribe tu nombre completo"),
   email: z.string().trim().email("Correo inválido"),
@@ -109,7 +127,42 @@ export async function createOrder(
   }
 
   const phone = toE164(data.phone, data.country);
-  const total = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
+  const subtotal = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
+
+  // ── Cupón ──
+  // Se REVALIDA por completo aquí, aunque ya se validara al aplicarlo: entre
+  // una cosa y otra el cupón pudo agotarse por otro comprador o pausarse desde
+  // el panel. La validación al aplicar es para la experiencia; la que decide
+  // es esta.
+  let coupon: Awaited<ReturnType<typeof validateCoupon>> | null = null;
+  if (data.couponCode) {
+    coupon = await validateCoupon(data.couponCode, cart, { phone, email: data.email });
+    if (!coupon.ok) {
+      return { ok: false, error: coupon.message, field: "couponCode" };
+    }
+  }
+  const discountTotal = coupon?.ok ? coupon.discount : 0;
+  const total = Math.max(0, subtotal - discountTotal);
+
+  // El producto regalado, si el cupón es de ese tipo.
+  const freeVariant = coupon?.ok && coupon.freeVariantId
+    ? await db.variant.findUnique({
+        where: { id: coupon.freeVariantId },
+        include: { product: true },
+      })
+    : null;
+  const freeItem =
+    freeVariant && coupon?.ok
+      ? {
+          variantId: freeVariant.id,
+          qty: 1,
+          unitPrice: 0,
+          total: 0,
+          productName: freeVariant.product.name,
+          variantName: `${freeVariant.name} · Regalo cupón ${coupon.coupon.code}`,
+          sku: freeVariant.sku,
+        }
+      : null;
   const address = compactAddress({
     country: data.country,
     address: data.address,
@@ -155,14 +208,33 @@ export async function createOrder(
             },
           });
 
+      // Consumo del uso, con ESCRITURA CONDICIONAL: solo incrementa si sigue
+      // activo y por debajo de su máximo. Leer, comprobar y luego escribir
+      // dejaría una ventana en la que dos compradores con el último uso verían
+      // ambos que queda uno. Aquí decide la base — mismo criterio que el motor
+      // de inventario con el stock.
+      //
+      // Si no afecta ninguna fila, el cupón se agotó entre validar y crear: se
+      // lanza y la transacción entera se deshace, así que el pedido no se crea.
+      if (coupon?.ok) {
+        const filas = await tx.$executeRaw`
+          UPDATE coupons
+          SET "usedCount" = "usedCount" + 1, "updatedAt" = NOW()
+          WHERE id = ${coupon.coupon.id}
+            AND active = true
+            AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+        `;
+        if (filas === 0) throw new CouponRaceError();
+      }
+
       const created = await tx.order.create({
         data: {
           channel: "WEB",
           status: "PENDING",
           currency,
           customerId: customer.id,
-          subtotal: total,
-          discountTotal: 0,
+          subtotal,
+          discountTotal,
           total,
           contactName: data.name,
           contactPhone: phone,
@@ -182,21 +254,39 @@ export async function createOrder(
           checkoutToken: data.checkoutToken,
           expiresAt: new Date(Date.now() + ORDER_TTL_MS),
           items: {
-            create: buyable.map((l) => ({
-              variantId: l.variantId,
-              qty: l.qtyAvailable,
-              unitPrice: l.unitPrice,
-              total: l.lineTotal,
-              productName: l.productName,
-              variantName: l.variantName,
-              sku: l.sku,
-            })),
+            create: [
+              ...buyable.map((l) => ({
+                variantId: l.variantId,
+                qty: l.qtyAvailable,
+                unitPrice: l.unitPrice,
+                total: l.lineTotal,
+                productName: l.productName,
+                variantName: l.variantName,
+                sku: l.sku,
+              })),
+              // El regalo entra como línea NORMAL con precio cero: así su stock
+              // lo descuenta el motor de inventario al confirmar, igual que
+              // cualquier otro ítem. Un regalo que no descontara stock sería
+              // inventario que desaparece del almacén y no de la base.
+              ...(freeItem ? [freeItem] : []),
+            ],
           },
           statusHistory: {
             create: { from: "PENDING", to: "PENDING", note: "Pedido creado desde la tienda web" },
           },
         },
       });
+
+      if (coupon?.ok) {
+        await tx.couponRedemption.create({
+          data: {
+            couponId: coupon.coupon.id,
+            orderId: created.id,
+            customerId: customer.id,
+            amount: discountTotal,
+          },
+        });
+      }
 
       // El mensaje necesita el consecutivo, que solo existe tras el insert.
       const message = buildWhatsappMessage({
@@ -210,6 +300,7 @@ export async function createOrder(
           lineTotal: l.lineTotal,
         })),
         total,
+        discount: coupon?.ok ? { code: coupon.coupon.code, amount: discountTotal } : undefined,
         contactName: data.name,
         contactPhone: phone,
         address,
@@ -224,6 +315,13 @@ export async function createOrder(
 
     return orderResult(order);
   } catch (e) {
+    // El cupón se agotó o se pausó entre validarlo y crear el pedido. La
+    // transacción se deshizo entera: el pedido NO se creó y el uso NO se
+    // consumió. Se devuelve el mensaje del canje, no un error genérico.
+    if (e instanceof CouponRaceError) {
+      return { ok: false, error: e.message, field: "couponCode" };
+    }
+
     // Carrera: dos envíos simultáneos pasaron la verificación de arriba y la
     // base rechazó el segundo por el token único. El pedido SÍ existe —
     // devolverlo en vez de un error que haría reintentar y duplicar.

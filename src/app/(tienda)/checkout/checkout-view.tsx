@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
+import { applyCoupon } from "@/modules/coupons/apply-action";
 import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
 import { createOrder } from "@/modules/orders/checkout-actions";
@@ -39,6 +40,12 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
   const [country, setCountry] = useState<Country>(initialCountry);
   const [state, setState] = useState("");
 
+  // Cupón: solo el CÓDIGO viaja al servidor; el descuento lo calcula él.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponPending, setCouponPending] = useState(false);
+
   // Token de idempotencia: el mismo durante toda esta sesión de checkout, así
   // un doble clic o un reintento no crean dos pedidos.
   const checkoutToken = useRef(
@@ -62,6 +69,7 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
     setError(null);
     const payload = {
       checkoutToken: checkoutToken.current,
+      couponCode: coupon?.code ?? "",
       country,
       name: String(formData.get("name") ?? ""),
       email: String(formData.get("email") ?? ""),
@@ -121,7 +129,8 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
   }
 
   const currency = cart!.currency;
-  const total = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
+  const subtotal = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
+  const total = Math.max(0, subtotal - (coupon?.discount ?? 0));
   const isCO = country === "CO";
   const fieldError = (name: string) =>
     error?.field === name ? (
@@ -384,6 +393,75 @@ export function CheckoutView({ initialCountry }: { initialCountry: Country }) {
           </div>
 
           <div className="my-4 h-px bg-[#efe9e1]" />
+
+          {/* Canje del cupón (CUP_HU004 §1). Un solo cupón por pedido. */}
+          {coupon ? (
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-[10px] border border-[#ffd9c7] bg-[#FFF4EF] px-3 py-2.5">
+              <div className="min-w-0">
+                <span className="font-mono text-[12.5px] font-bold text-kora-black">
+                  {coupon.code}
+                </span>
+                <span className="ml-2 text-[12.5px] text-[#8a5a2b]">
+                  −{formatMoney(coupon.discount, currency)}
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-label="Quitar cupón"
+                onClick={() => {
+                  setCoupon(null);
+                  setCouponError(null);
+                }}
+                className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[12px] font-bold text-[#8a5a2b]"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]">
+                ¿Tienes un cupón?
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  placeholder="CÓDIGO"
+                  className="min-w-0 flex-1 rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3 py-2.5 font-mono text-[13px] outline-none focus:border-kora-coral"
+                />
+                <button
+                  type="button"
+                  disabled={couponPending || !couponInput.trim()}
+                  onClick={async () => {
+                    setCouponPending(true);
+                    setCouponError(null);
+                    const r = await applyCoupon(couponInput, lines, {});
+                    if (r.ok) {
+                      setCoupon({ code: r.code, discount: r.discount });
+                      setCouponInput("");
+                    } else {
+                      setCouponError(r.error);
+                    }
+                    setCouponPending(false);
+                  }}
+                  className="shrink-0 rounded-[10px] border-[1.6px] border-[#e2ddd6] px-4 text-[13px] font-semibold text-kora-black disabled:opacity-50"
+                >
+                  {couponPending ? "…" : "Aplicar"}
+                </button>
+              </div>
+              {couponError && (
+                <p className="mt-1.5 text-[12px] text-destructive">{couponError}</p>
+              )}
+            </div>
+          )}
+
+          {coupon && (
+            <div className="mb-2 flex items-baseline justify-between text-[13px]">
+              <span className="text-[#6b6f78]">Subtotal</span>
+              <span className="text-kora-black">{formatMoney(subtotal, currency)}</span>
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-bold text-kora-black">Total</span>
             <span className="text-[22px] font-extrabold text-kora-black">

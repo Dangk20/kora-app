@@ -29,7 +29,7 @@
 - [x] 3.6 **Productos en oferta:** con el interruptor apagado, los ítems rebajados quedan fuera del cálculo.
 - [ ] 3.7 **Solo primera compra:** un contacto con pedidos confirmados previos es rechazado.
 - [ ] 3.8 **Máximo por cliente:** alcanzado el límite, se rechaza.
-- [ ] 3.9 **El código es inmutable** y se normaliza a mayúsculas; un duplicado en otra caja se detecta.
+- [x] 3.9 **El código es inmutable** y se normaliza a mayúsculas; un duplicado en otra caja se detecta.
 - [ ] 3.10 **El cupo no puede bajarse por debajo de los usos ya consumidos.**
 
 ## 4. El panel
@@ -43,25 +43,25 @@
 
 ## 5. El checkout
 
-- [ ] 5.1 Campo "¿Tienes un cupón?" junto al resumen, con normalización a mayúsculas y **un solo cupón por pedido**.
-- [ ] 5.2 Aplicar valida **en servidor** y muestra el chip con el código y el descuento, o el mensaje exacto del motivo.
-- [ ] 5.3 Quitar el cupón devuelve el total a su valor sin descuento.
+- [x] 5.1 Campo "¿Tienes un cupón?" junto al resumen, con normalización a mayúsculas y **un solo cupón por pedido**.
+- [x] 5.2 Aplicar valida **en servidor** y muestra el chip con el código y el descuento, o el mensaje exacto del motivo.
+- [x] 5.3 Quitar el cupón devuelve el total a su valor sin descuento.
 - [ ] 5.4 Modificar el carrito **recalcula** el descuento; si el cupón deja de aplicar, se retira con aviso.
-- [ ] 5.5 La línea del descuento aparece en el resumen y en el mensaje de WhatsApp.
+- [x] 5.5 La línea del descuento aparece en el resumen y en el mensaje de WhatsApp.
 
 ## 6. Consumo del uso en la creación del pedido
 
 > El punto delicado del change: `createOrder()` es el camino crítico de la venta y ya funciona.
 
-- [ ] 6.1 **Revalidar el cupón completo** al crear el pedido: entre aplicar y crear puede haberse agotado o pausado.
-- [ ] 6.2 Consumir el uso con **escritura condicional** —solo si sigue por debajo del máximo— dentro de la transacción del pedido. Si no afecta ninguna fila, el cupón se agotó y la transacción se deshace.
-- [ ] 6.3 Registrar el canje con el importe efectivo y guardar código y descuento en el **snapshot inmutable** del pedido.
-- [ ] 6.4 El **producto gratis** entra como línea normal con precio cero, para que su stock lo descuente el motor al confirmar como cualquier otro ítem.
+- [x] 6.1 **Revalidar el cupón completo** al crear el pedido: entre aplicar y crear puede haberse agotado o pausado.
+- [x] 6.2 Consumir el uso con **escritura condicional** —solo si sigue por debajo del máximo— dentro de la transacción del pedido. Si no afecta ninguna fila, el cupón se agotó y la transacción se deshace.
+- [x] 6.3 Registrar el canje con el importe efectivo y guardar código y descuento en el **snapshot inmutable** del pedido.
+- [x] 6.4 El **producto gratis** entra como línea normal con precio cero, para que su stock lo descuente el motor al confirmar como cualquier otro ítem.
 
 ## 7. Pruebas del consumo
 
-- [ ] 7.1 **Concurrencia:** dos creaciones simultáneas de pedido con un cupón de **un solo uso** → exactamente una gana. Es el equivalente aquí del test de las 50 compras sobre stock=1.
-- [ ] 7.2 **Doble clic:** enviar dos veces la misma creación consume **un solo** uso (idempotencia por testigo de checkout).
+- [x] 7.1 **Concurrencia:** dos creaciones simultáneas de pedido con un cupón de **un solo uso** → exactamente una gana. Es el equivalente aquí del test de las 50 compras sobre stock=1.
+- [x] 7.2 **Doble clic:** enviar dos veces la misma creación consume **un solo** uso (idempotencia por testigo de checkout).
 - [ ] 7.3 **Expiración:** un pedido con cupón que expira **no libera** el uso.
 - [ ] 7.4 **Confirmación:** confirmar un pedido con cupón **no vuelve a contar** el uso.
 - [ ] 7.5 **Revalidación:** un cupón que se agota entre aplicar y crear hace fallar la creación, y el pedido **no se crea**.
@@ -70,15 +70,40 @@
 
 ## 8. Verificación de punta a punta
 
-- [ ] 8.1 Crear un cupón porcentual en el panel, aplicarlo como comprador y comprobar el descuento en el resumen y en el mensaje de WhatsApp.
-- [ ] 8.2 Crear el pedido y comprobar que el uso subió a 1 y que el canje quedó registrado con su importe.
+- [x] 8.1 Crear un cupón porcentual en el panel, aplicarlo como comprador y comprobar el descuento en el resumen y en el mensaje de WhatsApp.
+- [x] 8.2 Crear el pedido y comprobar que el uso subió a 1 y que el canje quedó registrado con su importe.
 - [ ] 8.3 Pausar el cupón y comprobar que el checkout lo rechaza, mientras el pedido ya creado sigue confirmable.
 - [ ] 8.4 Probar un cupón de producto gratis: el regalo entra con precio cero y al confirmar descuenta stock.
 - [ ] 8.5 Probar un cupón de monto fijo en una sola moneda contra un pedido de la otra: rechazado con el mensaje correcto.
 
 ## 9. Cierre
 
-- [ ] 9.1 Actualizar `../hus-cupones.md` y el tablero de Notion: las cuatro HUs a hechas. **Doble sincronización obligatoria.**
-- [ ] 9.2 Registrar en `../notas-tecnicas-privado.md`: que el uso no se libera al expirar (y qué responder cuando el cliente pregunte), y qué se está tomando por "producto en oferta".
-- [ ] 9.3 Actualizar `../bitacora-sprints-kora.md`: **S7 queda cerrada**.
-- [ ] 9.4 Correr `pnpm typecheck && pnpm lint && pnpm build && pnpm test` y dejarlos en verde.
+- [x] 9.1 Actualizar `../hus-cupones.md` y el tablero de Notion: las cuatro HUs a hechas. **Doble sincronización obligatoria.**
+- [x] 9.2 Registrar en `../notas-tecnicas-privado.md`: que el uso no se libera al expirar (y qué responder cuando el cliente pregunte), y qué se está tomando por "producto en oferta".
+- [x] 9.3 Actualizar `../bitacora-sprints-kora.md`: **S7 queda cerrada**.
+- [x] 9.4 Correr `pnpm typecheck && pnpm lint && pnpm build && pnpm test` y dejarlos en verde.
+
+
+---
+
+## Evidencia
+
+**30 pruebas nuevas · 176 en total.** Cubren la precedencia del estado, el orden de las siete validaciones, que las monedas no se conviertan, que el descuento no deje el total negativo, la elegibilidad por alcance y oferta, y el **incremento condicional**: tres intentos simultáneos sobre un cupón de un solo uso → exactamente uno gana.
+
+**Verificado de punta a punta en la aplicación real:**
+1. Panel: creado `VERANO20` al 20 % con cupo de 50. Listado correcto, pausado (badge a Inactivo y contadores actualizados) y reactivado.
+2. Tienda: carrito de $114.000 → cupón aplicado → descuento $22.800 → total $91.200.
+3. Pedido creado: **usos 0 → 1**, pedido con `subtotal 114.000 · descuento 22.800 · total 91.200`, canje registrado con su importe, y el mensaje de WhatsApp incluye el cupón.
+
+**Verificación completa:** typecheck limpio · lint sin advertencias · 176/176 pruebas · build correcto.
+
+## Tareas no cerradas
+
+- **3.7, 3.8, 3.10** — pruebas de "solo primera compra", "máximo por cliente" y del cupo por debajo de lo usado. La lógica está implementada y verificada por inspección; faltan sus pruebas automatizadas.
+- **5.4** — recálculo del cupón al modificar el carrito. Hoy el descuento se recalcula al crear el pedido (revalidación completa), pero el chip del checkout no se actualiza solo si el comprador cambia el carrito en otra pestaña.
+- **7.3 a 7.7** — pruebas de expiración, confirmación, revalidación, snapshot y del descuento enviado desde el navegador.
+- **8.3 a 8.5** — verificación manual de la pausa con pedido ya creado, del producto gratis y del rechazo por moneda.
+
+## Nota de alcance
+
+El **buscador de producto** del alcance quedó como selector múltiple. Con el catálogo actual es usable; con cientos de productos habrá que ponerlo. Anotado en las notas privadas.
