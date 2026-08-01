@@ -20,16 +20,32 @@ El despliegue SHALL ejecutarse únicamente cuando la verificación automática d
 - **WHEN** se integra a la rama principal un cambio que pasa la verificación completa
 - **THEN** el entorno de pruebas queda actualizado sin intervención manual
 
-### Requirement: Despliegue automático a pruebas, manual a producción
+### Requirement: Despliegue nocturno o bajo petición, nunca en cada integración
 
-La integración a la rama principal SHALL desplegar automáticamente al entorno de pruebas. El despliegue a producción NO SHALL ocurrir de forma automática: SHALL requerir una aprobación humana explícita.
+*(Revisado el 1 ago 2026: antes se desplegaba a pruebas en cada integración a la rama principal.)*
+
+El entorno de pruebas SHALL desplegarse de forma **programada, una vez al día**, y **bajo petición explícita**. NO SHALL desplegarse en cada integración a la rama principal.
+
+El despliegue a producción NO SHALL ocurrir de forma automática en ningún caso: SHALL requerir petición explícita **y** aprobación humana.
 
 **Invariante:** ninguna combinación de eventos del repositorio puede publicar en producción sin que una persona lo autorice.
 
+**Por qué cambió:** desplegar en cada commit convierte el entorno de pruebas en un blanco móvil —cambia bajo los pies de quien lo está probando— y gasta tiempo de CI en cada iteración. El valor está en tener **commits por bloques de trabajo**, no en un servidor que cambia veinte veces al día. La verificación sí sigue corriendo en cada integración: esa es la compuerta y da la respuesta rápida.
+
 #### Scenario: Integración a la rama principal
 
-- **WHEN** un cambio verificado se integra a la rama principal
-- **THEN** se despliega al entorno de pruebas y producción permanece en su versión anterior
+- **WHEN** un cambio se integra a la rama principal
+- **THEN** se ejecuta la verificación completa y **no se despliega ni se construye ninguna imagen**
+
+#### Scenario: Ejecución programada
+
+- **WHEN** llega la hora programada del despliegue nocturno
+- **THEN** se construyen las imágenes y se despliega al entorno de pruebas sin intervención
+
+#### Scenario: Despliegue bajo petición
+
+- **WHEN** una persona solicita el despliegue a pruebas
+- **THEN** se construyen las imágenes y se despliega, sin esperar a la noche
 
 #### Scenario: Promoción a producción
 

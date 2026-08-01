@@ -84,10 +84,14 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm mi
 
 ## Despliegue
 
-Automático desde GitHub Actions. `main` despliega a **pruebas** sin intervención; **producción** exige aprobación humana (`environment: production`).
+Desde GitHub Actions. **En cada integración solo corre la verificación** — no se despliega ni se construyen imágenes. El entorno de pruebas se despliega **cada noche a las 02:00 (Colombia)** y **bajo petición** desde `Actions → CI → Run workflow`. **Producción** solo bajo petición y con aprobación humana.
+
+Desplegar en cada commit convierte el entorno de pruebas en un blanco móvil: cambia bajo los pies de quien lo está probando.
 
 ```
-verificación → imagen → sincronizar configuración → pruebas (automático) → producción (aprobación)
+cada push:     verificación
+cada noche:    verificación → imágenes → configuración → pruebas
+bajo petición: lo mismo, y opcionalmente producción (con aprobación)
 ```
 
 **El despliegue lleva imágenes Y configuración.** Los archivos de este directorio se copian al servidor en cada despliegue, así que una corrección del compose o del `Caddyfile` llega sola. Los `.env.*` y `auth.caddy` reales **no se tocan**: viven únicamente en el servidor.

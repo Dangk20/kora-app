@@ -2,17 +2,29 @@
 #
 # Ver openspec/changes/vps-two-stack-deploy — specs/continuous-deployment.
 #
-# Cadena: verificación → imagen → pruebas (automático) → producción (aprobación manual).
-# Ninguna imagen se construye si la verificación no pasó: si falla, el entorno
-# conserva la versión anterior.
+# En cada integración: SOLO verificación. Es la compuerta y da respuesta rápida.
+# El despliegue es NOCTURNO o BAJO PETICIÓN — desplegar en cada commit es ruido
+# y gasta tiempo de CI en cada iteración; lo que importa es tener commits por
+# bloques de trabajo, no un servidor que cambia veinte veces al día.
+#
+# Cadena al desplegar: verificación → imágenes → configuración → pruebas.
+# Producción, además, exige aprobación humana.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  # Nocturno: 02:00 en Colombia (07:00 UTC). Deja el entorno de pruebas al día
+  # cada mañana sin que nadie tenga que pedirlo.
+  schedule:
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
+      desplegar_pruebas:
+        description: "Desplegar a PRUEBAS (test.korashopp.com)"
+        type: boolean
+        default: true
       desplegar_produccion:
         description: "Desplegar a PRODUCCIÓN (exige aprobación del entorno)"
         type: boolean
@@ -70,7 +82,12 @@ jobs:
   # una imagen construida en un equipo Apple Silicon no arrancaría allí.
   imagen:
     needs: ci
-    if: github.ref == 'refs/heads/main'
+    # Solo cuando se va a desplegar: en una integración normal, construir y
+    # publicar tres imágenes que nadie va a usar es tiempo y espacio tirados.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.desplegar_pruebas || inputs.desplegar_produccion))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -137,11 +154,13 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────
-  # 3. Pruebas — automático en cada integración a main
+  # 3. Pruebas — nocturno o bajo petición
   # ─────────────────────────────────────────────────────────────
   desplegar-pruebas:
     needs: imagen
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.desplegar_pruebas)
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -216,7 +235,9 @@ jobs:
   # de eventos del repositorio que publique en producción sin que una persona
   # lo autorice (specs/continuous-deployment).
   desplegar-produccion:
-    needs: [imagen, desplegar-pruebas]
+    # Depende solo de la imagen: producción no puede quedar bloqueada porque el
+    # despliegue a pruebas no se haya pedido en la misma ejecución.
+    needs: imagen
     if: github.event_name == 'workflow_dispatch' && inputs.desplegar_produccion
     runs-on: ubuntu-latest
     environment:
