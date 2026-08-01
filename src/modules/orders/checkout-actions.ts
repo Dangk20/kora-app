@@ -23,6 +23,8 @@ import { whatsappNumberFor } from "./settings";
 import { toE164 } from "@/modules/customers/phone";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { resolveOrderCustomer } from "./customer-link";
+import { consumeCashback, CashbackError } from "@/modules/cashback/ledger";
+import { resolveRedemption } from "@/modules/cashback/redemption";
 import { validateCoupon } from "@/modules/coupons/validate";
 
 /**
@@ -47,6 +49,9 @@ const baseSchema = z.object({
   // El descuento NUNCA viene del navegador: solo el código. Quien calcula es
   // quien crea el pedido.
   couponCode: z.string().trim().toUpperCase().optional().or(z.literal("").transform(() => undefined)),
+  // Igual que el cupón: llega la INTENCIÓN, no el descuento. Cuánto se puede
+  // aplicar lo decide el servidor leyendo el libro de cashback.
+  cashbackRequested: z.coerce.number().min(0).optional().default(0),
   country: z.enum(["CO", "US"]),
   name: z.string().trim().min(3, "Escribe tu nombre completo"),
   email: z.string().trim().email("Correo inválido"),
@@ -147,7 +152,24 @@ export async function createOrder(
     }
   }
   const discountTotal = coupon?.ok ? coupon.discount : 0;
-  const total = Math.max(0, subtotal - discountTotal);
+  const totalTrasCupon = Math.max(0, subtotal - discountTotal);
+
+  // ── Kora Cashback ──
+  // Se resuelve en SERVIDOR, con el saldo leído del libro. La exclusión mutua
+  // con cupones es una regla del cliente y se comprueba aquí aunque la
+  // interfaz ya la impida: la petición no tiene por qué venir de la interfaz.
+  const canje = await resolveRedemption({
+    customerId: buyer?.customerId ?? null,
+    requested: data.cashbackRequested,
+    orderTotal: totalTrasCupon,
+    currency,
+    hasCoupon: Boolean(coupon?.ok),
+  });
+  if (!canje.ok && canje.reason !== "NOT_REQUESTED") {
+    return { ok: false, error: canje.message, field: "cashback" };
+  }
+  const cashbackApplied = canje.ok ? canje.amount : 0;
+  const total = Math.max(0, totalTrasCupon - cashbackApplied);
 
   // El producto regalado, si el cupón es de ese tipo.
   const freeVariant = coupon?.ok && coupon.freeVariantId
@@ -192,6 +214,19 @@ export async function createOrder(
         acceptsMarketing: data.acceptsMarketing,
       });
 
+      // El saldo se consume ANTES de crear el pedido y dentro de su misma
+      // transacción: `consumeCashback` bloquea la fila del cliente, y tomar ese
+      // bloqueo pronto es lo que serializa a dos pedidos que peleen por el
+      // mismo saldo — el segundo espera y relee lo ya gastado. Si no alcanza,
+      // lanza y no queda ni consumo ni pedido.
+      if (cashbackApplied > 0) {
+        await consumeCashback(tx, {
+          customerId: customer.id,
+          amount: cashbackApplied,
+          currency,
+        });
+      }
+
       // Consumo del uso, con ESCRITURA CONDICIONAL: solo incrementa si sigue
       // activo y por debajo de su máximo. Leer, comprobar y luego escribir
       // dejaría una ventana en la que dos compradores con el último uso verían
@@ -219,6 +254,7 @@ export async function createOrder(
           customerId: customer.id,
           subtotal,
           discountTotal,
+          cashbackApplied,
           total,
           contactName: data.name,
           contactPhone: phone,
@@ -285,6 +321,7 @@ export async function createOrder(
         })),
         total,
         discount: coupon?.ok ? { code: coupon.coupon.code, amount: discountTotal } : undefined,
+        cashbackApplied,
         contactName: data.name,
         contactPhone: phone,
         address,
@@ -304,6 +341,18 @@ export async function createOrder(
     // consumió. Se devuelve el mensaje del canje, no un error genérico.
     if (e instanceof CouponRaceError) {
       return { ok: false, error: e.message, field: "couponCode" };
+    }
+
+    // Otro pedido del mismo comprador se llevó el saldo entre que se calculó el
+    // aplicable y que se intentó gastarlo. La transacción se deshizo entera: no
+    // hay pedido ni consumo. Se le dice qué pasó, no un error genérico — el
+    // saldo que ve en pantalla ya no es el que tiene.
+    if (e instanceof CashbackError && e.code === "INSUFFICIENT") {
+      return {
+        ok: false,
+        error: "Tu saldo de Kora Cashback cambió mientras completabas el pedido. Vuelve a intentarlo.",
+        field: "cashback",
+      };
     }
 
     // Carrera: dos envíos simultáneos pasaron la verificación de arriba y la

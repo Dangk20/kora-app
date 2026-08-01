@@ -114,10 +114,8 @@ export function CashbackPanel({ resumen }: { resumen: CashbackSummary }) {
         </div>
       )}
 
-      {/* Todavía no se puede canjear: decirlo evita que lo intente en el
-          checkout y concluya que la tienda está rota. */}
       <p className="mt-4 text-[12px] text-muted-foreground">
-        Para usar tu cashback, menciónalo al confirmar tu pedido por WhatsApp.
+        Puedes usarlo como descuento al finalizar tu próxima compra. No se combina con cupones.
       </p>
     </section>
   );

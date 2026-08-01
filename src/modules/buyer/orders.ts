@@ -88,6 +88,7 @@ export async function buyerOrder(customerId: string, number: number) {
     currency: o.currency,
     subtotal: aNumero(o.subtotal),
     discountTotal: aNumero(o.discountTotal),
+    cashbackApplied: aNumero(o.cashbackApplied),
     total,
     expiresAt: o.expiresAt,
     vigente: estaVigente(o),

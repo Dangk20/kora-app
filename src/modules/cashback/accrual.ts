@@ -9,29 +9,28 @@ import type { Currency } from "@/generated/prisma/enums";
 import { TASA_CASHBACK, truncar } from "./money";
 
 export type AccrualInput = {
-  /** Total del pedido: el snapshot inmutable, ya con cupones descontados. */
-  total: number;
   /**
-   * Parte del total pagada con saldo de cashback.
+   * El total del pedido: exactamente lo que el operador va a cobrar.
    *
-   * Hoy siempre es 0: la redención en el checkout es un change aparte. Cuando
-   * exista, el pedido tendrá que guardar cuánto se pagó con saldo y ese valor
-   * entra por aquí — la fórmula ya lo contempla.
+   * ⚠️ YA VIENE NETO de cupones **y de cashback aplicado** — `createOrder()` lo
+   * guarda así. No hay que restarle nada aquí: hacerlo descontaría el saldo dos
+   * veces y el comprador recibiría menos cashback del que le corresponde.
    */
-  cashbackApplied?: number;
+  total: number;
   currency: Currency;
 };
 
 /**
  * Base de cálculo: el dinero REALMENTE pagado.
  *
- * Se parte del total del pedido y no de sus líneas porque el total es lo que el
- * operador va a cobrar por WhatsApp: recalcular la base desde los ítems abriría
- * la puerta a generar cashback sobre un número distinto del que se cobró.
+ * Es el total del pedido, y no la suma de sus líneas, porque el total es lo que
+ * el operador cobra por WhatsApp: recalcular la base desde los ítems abriría la
+ * puerta a generar cashback sobre un número distinto del que se cobró. Y como
+ * ese total ya viene con el cupón y el cashback descontados, es literalmente lo
+ * que el comprador pagó con dinero.
  */
 export function accrualBase(input: AccrualInput): number {
-  const pagadoConDinero = input.total - (input.cashbackApplied ?? 0);
-  return Math.max(0, pagadoConDinero);
+  return Math.max(0, input.total);
 }
 
 /**

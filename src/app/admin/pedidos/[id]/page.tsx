@@ -171,8 +171,27 @@ export default async function OrderDetailPage({
               );
             })}
 
+            {/* El operador tiene que poder explicar de dónde sale la rebaja
+                antes de cobrar: cupón y cashback van por separado. */}
+            {Number(order.discountTotal) > 0 && (
+              <div className="flex items-center justify-between px-6 pt-3 text-[13.5px]">
+                <span className="text-[#6b6f78]">Descuento por cupón</span>
+                <span className="text-kora-black">
+                  − {formatMoney(Number(order.discountTotal), order.currency)}
+                </span>
+              </div>
+            )}
+            {Number(order.cashbackApplied) > 0 && (
+              <div className="flex items-center justify-between px-6 pt-1 text-[13.5px]">
+                <span className="text-[#6b6f78]">Pagado con Kora Cashback</span>
+                <span className="text-kora-black">
+                  − {formatMoney(Number(order.cashbackApplied), order.currency)}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-6 py-4">
-              <span className="text-[15px] font-bold text-kora-black">Total</span>
+              <span className="text-[15px] font-bold text-kora-black">Total a cobrar</span>
               <span className="text-xl font-extrabold text-kora-black">
                 {formatMoney(Number(order.total), order.currency)} {order.currency}
               </span>

@@ -29,7 +29,14 @@ const labelCls = "mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]";
 type Country = "CO" | "US";
 
 /** Datos del comprador con sesión, para no hacerle escribir lo que ya sabemos. */
-export type BuyerDefaults = { name: string; email: string; phone: string } | null;
+export type BuyerDefaults = {
+  name: string;
+  email: string;
+  phone: string;
+  /** Saldo de Kora Cashback en la moneda activa. Solo informativo: el importe
+   *  aplicable lo decide el servidor al crear el pedido. */
+  cashback: number;
+} | null;
 
 export function CheckoutView({
   initialCountry,
@@ -55,6 +62,10 @@ export function CheckoutView({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponPending, setCouponPending] = useState(false);
 
+  // Kora Cashback: solo viaja el importe PEDIDO. Cuánto se aplica de verdad lo
+  // decide el servidor leyendo el libro — igual que con el cupón.
+  const [usarCashback, setUsarCashback] = useState(false);
+
   // Token de idempotencia: el mismo durante toda esta sesión de checkout, así
   // un doble clic o un reintento no crean dos pedidos.
   const checkoutToken = useRef(
@@ -79,6 +90,7 @@ export function CheckoutView({
     const payload = {
       checkoutToken: checkoutToken.current,
       couponCode: coupon?.code ?? "",
+      cashbackRequested: cashbackAplicable,
       country,
       name: String(formData.get("name") ?? ""),
       email: String(formData.get("email") ?? ""),
@@ -139,7 +151,11 @@ export function CheckoutView({
 
   const currency = cart!.currency;
   const subtotal = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
-  const total = Math.max(0, subtotal - (coupon?.discount ?? 0));
+  const totalTrasCupon = Math.max(0, subtotal - (coupon?.discount ?? 0));
+  // Estimación para la pantalla; la cifra que vale es la del servidor.
+  const cashbackAplicable =
+    usarCashback && buyer ? Math.min(buyer.cashback, totalTrasCupon) : 0;
+  const total = Math.max(0, totalTrasCupon - cashbackAplicable);
   const isCO = country === "CO";
   const fieldError = (name: string) =>
     error?.field === name ? (
@@ -475,10 +491,53 @@ export function CheckoutView({
             </div>
           )}
 
-          {coupon && (
+          {/* Kora Cashback. Solo con sesión: sin cuenta, la identidad del
+              comprador sería el correo que escribió, y eso dejaría gastar el
+              saldo ajeno. Y no se combina con cupón — regla del cliente. */}
+          {buyer && buyer.cashback > 0 && (
+            <div className="mb-3">
+              <label
+                className={`flex items-center gap-2.5 rounded-[10px] border-[1.6px] px-3 py-2.5 ${
+                  coupon
+                    ? "cursor-not-allowed border-[#e2ddd6] opacity-60"
+                    : "cursor-pointer border-[#ffd9c7] bg-[#FFF4EF]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={usarCashback}
+                  disabled={Boolean(coupon)}
+                  onChange={(e) => setUsarCashback(e.target.checked)}
+                  className="size-4 accent-kora-orange"
+                />
+                <span className="text-[12.5px] text-kora-black">
+                  Usar mi Kora Cashback
+                  <span className="ml-1.5 font-bold">
+                    ({formatMoney(buyer.cashback, currency)} disponible)
+                  </span>
+                </span>
+              </label>
+              {coupon && (
+                <p className="mt-1.5 text-[12px] text-[#8a8f98]">
+                  No puedes usar un cupón y tu Kora Cashback en la misma compra.
+                </p>
+              )}
+            </div>
+          )}
+
+          {(coupon || cashbackAplicable > 0) && (
             <div className="mb-2 flex items-baseline justify-between text-[13px]">
               <span className="text-[#6b6f78]">Subtotal</span>
               <span className="text-kora-black">{formatMoney(subtotal, currency)}</span>
+            </div>
+          )}
+
+          {cashbackAplicable > 0 && (
+            <div className="mb-2 flex items-baseline justify-between text-[13px]">
+              <span className="text-[#6b6f78]">Kora Cashback</span>
+              <span className="text-kora-black">
+                −{formatMoney(cashbackAplicable, currency)}
+              </span>
             </div>
           )}
 

@@ -86,15 +86,23 @@ describe("cálculo del cashback", () => {
     expect(computeAccrual({ total: 40, currency: "USD" })).toBe(1.2);
   });
 
-  it("calcula sobre el dinero pagado, no sobre el total, cuando se usó saldo", () => {
-    // El ejemplo textual del cliente: compra de $100.000, paga $80.000 con
-    // dinero y $20.000 con saldo → genera $2.400, no $3.000.
-    expect(accrualBase({ total: 100_000, cashbackApplied: 20_000, currency: "COP" })).toBe(80_000);
-    expect(computeAccrual({ total: 100_000, cashbackApplied: 20_000, currency: "COP" })).toBe(2_400);
+  it("calcula sobre el dinero pagado, no sobre el precio de lista", () => {
+    // El ejemplo textual del cliente: compra de $100.000, usa $20.000 de saldo
+    // y paga $80.000 con dinero → genera $2.400, no $3.000.
+    //
+    // El pedido guarda como `total` lo que se cobra —ya con el cupón y el
+    // cashback descontados—, así que la base ES ese total. Restarle otra vez el
+    // saldo aplicado descontaría dos veces.
+    expect(accrualBase({ total: 80_000, currency: "COP" })).toBe(80_000);
+    expect(computeAccrual({ total: 80_000, currency: "COP" })).toBe(2_400);
+    // Sobre el precio de lista habría dado 3.000: ese es el ciclo que la regla
+    // del cliente evita.
+    expect(computeAccrual({ total: 100_000, currency: "COP" })).toBe(3_000);
   });
 
   it("una compra cubierta al 100 % con saldo genera cero", () => {
-    expect(computeAccrual({ total: 50_000, cashbackApplied: 50_000, currency: "COP" })).toBe(0);
+    // Total cobrado = 0 porque el saldo lo cubrió todo.
+    expect(computeAccrual({ total: 0, currency: "COP" })).toBe(0);
   });
 
   it("trunca hacia abajo: al peso en COP y al centavo en USD", () => {

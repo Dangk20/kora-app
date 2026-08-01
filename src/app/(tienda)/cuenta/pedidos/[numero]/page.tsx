@@ -101,6 +101,12 @@ export default async function PedidoPage({
           {pedido.discountTotal > 0 && (
             <Fila label="Descuento" valor={`− ${money(pedido.discountTotal, pedido.currency)}`} />
           )}
+          {pedido.cashbackApplied > 0 && (
+            <Fila
+              label="Kora Cashback"
+              valor={`− ${money(pedido.cashbackApplied, pedido.currency)}`}
+            />
+          )}
           <div className="mt-2 flex justify-between border-t border-[#f0ece6] pt-3">
             <span className="text-[15px] font-bold text-kora-black">Total</span>
             <span className="text-[17px] font-extrabold text-kora-black">

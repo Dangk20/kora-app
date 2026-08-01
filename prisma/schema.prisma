@@ -290,6 +290,12 @@ model Order {
   discountTotal Decimal @default(0) @db.Decimal(12, 2)
   total         Decimal @db.Decimal(12, 2)
 
+  // Cuánto de este pedido se pagó con saldo de Kora Cashback. Parte del
+  // snapshot inmutable: es lo que el operador cobró, y tiene que sobrevivir
+  // aunque el libro de cashback se reorganice. QUÉ lotes lo pagaron no se
+  // copia aquí — ya está en cashback_movements, apuntando a este pedido.
+  cashbackApplied Decimal @default(0) @db.Decimal(12, 2)
+
   couponRedemption CouponRedemption?
   whatsappMessage  String? // mensaje pre-armado (se envía por api.whatsapp.com/send)
   note             String?

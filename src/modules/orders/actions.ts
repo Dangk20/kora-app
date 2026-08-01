@@ -10,6 +10,8 @@ import { revalidatePath } from "next/cache";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
+import { CashbackError, consumeCashback } from "@/modules/cashback/ledger";
+import { outstandingCashback, refundOrderCashback } from "@/modules/cashback/refund";
 import { applyStockMovement, StockError } from "@/modules/inventory/engine";
 import { canTransition, STATUS_LABEL } from "./status";
 
@@ -219,12 +221,16 @@ export async function cancelOrder(
   // Cancelar un pedido ya confirmado NO devuelve el stock automáticamente:
   // la mercancía pudo haber salido. El operador lo ajusta desde Inventario,
   // que deja el movimiento con su motivo en el kardex.
-  await db.$transaction([
-    db.order.update({
+  //
+  // El cashback SÍ vuelve, y la asimetría es a propósito: el stock pudo salir
+  // por la puerta, pero el saldo es dinero del comprador que salió de su
+  // bolsillo al crear el pedido. Si la compra no ocurre, es suyo.
+  await db.$transaction(async (tx) => {
+    await tx.order.update({
       where: { id: orderId },
       data: { status: "CANCELLED", expiresAt: null },
-    }),
-    db.orderStatusHistory.create({
+    });
+    await tx.orderStatusHistory.create({
       data: {
         orderId,
         from: order.status,
@@ -232,8 +238,9 @@ export async function cancelOrder(
         actorId: session.user.id,
         note: motivo,
       },
-    }),
-  ]);
+    });
+    await refundOrderCashback(tx, orderId);
+  });
 
   revalidate(orderId);
   return { ok: true };
@@ -245,7 +252,12 @@ export async function reopenOrder(orderId: string): Promise<OrderActionResult> {
 
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: { status: true },
+    select: {
+      status: true,
+      cashbackApplied: true,
+      currency: true,
+      customerId: true,
+    },
   });
   if (!order) return { ok: false, error: "El pedido no existe" };
   if (order.status !== "CANCELLED") {
@@ -253,21 +265,52 @@ export async function reopenOrder(orderId: string): Promise<OrderActionResult> {
   }
 
   const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
-  await db.$transaction([
-    db.order.update({
-      where: { id: orderId },
-      data: { status: "PENDING", expiresAt },
-    }),
-    db.orderStatusHistory.create({
-      data: {
-        orderId,
-        from: "CANCELLED",
-        to: "PENDING",
-        actorId: session.user.id,
-        note: "Pedido reabierto desde el panel",
-      },
-    }),
-  ]);
+
+  try {
+    await db.$transaction(async (tx) => {
+      // Si el pedido se pagó en parte con cashback, al cancelarlo se devolvió.
+      // Reabrirlo sin volver a gastarlo dejaría un pedido que dice haberse
+      // pagado con un saldo que ya está de vuelta en el bolsillo del
+      // comprador: el operador cobraría de menos. Si el saldo ya no alcanza
+      // —porque lo gastó en otra compra—, la reapertura se niega y se explica.
+      const aplicado = Number(order.cashbackApplied);
+      if (aplicado > 0) {
+        const pendiente = await outstandingCashback(tx, orderId);
+        const porVolverAGastar = aplicado - pendiente;
+        if (porVolverAGastar > 0) {
+          await consumeCashback(tx, {
+            customerId: order.customerId!,
+            amount: porVolverAGastar,
+            currency: order.currency,
+            orderId,
+          });
+        }
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "PENDING", expiresAt },
+      });
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          from: "CANCELLED",
+          to: "PENDING",
+          actorId: session.user.id,
+          note: "Pedido reabierto desde el panel",
+        },
+      });
+    });
+  } catch (e) {
+    if (e instanceof CashbackError && e.code === "INSUFFICIENT") {
+      return {
+        ok: false,
+        error:
+          "No se puede reabrir: el cliente ya no tiene el saldo de Kora Cashback con el que se pagó este pedido.",
+      };
+    }
+    throw e;
+  }
 
   revalidate(orderId);
   return { ok: true };

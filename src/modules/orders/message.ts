@@ -34,6 +34,12 @@ export type MessageInput = {
   items: MessageItem[];
   total: number;
   discount?: { code: string; amount: number };
+  /**
+   * Cashback aplicado. Va como línea PROPIA, distinta del cupón: este mensaje
+   * es el documento con el que el operador cobra, y si no puede distinguir de
+   * dónde sale cada rebaja no se la puede explicar al comprador.
+   */
+  cashbackApplied?: number;
   contactName: string;
   contactPhone: string;
   address: string;
@@ -60,6 +66,10 @@ export function buildWhatsappMessage(input: MessageInput): string {
 
   if (input.discount) {
     lines.push(`Cupón ${input.discount.code}: −${money(input.discount.amount)}`);
+  }
+
+  if (input.cashbackApplied && input.cashbackApplied > 0) {
+    lines.push(`Kora Cashback: −${money(input.cashbackApplied)}`);
   }
 
   lines.push(
