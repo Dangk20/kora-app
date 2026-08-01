@@ -11,6 +11,7 @@ import { consumeCashback, creditCashback } from "@/modules/cashback/ledger";
 import { applicableAmount, MENSAJE_RECHAZO, resolveRedemption } from "@/modules/cashback/redemption";
 import { outstandingCashback, refundOrderCashback } from "@/modules/cashback/refund";
 import { verifyCashbackLedger } from "@/modules/cashback/verify";
+import { expireStaleOrders } from "@/modules/orders/expire";
 
 const PREFIJO = "zzt-canje";
 
@@ -301,6 +302,50 @@ describe("devolución", () => {
     const v = await verifyCashbackLedger();
     expect(v.balances.find((b) => b.customerId === c.id)).toBeUndefined();
     expect(v.lots.find((l) => l.customerId === c.id)).toBeUndefined();
+  });
+
+  it("EXPIRAR el pedido devuelve el saldo; un pedido confirmado no lo devuelve", async () => {
+    const c = await cliente();
+    await acreditar({ customerId: c.id, amount: 10_000, currency: "COP" });
+
+    // Uno pendiente y vencido: debe devolver.
+    const vencido = await pedido(c.id, { applied: 4_000 });
+    await db.order.update({
+      where: { id: vencido.id },
+      data: { expiresAt: new Date(Date.now() - 3600_000) },
+    });
+    await db.$transaction((tx) =>
+      consumeCashback(tx, {
+        customerId: c.id,
+        amount: 4_000,
+        currency: "COP",
+        orderId: vencido.id,
+      }),
+    );
+
+    // Otro confirmado: la compra ocurrió, el saldo se gastó de verdad.
+    const confirmado = await pedido(c.id, { applied: 3_000 });
+    await db.order.update({
+      where: { id: confirmado.id },
+      data: { status: "CONFIRMED", expiresAt: null },
+    });
+    await db.$transaction((tx) =>
+      consumeCashback(tx, {
+        customerId: c.id,
+        amount: 3_000,
+        currency: "COP",
+        orderId: confirmado.id,
+      }),
+    );
+
+    expect(await cashbackBalance(c.id)).toEqual({ cop: 3_000, usd: 0 });
+
+    await expireStaleOrders();
+
+    // Vuelven los 4.000 del expirado; los 3.000 del confirmado NO.
+    expect(await cashbackBalance(c.id)).toEqual({ cop: 7_000, usd: 0 });
+    expect((await db.order.findUnique({ where: { id: vencido.id } }))?.status).toBe("CANCELLED");
+    expect((await db.order.findUnique({ where: { id: confirmado.id } }))?.status).toBe("CONFIRMED");
   });
 
   it("un lote que venció mientras el pedido esperaba recibe el importe SIN volverse gastable", async () => {
