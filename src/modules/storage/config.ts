@@ -53,3 +53,27 @@ export function assertStorageConfigured(env: NodeJS.ProcessEnv = process.env): v
   const missing = missingR2Vars(env);
   if (missing.length > 0) throw new StorageConfigError(missing);
 }
+
+/**
+ * Comprobación de arranque: verifica y, si falta configuración, TERMINA.
+ *
+ * El `process.exit` vive aquí y no en `src/instrumentation.ts` porque Next
+ * compila ese archivo **también para el runtime edge**, donde `process.exit` no
+ * existe — y el empaquetador lo señala como error aunque haya una guarda en
+ * tiempo de ejecución. Este módulo solo se carga mediante importación dinámica
+ * desde el runtime de Node, así que nunca entra en el paquete edge.
+ *
+ * Se usa `process.exit` y no `throw` porque un throw en el gancho de arranque
+ * puede quedar atrapado por el servidor y dejar el proceso vivo — que es
+ * exactamente el defecto que esta guarda corrige.
+ */
+export function assertStorageConfiguredOrExit(env: NodeJS.ProcessEnv = process.env): void {
+  try {
+    assertStorageConfigured(env);
+  } catch (error) {
+    console.error(
+      `\n✖ KORA no puede arrancar.\n  ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exit(1);
+  }
+}

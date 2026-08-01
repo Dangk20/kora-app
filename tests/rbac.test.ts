@@ -101,3 +101,19 @@ describe("verifyCredentials", () => {
     expect(await verifyCredentials(TEST_EMAIL, TEST_PASSWORD)).toBeNull();
   });
 });
+
+describe("nomenclatura de la matriz de permisos", () => {
+  it('NO existe ningún módulo llamado "crm"', async () => {
+    // El acuerdo con el cliente (18 jul 2026) prohíbe la palabra "CRM": nombra
+    // un producto mucho más grande del que se vendió. Esta prueba impide que
+    // vuelva por descuido — un permiso acaba apareciendo en pantallas de
+    // administración y en conversaciones.
+    const crm = await db.permission.findMany({ where: { module: "crm" } });
+    expect(crm).toHaveLength(0);
+  });
+
+  it('existe el módulo "customers" con sus cuatro acciones', async () => {
+    const perms = await db.permission.findMany({ where: { module: "customers" } });
+    expect(perms.map((p) => p.action).sort()).toEqual(["create", "edit", "export", "view"]);
+  });
+});

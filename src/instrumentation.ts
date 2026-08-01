@@ -10,8 +10,10 @@
 // Ver openspec/changes/vps-two-stack-deploy — design.md decisión 8.
 
 export async function register(): Promise<void> {
-  // El gancho también se evalúa en el runtime edge (middleware), donde estas
-  // comprobaciones no aplican y `process.exit` no existe.
+  // El gancho también se compila para el runtime edge (middleware), donde estas
+  // comprobaciones no aplican. La verificación y su `process.exit` viven en un
+  // módulo aparte que solo se carga desde aquí, para que nada de Node entre en
+  // el paquete edge.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   // Durante `next build` NODE_ENV ya es "production" pero las variables del
@@ -19,16 +21,6 @@ export async function register(): Promise<void> {
   // imposible construir la imagen sin credenciales de producción dentro.
   if (process.env.NEXT_PHASE === "phase-production-build") return;
 
-  const { assertStorageConfigured } = await import("./modules/storage/config");
-
-  try {
-    assertStorageConfigured();
-  } catch (error) {
-    console.error(
-      `\n✖ KORA no puede arrancar.\n  ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-    // `process.exit` y no relanzar: un throw aquí puede quedar atrapado por el
-    // servidor y dejar el proceso vivo, que es exactamente lo que se corrige.
-    process.exit(1);
-  }
+  const { assertStorageConfiguredOrExit } = await import("./modules/storage/config");
+  assertStorageConfiguredOrExit();
 }

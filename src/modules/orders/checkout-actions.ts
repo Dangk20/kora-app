@@ -20,6 +20,7 @@ import {
   whatsappUrl,
 } from "./message";
 import { whatsappNumberFor } from "./settings";
+import { toE164 } from "@/modules/customers/phone";
 
 /** Validez del pedido pendiente (PED_HU003). */
 const ORDER_TTL_MS = 2 * 60 * 60 * 1000;
@@ -66,16 +67,6 @@ async function orderResult(order: OrderRow): Promise<CheckoutResult> {
       order.whatsappMessage ?? `Hola KORA 👋, quiero confirmar mi pedido ${orderNumber}`,
     ),
   };
-}
-
-/** Teléfono a E.164 — es la clave de match del cliente (PED_HU001). */
-function toE164(phone: string, country: "CO" | "US"): string {
-  const digits = phone.replace(/\D/g, "");
-  const prefix = country === "CO" ? "57" : "1";
-  const national = digits.startsWith(prefix)
-    ? digits.slice(prefix.length)
-    : digits;
-  return `+${prefix}${national}`;
 }
 
 export async function createOrder(

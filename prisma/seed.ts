@@ -17,7 +17,9 @@ const MATRIX: Record<string, string[]> = {
   inventory: ["view", "adjust"],
   orders: ["view", "create", "edit", "confirm", "cancel"],
   pos: ["view", "sell"],
-  crm: ["view", "create", "edit", "export"],
+  // "customers" y NO "crm": la nomenclatura acordada con el cliente prohíbe esa
+  // palabra — un CRM implica un alcance mucho mayor del que se vendió.
+  customers: ["view", "create", "edit", "export"],
   dashboard: ["view"],
   loyalty: ["view", "adjust"],
   marketing: ["view", "create", "send"],
@@ -33,7 +35,7 @@ const ROLES: Record<string, { description: string; grants: string[] | "ALL" }> =
       "catalog:view", "catalog:edit",
       "inventory:view", "inventory:adjust",
       "orders:view", "orders:create", "orders:edit", "orders:confirm", "orders:cancel",
-      "crm:view", "crm:create", "crm:edit",
+      "customers:view", "customers:create", "customers:edit",
       "dashboard:view", "loyalty:view",
     ],
   },
@@ -43,7 +45,7 @@ const ROLES: Record<string, { description: string; grants: string[] | "ALL" }> =
   },
   marketing: {
     description: "Campañas y clientes",
-    grants: ["crm:view", "crm:export", "marketing:view", "marketing:create", "marketing:send", "dashboard:view"],
+    grants: ["customers:view", "customers:export", "marketing:view", "marketing:create", "marketing:send", "dashboard:view"],
   },
 };
 

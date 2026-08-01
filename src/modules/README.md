@@ -10,6 +10,6 @@ Las rutas de `src/app/` son delgadas: validan entrada y llaman a estos módulos.
 | `inventory` | **La función transaccional de stock** (único camino que modifica `stockActual`), libro contable, job de verificación | S4 |
 | `orders` | Pedidos, estados, `order.confirmed` + outbox, mensaje WhatsApp | S8 |
 | `pos` | Punto de venta (usa `inventory`, el mismo motor que la web) | S9 |
-| `crm` | Clientes, historial, seguimiento | S10 |
+| `customers` | Módulo de clientes: listado, perfil y gestión. **Nunca "CRM"** — la nomenclatura acordada con el cliente prohíbe esa palabra | S10 |
 | `loyalty` | KoraPuntos (ledger, mismo patrón que stock) | S12 |
 | `marketing` | Campañas, segmentación, envío vía cola | S13 |

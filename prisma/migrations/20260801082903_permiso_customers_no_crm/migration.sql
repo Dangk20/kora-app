@@ -1,0 +1,11 @@
+-- Renombra el módulo de permisos `crm` a `customers`.
+--
+-- La nomenclatura acordada con el cliente (18 jul 2026) prohíbe la palabra
+-- "CRM": nombra un producto mucho más grande del que se vendió y crea una
+-- expectativa que KORA no va a cumplir.
+--
+-- Se hace con UPDATE y NO borrando y recreando las filas. Los permisos están
+-- referenciados por `role_permissions`: recrearlos con identificadores nuevos
+-- dejaría a los roles SIN sus permisos en cualquier base donde el seed ya se
+-- hubiera ejecutado — incluida la del servidor de pruebas.
+UPDATE "permissions" SET "module" = 'customers' WHERE "module" = 'crm';
