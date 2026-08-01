@@ -128,6 +128,25 @@ Ocho fallos reales encontrados montando esto. Ninguno era visible leyendo la con
 
 **8 · Arquitectura.** Una imagen construida en Apple Silicon (arm64) no arranca en el servidor (x86_64) — da `exec format error`, difícil de diagnosticar sin sospecharlo. → Las imágenes las construye el CI, que es x86_64. Comprobar con `docker image inspect <img> --format '{{.Architecture}}'`.
 
+## Trabajos programados
+
+Los ejecuta el propio worker, en el mismo proceso que consume la bandeja de salida — no hay contenedor aparte.
+
+| Trabajo | Cadencia | Qué hace |
+|---|---|---|
+| `orders:expire` | 5 min | Cancela los pedidos pendientes que superaron su vigencia de 2 h |
+| `ledger:verify` | Diario | Comprueba que `stockActual` cuadra con la suma de movimientos. **Avisa, no corrige**: un libro descuadrado es un síntoma y corregirlo borra la evidencia |
+| `outbox:status` | 15 min | Vigila que la bandeja de eventos no se atasque |
+
+```bash
+pnpm jobs:status     # última ejecución con éxito de cada uno, y si van atrasados
+pnpm outbox:status   # estado de la bandeja de eventos
+```
+
+**La señal que importa no es "falló", es "lleva demasiado sin correr".** Un trabajo programado no se cae ruidosamente: se apaga en silencio, y el daño se ve semanas después. Por eso `jobs:status` termina con código distinto de cero cuando algo va atrasado — para poder encadenarlo a una comprobación automática el día que haya canal de alertas.
+
+Desactivar el programador sin tocar el consumo de eventos: `JOBS_SCHEDULER=off`.
+
 ## Certificados
 
 Los emite y renueva Caddy solo. Persisten en el volumen `kora-edge_caddy_data`: **no borrarlo** o se vuelven a solicitar en cada recreación y se agota la cuota del emisor (5 por dominio a la semana).

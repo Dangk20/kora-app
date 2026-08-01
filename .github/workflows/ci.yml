@@ -157,26 +157,25 @@ jobs:
       # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
       # reales viven únicamente en el servidor y no se tocan.
       - name: Sincronizar configuración de despliegue
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "deploy/*.yml,deploy/Caddyfile,deploy/desplegar.sh,deploy/*.example,deploy/README.md,deploy/holding/**"
-          target: "~/kora-sync"
-          overwrite: true
-
-      - name: Aplicar configuración
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
-          script: |
-            cp -r ~/kora-sync/deploy/. ~/kora/deploy/
-            chmod +x ~/kora/deploy/desplegar.sh
-            rm -rf ~/kora-sync
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i ~/.ssh/deploy -o BatchMode=yes"
+          # tar sobre SSH y no una acción de terceros: el manejo de rutas de scp
+          # es difícil de verificar sin poder ejecutarlo, y esto es exactamente
+          # lo que hace falta — copiar un árbol de archivos, sin sorpresas.
+          #
+          # Se envían SOLO los archivos versionados: los .env.* y auth.caddy
+          # reales viven únicamente en el servidor y no se tocan.
+          tar czf - -C deploy \
+            Caddyfile desplegar.sh README.md holding \
+            docker-compose.edge.yml docker-compose.staging.yml docker-compose.prod.yml \
+            .env.edge.example .env.staging.example .env.production.example auth.caddy.example \
+            | $SSH "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+              'mkdir -p ~/kora/deploy && tar xzf - -C ~/kora/deploy && chmod +x ~/kora/deploy/desplegar.sh && echo "configuración sincronizada:" && ls ~/kora/deploy'
 
       - name: Desplegar
         uses: appleboy/ssh-action@v1
@@ -230,26 +229,25 @@ jobs:
       # Se copian SOLO los archivos versionados: los `.env.*` y `auth.caddy`
       # reales viven únicamente en el servidor y no se tocan.
       - name: Sincronizar configuración de despliegue
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "deploy/*.yml,deploy/Caddyfile,deploy/desplegar.sh,deploy/*.example,deploy/README.md,deploy/holding/**"
-          target: "~/kora-sync"
-          overwrite: true
-
-      - name: Aplicar configuración
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
-          script: |
-            cp -r ~/kora-sync/deploy/. ~/kora/deploy/
-            chmod +x ~/kora/deploy/desplegar.sh
-            rm -rf ~/kora-sync
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i ~/.ssh/deploy -o BatchMode=yes"
+          # tar sobre SSH y no una acción de terceros: el manejo de rutas de scp
+          # es difícil de verificar sin poder ejecutarlo, y esto es exactamente
+          # lo que hace falta — copiar un árbol de archivos, sin sorpresas.
+          #
+          # Se envían SOLO los archivos versionados: los .env.* y auth.caddy
+          # reales viven únicamente en el servidor y no se tocan.
+          tar czf - -C deploy \
+            Caddyfile desplegar.sh README.md holding \
+            docker-compose.edge.yml docker-compose.staging.yml docker-compose.prod.yml \
+            .env.edge.example .env.staging.example .env.production.example auth.caddy.example \
+            | $SSH "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+              'mkdir -p ~/kora/deploy && tar xzf - -C ~/kora/deploy && chmod +x ~/kora/deploy/desplegar.sh && echo "configuración sincronizada:" && ls ~/kora/deploy'
 
       - name: Desplegar
         uses: appleboy/ssh-action@v1

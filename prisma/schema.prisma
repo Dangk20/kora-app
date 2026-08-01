@@ -617,3 +617,38 @@ model DomainEvent {
   @@index([status, createdAt])
   @@map("domain_events")
 }
+
+// ─────────────────────────────────────────────────────────────
+// TRABAJOS PROGRAMADOS
+// ─────────────────────────────────────────────────────────────
+
+// SUCCESS  terminó bien
+// FAILURE  lanzó, o superó su tope de duración
+// SKIPPED  no arrancó porque la anterior seguía corriendo
+enum JobResult {
+  SUCCESS
+  FAILURE
+  SKIPPED
+}
+
+// Registro de ejecuciones. Existe en la base y no en los registros del
+// contenedor porque la pregunta que hay que poder responder —"¿cuándo corrió
+// bien por última vez?"— tiene que sobrevivir a la rotación de logs.
+//
+// Una fila con `finishedAt` nulo es una ejecución que MURIÓ A MITAD: se escribe
+// al iniciar y se completa al terminar, precisamente para que eso se distinga
+// de una que nunca empezó.
+model JobRun {
+  id         String    @id @default(cuid())
+  job        String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+  result     JobResult
+  summary    String?
+  error      String?
+
+  @@index([job, startedAt])
+  @@index([job, result, finishedAt])
+  @@map("job_runs")
+}
