@@ -5,7 +5,7 @@
 //   3. El pie legal siempre lleva sus tres elementos (Ley 1581 / CAN-SPAM).
 //   4. Una audiencia mixta NUNCA muestra un precio: no existe tasa de cambio.
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -115,10 +115,24 @@ describe("driver de desarrollo", () => {
   });
 
   it("un fallo al escribir se reporta como fallo, no como envío", async () => {
-    // Una ruta imposible: el driver tiene que decirlo, no tragárselo.
-    const driver = createFileDriver("/proc/no-se-puede-escribir-aqui");
+    // Ruta imposible = una carpeta DENTRO de un archivo. Da ENOTDIR al instante
+    // en cualquier sistema, y se construye aquí en vez de depender de una ruta
+    // del sistema.
+    //
+    // Antes se usaba `/proc/...`, y esa elección tumbó el CI: en macOS `/proc`
+    // no existe y el error llega enseguida, pero en Linux existe, y `mkdir`
+    // recursivo sobre procfs NO resuelve NI rechaza — se queda colgado. La
+    // prueba pasaba en el portátil y agotaba el tiempo en el servidor, que es
+    // la peor forma de fallar: parece un problema del CI y es del código.
+    const base = await carpetaTemporal();
+    const archivo = path.join(base, "esto-es-un-archivo");
+    await writeFile(archivo, "no soy una carpeta");
+
+    const driver = createFileDriver(path.join(archivo, "subcarpeta"));
     const r = await driver.send({ to: "x@y.com", subject: "s", html: "h", text: "t" });
+
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBeTruthy();
   });
 
   it("el correo va dirigido a UNA sola persona", () => {
