@@ -5,6 +5,13 @@ import { handlersFor, registerHandler, registeredTypes } from "../registry";
 import type { EventHandler } from "../types";
 import { orderConfirmedCashbackHandler } from "./order-confirmed-cashback";
 import { orderConfirmedLogHandler } from "./order-confirmed-log";
+import {
+  orderCancelledBuyerEmail,
+  orderConfirmedBuyerEmail,
+  orderCreatedBuyerEmail,
+  orderCreatedStaffEmail,
+  orderShippedBuyerEmail,
+} from "./order-emails";
 
 /** Registra un manejador si no está ya. */
 function registrar(tipo: string, handler: EventHandler): void {
@@ -23,6 +30,15 @@ function registrar(tipo: string, handler: EventHandler): void {
 export function registerAllHandlers(): void {
   registrar("order.confirmed", orderConfirmedLogHandler);
   registrar("order.confirmed", orderConfirmedCashbackHandler);
+
+  // Correos. Van DESPUÉS del cashback en el orden de registro para que el
+  // correo de confirmación encuentre el saldo ya acreditado y pueda decir
+  // cuánto ganó el comprador.
+  registrar("order.created", orderCreatedBuyerEmail);
+  registrar("order.created", orderCreatedStaffEmail);
+  registrar("order.confirmed", orderConfirmedBuyerEmail);
+  registrar("order.shipped", orderShippedBuyerEmail);
+  registrar("order.cancelled", orderCancelledBuyerEmail);
 }
 
 export { registeredTypes };

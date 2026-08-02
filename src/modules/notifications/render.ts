@@ -1,0 +1,147 @@
+// Qué dice cada correo del pedido.
+// Ver openspec/changes/correos-transaccionales — specs/transactional-email.
+//
+// Solo redacta: no consulta la base ni decide si se envía. Así se puede probar
+// el texto sin fabricar un pedido, y quien lea este archivo ve de un vistazo
+// todo lo que KORA le dice a un comprador.
+
+import type { OrderEmailType } from "@/generated/prisma/enums";
+import { renderCampaign, type TemplateOrder } from "@/modules/email/template";
+import { storeUrl } from "@/modules/email/driver";
+import { formatMoney } from "@/modules/pricing";
+
+export type OrderEmailData = {
+  orderNumber: string;
+  orderId: string;
+  buyerName: string | null;
+  whatsappUrl: string | null;
+  order: TemplateOrder;
+  /** Cashback acreditado al confirmar, si lo hubo. */
+  cashbackEarned?: number;
+  cashbackExpiresAt?: Date | null;
+  /** Cashback devuelto al cancelar, si lo hubo. */
+  cashbackRefunded?: number;
+  /** Motivo, cuando el pedido se canceló o expiró. */
+  cancelReason?: "EXPIRED" | "CANCELLED";
+};
+
+export type RenderedEmail = { subject: string; html: string; text: string };
+
+const fecha = (d: Date) =>
+  new Intl.DateTimeFormat("es-CO", {
+    dateStyle: "long",
+    timeZone: "America/Bogota",
+  }).format(d);
+
+function base(
+  data: OrderEmailData,
+  parts: { subject: string; title: string; body: string; preheader: string; cta?: { label: string; url: string } | null; notes?: string[] },
+): RenderedEmail {
+  const { html, text } = renderCampaign({
+    subject: parts.subject,
+    preheader: parts.preheader,
+    title: parts.title,
+    body: parts.body,
+    products: [],
+    // Vacío A PROPÓSITO: un comprobante no ofrece darse de baja.
+    unsubscribeUrl: "",
+    recipientName: data.buyerName,
+    ctaLabel: parts.cta?.label ?? null,
+    ctaUrl: parts.cta?.url ?? null,
+    order: { ...data.order, notes: parts.notes ?? [] },
+  });
+  return { subject: parts.subject, html, text };
+}
+
+export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): RenderedEmail {
+  const c = data.order.currency;
+
+  switch (type) {
+    case "BUYER_CREATED":
+      return base(data, {
+        subject: `Recibimos tu pedido ${data.orderNumber}`,
+        preheader: "Continúa por WhatsApp para confirmar tu pago.",
+        title: "Ya tenemos tu pedido",
+        // El pago ocurre FUERA de la plataforma: sin este enlace, quien cerró
+        // la pestaña no tiene forma de volver, y el pedido expira en 2 horas.
+        body:
+          "Gracias por comprar en KORA. Tu pedido quedó reservado y el pago se acuerda por " +
+          "WhatsApp: escríbenos con el botón de abajo y lo confirmamos contigo.\n\n" +
+          "Si no lo confirmas dentro de las próximas 2 horas, el pedido se cancela solo y " +
+          "los productos vuelven a quedar disponibles.",
+        cta: data.whatsappUrl
+          ? { label: "Continuar por WhatsApp", url: data.whatsappUrl }
+          : null,
+      });
+
+    case "BUYER_CONFIRMED": {
+      const notes: string[] = [];
+      if (data.cashbackEarned && data.cashbackEarned > 0) {
+        notes.push(
+          `Ganaste ${formatMoney(data.cashbackEarned, c)} de Kora Cashback` +
+            (data.cashbackExpiresAt
+              ? `, disponible hasta el ${fecha(data.cashbackExpiresAt)}.`
+              : "."),
+        );
+      }
+      return base(data, {
+        subject: `Confirmamos el pago de tu pedido ${data.orderNumber}`,
+        preheader: "Ya lo estamos preparando.",
+        title: "Pago confirmado",
+        body:
+          "Recibimos tu pago y tu pedido ya está en proceso. Te avisamos apenas salga hacia " +
+          "tu dirección.",
+        cta: { label: "Ver mi pedido", url: `${storeUrl()}/cuenta` },
+        notes,
+      });
+    }
+
+    case "BUYER_SHIPPED":
+      return base(data, {
+        subject: `Tu pedido ${data.orderNumber} va en camino`,
+        preheader: "Ya salió hacia tu dirección.",
+        title: "Tu pedido va en camino",
+        body:
+          "Tu pedido salió hacia la dirección que nos diste. Si necesitas coordinar la " +
+          "entrega, escríbenos por WhatsApp y lo vemos.",
+        cta: data.whatsappUrl ? { label: "Escribirnos", url: data.whatsappUrl } : null,
+      });
+
+    case "BUYER_CANCELLED": {
+      const expirado = data.cancelReason === "EXPIRED";
+      const notes: string[] = [];
+      if (data.cashbackRefunded && data.cashbackRefunded > 0) {
+        // Es dinero suyo: decirlo evita que crea que lo perdió.
+        notes.push(
+          `Devolvimos ${formatMoney(data.cashbackRefunded, c)} de Kora Cashback a tu saldo.`,
+        );
+      }
+      return base(data, {
+        subject: `Tu pedido ${data.orderNumber} fue cancelado`,
+        preheader: expirado ? "Puedes volver a armarlo cuando quieras." : "Cualquier duda, escríbenos.",
+        title: expirado ? "Tu pedido expiró" : "Tu pedido fue cancelado",
+        body: expirado
+          ? "Tu pedido se canceló porque pasaron las 2 horas sin confirmar el pago, y los " +
+            "productos volvieron a quedar disponibles. Si todavía lo quieres, puedes armarlo " +
+            "de nuevo en la tienda."
+          : "Tu pedido fue cancelado. Si crees que fue un error o quieres retomarlo, " +
+            "escríbenos por WhatsApp.",
+        cta: { label: "Volver a la tienda", url: storeUrl() },
+        notes,
+      });
+    }
+
+    case "STAFF_NEW_ORDER":
+      return base(data, {
+        // El operador tiene 2 horas antes de que el pedido expire: el asunto
+        // dice lo que necesita para decidir si atiende ahora.
+        subject: `Pedido nuevo ${data.orderNumber} · ${formatMoney(data.order.total, c)} ${c}`,
+        preheader: "Confírmalo en el panel antes de que expire.",
+        title: "Entró un pedido",
+        body:
+          `${data.buyerName ?? "Un comprador"} acaba de hacer un pedido. Está pendiente de ` +
+          "confirmación y expira en 2 horas si nadie lo atiende.",
+        cta: { label: "Abrir el pedido", url: `${storeUrl()}/admin/pedidos/${data.orderId}` },
+      });
+  }
+}

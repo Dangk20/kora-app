@@ -329,11 +329,30 @@ export async function createOrder(
         paymentPreference: data.paymentPreference,
       });
 
-      return tx.order.update({
+      const guardado = await tx.order.update({
         where: { id: created.id },
         data: { whatsappMessage: message },
         include: { customer: { select: { id: true } } },
       });
+
+      // Bandeja de salida: el pedido y su aviso se escriben JUNTOS o ninguno.
+      // De aquí cuelgan el correo al comprador y el aviso al operador — nada
+      // se envía dentro de esta transacción, porque atar la venta a que un
+      // tercero responda es cambiar un problema pequeño por el peor de todos.
+      await tx.domainEvent.create({
+        data: {
+          type: "order.created",
+          payload: {
+            orderId: created.id,
+            orderNumber: created.number,
+            customerId: customer.id,
+            currency,
+            total: total.toString(),
+          },
+        },
+      });
+
+      return guardado;
     });
 
     // El consentimiento se registra DESPUÉS del pedido y fuera de su

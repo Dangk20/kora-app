@@ -336,6 +336,7 @@ model Order {
   confirmedBy   User?     @relation("OrderConfirmedBy", fields: [confirmedById], references: [id])
 
   items             OrderItem[]
+  emailsSent        OrderEmail[]
   stockMovements    StockMovement[]
   statusHistory     OrderStatusHistory[]
   cashbackMovements CashbackMovement[]
@@ -801,6 +802,55 @@ model Setting {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// CORREOS TRANSACCIONALES — el registro de lo ya enviado
+//
+// Existe para que un correo no salga dos veces. La entrega de la bandeja de
+// salida es *al menos una vez*, así que un evento puede llegar repetido: un
+// comprador que recibe dos confirmaciones duda de si hizo dos pedidos, y un
+// operador que recibe dos avisos de "pedido nuevo" empieza a ignorarlos —y el
+// día que llegue uno de verdad, no lo verá.
+//
+// La fila se escribe ANTES de entregar al proveedor. Si algo falla en medio, el
+// peor caso es que alguien no reciba un correo; nunca que lo reciba dos veces.
+// ─────────────────────────────────────────────────────────────
+
+enum OrderEmailType {
+  BUYER_CREATED // al comprador: pedido recibido, con el enlace de WhatsApp
+  BUYER_CONFIRMED // al comprador: pago confirmado y cashback acreditado
+  BUYER_SHIPPED // al comprador: pedido enviado
+  BUYER_CANCELLED // al comprador: cancelado o expirado
+  STAFF_NEW_ORDER // al operador: entró un pedido
+}
+
+model OrderEmail {
+  id      String         @id @default(cuid())
+  orderId String
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type    OrderEmailType
+
+  to     String
+  sentAt DateTime? // nulo = reservado pero todavía no entregado
+
+  // Quién lo está intentando ahora. Sin esto, un fallo del proveedor dejaría
+  // la reserva puesta y el reintento la leería como "ya enviado": el correo no
+  // saldría nunca. Con la marca, el reintento puede retomarlo, y dos procesos
+  // a la vez no pueden porque la toma es una escritura condicional.
+  claimedAt DateTime?
+  attempts  Int       @default(0)
+
+  providerId String? // identificador del proveedor, para diagnosticar
+  error      String? // último fallo, si lo hubo
+  createdAt  DateTime @default(now())
+
+  // LA garantía: un correo por pedido y tipo. No una comprobación previa —
+  // dos trabajadores pueden mirar a la vez y ver ambos que no está.
+  @@unique([orderId, type])
+  @@index([sentAt])
+  @@map("order_emails")
 }
 
 // ─────────────────────────────────────────────────────────────

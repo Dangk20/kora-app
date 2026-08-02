@@ -184,12 +184,19 @@ export async function advanceOrderStatus(
     };
   }
 
-  await db.$transaction([
-    db.order.update({ where: { id: orderId }, data: { status: to } }),
-    db.orderStatusHistory.create({
+  await db.$transaction(async (tx) => {
+    await tx.order.update({ where: { id: orderId }, data: { status: to } });
+    await tx.orderStatusHistory.create({
       data: { orderId, from: order.status, to, actorId: session.user.id },
-    }),
-  ]);
+    });
+    // Solo "enviado" avisa al comprador: un correo por cada estado intermedio
+    // cansa, y "en preparación" no le pide nada ni le dice dónde está su cosa.
+    if (to === "SHIPPED") {
+      await tx.domainEvent.create({
+        data: { type: "order.shipped", payload: { orderId } },
+      });
+    }
+  });
 
   revalidate(orderId);
   return { ok: true };
@@ -240,6 +247,16 @@ export async function cancelOrder(
       },
     });
     await refundOrderCashback(tx, orderId);
+
+    // El evento describe LO QUE PASÓ en el negocio, no lo que se quiere hacer
+    // con ello: de `order.cancelled` cuelga hoy un correo y mañana lo que haga
+    // falta, sin tocar quien lo emite.
+    await tx.domainEvent.create({
+      data: {
+        type: "order.cancelled",
+        payload: { orderId, reason: "CANCELLED", note: motivo },
+      },
+    });
   });
 
   revalidate(orderId);

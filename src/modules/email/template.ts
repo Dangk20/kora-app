@@ -42,10 +42,38 @@ export type TemplateInput = {
   ctaLabel?: string | null;
   ctaUrl?: string | null;
   products: TemplateProduct[];
-  /** Obligatorio en campañas: el pie legal no es opcional. */
+  /**
+   * Obligatorio en CAMPAÑAS: el pie legal no es opcional.
+   *
+   * En un correo TRANSACCIONAL va vacío a propósito: ofrecer "date de baja" en
+   * un comprobante promete algo que no se va a cumplir —el siguiente pedido
+   * generará su correo igual— y marca el mensaje como comercial ante los
+   * filtros, que es justo lo contrario de lo que conviene.
+   */
   unsubscribeUrl: string;
+  /** Líneas del pedido y totales, solo en los correos transaccionales. */
+  order?: TemplateOrder | null;
   recipientName?: string | null;
   storeBase?: string;
+};
+
+export type TemplateOrderLine = {
+  qty: number;
+  name: string;
+  variant?: string | null;
+  total: number;
+};
+
+export type TemplateOrder = {
+  number: string;
+  currency: Currency;
+  lines: TemplateOrderLine[];
+  subtotal: number;
+  discountTotal: number;
+  cashbackApplied: number;
+  total: number;
+  /** Pie de detalle: cashback ganado, devuelto, etc. Ya redactado. */
+  notes?: string[];
 };
 
 const NEGOCIO = "KORA";
@@ -180,6 +208,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
       )}</h1>
       ${parrafos(input.body)}
       ${cta}
+      ${tablaPedido(input.order)}
       ${parrillaProductos(input.products)}
     </td></tr>
 
@@ -190,8 +219,11 @@ export function renderCampaignHtml(input: TemplateInput): string {
       <p style="margin:0 0 6px;">${NEGOCIO} · Todo lo que quieres, en un solo lugar</p>
       <p style="margin:0;">
         <a href="${base}/politica-de-datos" style="color:${GRIS};">Política de tratamiento de datos</a>
-        &nbsp;·&nbsp;
-        <a href="${input.unsubscribeUrl}" style="color:${GRIS};">Cancelar suscripción</a>
+        ${
+          input.unsubscribeUrl
+            ? `&nbsp;·&nbsp;<a href="${input.unsubscribeUrl}" style="color:${GRIS};">Cancelar suscripción</a>`
+            : ""
+        }
       </p>
     </td></tr>
 
@@ -222,15 +254,85 @@ export function renderCampaignText(input: TemplateInput): string {
     lineas.push("");
   }
 
+  if (input.order) lineas.push(...pedidoTexto(input.order), "");
+
   lineas.push(
     "—",
     `${NEGOCIO} · Todo lo que quieres, en un solo lugar`,
     `Política de tratamiento de datos: ${base}/politica-de-datos`,
-    `Cancelar suscripción: ${input.unsubscribeUrl}`,
   );
+  if (input.unsubscribeUrl) lineas.push(`Cancelar suscripción: ${input.unsubscribeUrl}`);
   return lineas.join("\n");
 }
 
 export function renderCampaign(input: TemplateInput): { html: string; text: string } {
   return { html: renderCampaignHtml(input), text: renderCampaignText(input) };
+}
+
+
+/**
+ * El detalle del pedido dentro del correo.
+ *
+ * Los importes salen SIEMPRE en la moneda del pedido: no hay conversión en
+ * KORA, y un correo que mostrara pesos para una compra en dólares sería un
+ * comprobante equivocado en manos del comprador.
+ */
+function tablaPedido(order: TemplateOrder | null | undefined): string {
+  if (!order) return "";
+  const c = order.currency;
+
+  const filas = order.lines
+    .map(
+      (l) => `<tr>
+        <td style="padding:9px 0;border-bottom:1px solid #f0ece6;font-size:14px;color:${NEGRO};">
+          ${escapeHtml(l.name)}${l.variant ? `<br /><span style="font-size:12px;color:${GRIS};">${escapeHtml(l.variant)}</span>` : ""}
+          <span style="font-size:12px;color:${GRIS};"> × ${l.qty}</span>
+        </td>
+        <td align="right" style="padding:9px 0;border-bottom:1px solid #f0ece6;font-size:14px;font-weight:bold;color:${NEGRO};white-space:nowrap;">${money(l.total, c)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const linea = (etiqueta: string, valor: string) =>
+    `<tr><td style="padding:4px 0;font-size:13px;color:${GRIS};">${etiqueta}</td>
+         <td align="right" style="padding:4px 0;font-size:13px;color:${NEGRO};white-space:nowrap;">${valor}</td></tr>`;
+
+  const descuentos =
+    (order.discountTotal > 0 ? linea("Descuento", `− ${money(order.discountTotal, c)}`) : "") +
+    (order.cashbackApplied > 0
+      ? linea("Kora Cashback", `− ${money(order.cashbackApplied, c)}`)
+      : "");
+
+  const notas = (order.notes ?? [])
+    .map(
+      (n) =>
+        `<p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:${GRIS};">${escapeHtml(n)}</p>`,
+    )
+    .join("");
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
+    <tr><td colspan="2" style="padding-bottom:6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:${GRIS};">Pedido ${escapeHtml(order.number)}</td></tr>
+    ${filas}
+    ${order.discountTotal > 0 || order.cashbackApplied > 0 ? linea("Subtotal", money(order.subtotal, c)) : ""}
+    ${descuentos}
+    <tr>
+      <td style="padding:10px 0 0;font-size:15px;font-weight:bold;color:${NEGRO};">Total</td>
+      <td align="right" style="padding:10px 0 0;font-size:17px;font-weight:bold;color:${NEGRO};white-space:nowrap;">${money(order.total, c)} ${c}</td>
+    </tr>
+  </table>${notas}`;
+}
+
+function pedidoTexto(order: TemplateOrder): string[] {
+  const c = order.currency;
+  const l: string[] = [`Pedido ${order.number}`, ""];
+  for (const item of order.lines) {
+    const v = item.variant ? ` (${item.variant})` : "";
+    l.push(`· ${item.qty} x ${item.name}${v} — ${money(item.total, c)}`);
+  }
+  l.push("");
+  if (order.discountTotal > 0) l.push(`Descuento: −${money(order.discountTotal, c)}`);
+  if (order.cashbackApplied > 0) l.push(`Kora Cashback: −${money(order.cashbackApplied, c)}`);
+  l.push(`Total: ${money(order.total, c)} ${c}`);
+  for (const n of order.notes ?? []) l.push("", n);
+  return l;
 }

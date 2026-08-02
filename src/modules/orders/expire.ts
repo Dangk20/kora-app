@@ -43,6 +43,15 @@ export async function expireStaleOrders(now: Date = new Date()): Promise<ExpiryR
       if (Number(o.cashbackApplied) <= 0) continue;
       await refundOrderCashback(tx, o.id);
     }
+
+    // El aviso al comprador cuelga de la bandeja, en la MISMA transacción que
+    // la cancelación: o se cancela y se avisa, o no pasa ninguna de las dos.
+    await tx.domainEvent.createMany({
+      data: stale.map((o) => ({
+        type: "order.cancelled",
+        payload: { orderId: o.id, reason: "EXPIRED" },
+      })),
+    });
   });
 
   return { expired: stale.length, numbers: stale.map((o) => o.number) };
