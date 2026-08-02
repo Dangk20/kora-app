@@ -1,6 +1,7 @@
 // Mensaje de WhatsApp del pedido (PED_HU002 §2) y número legible del pedido.
 // Función pura: se testea sin base de datos y produce exactamente el texto
 // que el comprador envía desde su propio WhatsApp.
+import { BUSINESS_TIMEZONE } from "@/lib/business-time";
 import { formatMoney, type Currency } from "@/modules/pricing";
 
 /**
@@ -10,8 +11,6 @@ import { formatMoney, type Currency } from "@/modules/pricing";
  * un pedido del 31 de diciembre a las 8 p.m. en Colombia ya es 1 de enero en
  * UTC, y numerarlo con el año siguiente confundiría la contabilidad.
  */
-const BUSINESS_TIMEZONE = "America/Bogota";
-
 export function formatOrderNumber(number: number, createdAt: Date): string {
   const year = new Intl.DateTimeFormat("en-CA", {
     timeZone: BUSINESS_TIMEZONE,

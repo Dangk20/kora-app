@@ -48,6 +48,29 @@ describe("matriz de permisos por rol", () => {
     expect(keys).toEqual(["catalog:view", "orders:view", "pos:sell", "pos:view"]);
   });
 
+  it("LA FACTURACIÓN NO ES PARA TODOS: el cajero no ve ventas, el operador no las exporta", async () => {
+    // Ver pedidos es atender; ver ventas es saber cuánto factura el negocio.
+    // Y exportar es llevarse esos datos fuera del sistema: eso solo el admin.
+    const de = async (rol: string) => {
+      const grants = await db.rolePermission.findMany({
+        where: { role: { name: rol } },
+        include: { permission: true },
+      });
+      return grants.map((g) => `${g.permission.module}:${g.permission.action}`);
+    };
+
+    const cajero = await de("cajero");
+    expect(cajero).toContain("orders:view");
+    expect(cajero).not.toContain("sales:view");
+
+    const operador = await de("operador");
+    expect(operador).toContain("sales:view");
+    expect(operador).not.toContain("sales:export");
+
+    const admin = await de("admin");
+    expect(admin).toContain("sales:export");
+  });
+
   it("marketing no puede confirmar pedidos ni tocar usuarios", async () => {
     const grants = await db.rolePermission.findMany({
       where: { role: { name: "marketing" } },

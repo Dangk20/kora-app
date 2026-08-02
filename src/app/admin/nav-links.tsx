@@ -8,6 +8,7 @@ import {
   LayoutTemplate,
   Mail,
   Package,
+  Receipt,
   ShoppingCart,
   Store,
   Users,
@@ -34,6 +35,9 @@ const NAV: NavItem[] = [
   { href: "/admin/catalogo", label: "Productos", permission: "catalog:view", icon: Package },
   { href: "/admin/inventario", label: "Inventario", permission: "inventory:view", icon: Layers },
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart },
+  // Ventas va aparte de Pedidos y con su propio permiso: un pedido es trabajo
+  // por hacer, una venta es dinero que entró. El cajero ve lo primero.
+  { href: "/admin/ventas", label: "Ventas", permission: "sales:view", icon: Receipt },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
   { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
   { href: "/admin/campanas", label: "Email marketing", permission: "marketing:view", icon: Mail },

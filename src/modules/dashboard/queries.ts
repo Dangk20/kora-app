@@ -7,13 +7,26 @@
 // razonables.
 
 import { db } from "@/lib/db";
+import {
+  businessDayKey,
+  businessDayKeyOffset,
+  businessDayLabel,
+  businessDayStart,
+  sqlBusinessDay,
+} from "@/lib/business-time";
 import { CONFIRMED_SQL_LIST } from "@/modules/customers/confirmed";
 
 type Db = typeof db;
 
-export type DaySales = { date: Date; label: string; total: number };
-
-const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+export type DaySales = {
+  /** Día del negocio, `YYYY-MM-DD`. No un Date: un Date invita a compararlo
+   *  con la fecha del servidor, que corre en UTC y parte el día por otro
+   *  sitio. */
+  key: string;
+  label: string;
+  total: number;
+  isToday: boolean;
+};
 
 /**
  * Ventas de los últimos siete días, un elemento por día.
@@ -27,31 +40,36 @@ export async function salesLastWeek(
   client: Db = db,
   now: Date = new Date(),
 ): Promise<DaySales[]> {
-  const desde = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  // Los siete días del negocio, no del servidor. Agrupar en UTC ponía las
+  // ventas de la mañana en el día anterior: el error no se ve, solo mueve el
+  // dinero de columna.
+  const dias = Array.from({ length: 7 }, (_, i) => businessDayKeyOffset(now, i - 6));
+  const hoy = businessDayKey(now);
 
-  const filas = await client.$queryRawUnsafe<{ dia: Date; total: string }[]>(
-    `SELECT date_trunc('day', "confirmedAt") AS dia, SUM(total) AS total
+  const filas = await client.$queryRawUnsafe<{ dia: string; total: string }[]>(
+    `SELECT ${sqlBusinessDay('"confirmedAt"')} AS dia,
+            SUM(total) AS total
      FROM orders
      WHERE status IN (${CONFIRMED_SQL_LIST})
        AND currency = $1
        AND "confirmedAt" >= $2
      GROUP BY dia`,
     currency,
-    desde,
+    // El instante en que empezó ese día EN COLOMBIA, ya en UTC como la columna.
+    businessDayStart(dias[0]),
   );
 
-  const porDia = new Map(
-    filas.map((f) => [new Date(f.dia).toDateString(), Number(f.total)]),
-  );
+  const porDia = new Map(filas.map((f) => [f.dia, Number(f.total)]));
 
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate() + i);
-    return {
-      date: d,
-      label: DIAS_CORTOS[d.getDay()],
-      total: porDia.get(d.toDateString()) ?? 0,
-    };
-  });
+  // Se devuelven SIEMPRE los siete, con cero donde no hubo ventas: pintar solo
+  // los días con datos haría que una semana de dos ventas se leyera como una
+  // semana de dos días.
+  return dias.map((key) => ({
+    key,
+    label: businessDayLabel(key),
+    total: porDia.get(key) ?? 0,
+    isToday: key === hoy,
+  }));
 }
 
 export type TopProduct = {
@@ -70,7 +88,11 @@ export type TopProduct = {
  * top de nada: le devolvía al operador lo que él mismo había marcado. Destacado
  * es una decisión suya, no un dato.
  */
-export async function topProducts(limit = 5, client: Db = db): Promise<TopProduct[]> {
+export async function topProducts(
+  currency = "COP",
+  limit = 5,
+  client: Db = db,
+): Promise<TopProduct[]> {
   const filas = await client.$queryRawUnsafe<
     {
       productId: string;
@@ -93,9 +115,16 @@ export async function topProducts(limit = 5, client: Db = db): Promise<TopProduc
      JOIN products p   ON p.id = v."productId"
      JOIN categories c ON c.id = p."categoryId"
      WHERE o.status IN (${CONFIRMED_SQL_LIST})
+       -- Sin este filtro, la columna de ingresos sumaba pesos y dólares en el
+       -- mismo número. Las unidades sí se pueden sumar entre monedas —una
+       -- unidad es una unidad— pero el dinero no: no existe tasa de cambio en
+       -- KORA y es deliberado.
+       AND o.currency = $1
      GROUP BY p.id, p.name, c.color, c.icon
      ORDER BY units DESC, revenue DESC
-     LIMIT ${limit}`,
+     LIMIT $2`,
+    currency,
+    limit,
   );
 
   return filas.map((f) => ({

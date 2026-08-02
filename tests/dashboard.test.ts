@@ -85,7 +85,7 @@ describe("ventas de la semana", () => {
 
 describe("top de productos", () => {
   it("ordena por unidades vendidas y devuelve números, no promesas", async () => {
-    const top = await topProducts(5, db);
+    const top = await topProducts("COP", 5, db);
     for (const p of top) {
       expect(Number.isFinite(p.units)).toBe(true);
       expect(Number.isFinite(p.revenue)).toBe(true);
@@ -97,6 +97,6 @@ describe("top de productos", () => {
   });
 
   it("respeta el límite", async () => {
-    expect((await topProducts(2, db)).length).toBeLessThanOrEqual(2);
+    expect((await topProducts("COP", 2, db)).length).toBeLessThanOrEqual(2);
   });
 });

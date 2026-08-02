@@ -16,6 +16,10 @@ const MATRIX: Record<string, string[]> = {
   catalog: ["view", "create", "edit", "delete"],
   inventory: ["view", "adjust"],
   orders: ["view", "create", "edit", "confirm", "cancel"],
+  // "sales" es distinto de "orders" a propósito: ver pedidos es atender; ver
+  // ventas es ver cuánto factura el negocio. El cajero necesita lo primero y no
+  // tiene por qué saber lo segundo.
+  sales: ["view", "export"],
   pos: ["view", "sell"],
   // "customers" y NO "crm": la nomenclatura acordada con el cliente prohíbe esa
   // palabra — un CRM implica un alcance mucho mayor del que se vendió.
@@ -39,6 +43,9 @@ const ROLES: Record<string, { description: string; grants: string[] | "ALL" }> =
       "customers:view", "customers:create", "customers:edit",
       "coupons:view", "coupons:create", "coupons:edit",
       "dashboard:view", "loyalty:view",
+      // Ve la facturación, pero NO puede sacarla del sistema: exportar es
+      // llevarse los datos del negocio, y eso queda en el administrador.
+      "sales:view",
     ],
   },
   cajero: {
@@ -47,7 +54,7 @@ const ROLES: Record<string, { description: string; grants: string[] | "ALL" }> =
   },
   marketing: {
     description: "Campañas y clientes",
-    grants: ["customers:view", "customers:export", "marketing:view", "marketing:create", "marketing:send", "dashboard:view"],
+    grants: ["customers:view", "customers:export", "marketing:view", "marketing:create", "marketing:send", "dashboard:view", "sales:view"],
   },
 };
 
