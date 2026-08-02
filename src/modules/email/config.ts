@@ -38,11 +38,28 @@ export class EmailConfigError extends Error {
   }
 }
 
-/** Lanza si en producción falta configuración del proveedor. */
+/**
+ * ¿Es este el entorno donde el correo DEBE salir de verdad?
+ *
+ * No basta con `NODE_ENV`: la imagen se compila una sola vez con
+ * `NODE_ENV=production` y se usa en pruebas y en producción. Sin distinguirlas,
+ * exigir el proveedor tumbaría también el entorno de pruebas — donde además
+ * NO QUEREMOS que salga correo real: staging escribiría a direcciones de
+ * clientes de verdad mientras alguien prueba un pedido.
+ *
+ * `KORA_ENV` sin definir se comporta como producción: si alguien despliega un
+ * entorno nuevo y olvida ponerlo, la guarda protege en vez de callarse.
+ */
+export function requiereProveedor(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.NODE_ENV !== "production") return false;
+  return env.KORA_ENV?.trim().toLowerCase() !== "staging";
+}
+
+/** Lanza si el entorno exige proveedor y falta configuración. */
 export function assertEmailConfigured(env = process.env): void {
-  // En desarrollo el driver de disco funciona sin configurar nada: exigirlo
-  // haría imposible trabajar en el módulo sin una cuenta de proveedor.
-  if (env.NODE_ENV !== "production") return;
+  // En desarrollo —y en pruebas— el driver de disco funciona sin configurar
+  // nada: exigirlo haría imposible trabajar sin una cuenta de proveedor.
+  if (!requiereProveedor(env)) return;
   const missing = missingEmailVars(env);
   if (missing.length > 0) throw new EmailConfigError(missing);
 }

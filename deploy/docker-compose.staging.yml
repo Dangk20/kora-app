@@ -99,6 +99,12 @@ services:
       postgres:
         condition: service_healthy
     mem_limit: 256m
+    # En PRUEBAS el correo NO sale a internet: se escribe aquí y se lee. Es
+    # deliberado — un entorno de pruebas que enviara de verdad le escribiría a
+    # direcciones de clientes reales mientras alguien ensaya un pedido.
+    # Para leerlos:  docker exec kora-staging-worker ls /emails
+    volumes:
+      - correos:/emails
     networks:
       - interna
 
@@ -123,6 +129,8 @@ services:
 volumes:
   pgdata:
   redisdata:
+  # Los correos que el worker escribe en pruebas, para poder abrirlos.
+  correos:
 
 networks:
   # `internal: true` corta el acceso a internet de esta red: la base y la caché

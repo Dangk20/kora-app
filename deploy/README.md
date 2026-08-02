@@ -112,6 +112,35 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --no-
 
 Las migraciones **no** se revierten solas: se asume compatibilidad hacia atrás del esquema. Una migración destructiva exige plan propio.
 
+## El entorno de PRUEBAS no envía correo, y es a propósito
+
+`.env.staging` lleva dos variables que producción NO tiene:
+
+```
+KORA_ENV=staging
+EMAIL_DEV_DIR=/emails
+```
+
+Con ellas, la aplicación **arranca sin proveedor de correo** y el worker
+**escribe los correos a disco** en vez de enviarlos. Para leerlos:
+
+```bash
+docker exec kora-staging-worker ls -t /emails | head
+docker exec kora-staging-worker cat /emails/<archivo>.eml
+```
+
+Dos motivos, y el segundo pesa más que el primero:
+
+1. La imagen se compila **una sola vez** con `NODE_ENV=production` y se usa en
+   los dos entornos. Sin `KORA_ENV`, la guarda que impide arrancar sin proveedor
+   —que en producción es correcta— tumbaría también pruebas.
+2. **Un entorno de pruebas que enviara de verdad le escribiría a direcciones de
+   clientes reales** mientras alguien ensaya un pedido. Que no salga no es una
+   limitación: es lo que debe pasar.
+
+`KORA_ENV` sin definir se comporta como producción. Si alguien monta un entorno
+nuevo y lo olvida, la guarda protege en vez de callarse.
+
 ## Trampas que ya nos costaron tiempo
 
 Ocho fallos reales encontrados montando esto. Ninguno era visible leyendo la configuración; todos aparecieron al verificar contra el servidor.

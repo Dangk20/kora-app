@@ -13,6 +13,7 @@ import {
   EmailConfigError,
   emailProviderConfigured,
   missingEmailVars,
+  requiereProveedor,
 } from "@/modules/email/config";
 import { buildEml, createFileDriver } from "@/modules/email/file-driver";
 import {
@@ -77,6 +78,27 @@ describe("configuración del proveedor", () => {
 
   it("en desarrollo arranca sin configurar nada", () => {
     expect(() => assertEmailConfigured({ NODE_ENV: "development" } as NodeJS.ProcessEnv)).not.toThrow();
+  });
+
+  it("EN PRUEBAS ARRANCA SIN PROVEEDOR, y es a propósito", () => {
+    // La imagen se compila una sola vez con NODE_ENV=production y se usa en
+    // pruebas y en producción. Sin distinguirlas, esta guarda tumbaría también
+    // el entorno de pruebas — donde además NO queremos que salga correo real:
+    // staging le escribiría a direcciones de clientes de verdad mientras
+    // alguien ensaya un pedido.
+    const pruebas = { NODE_ENV: "production", KORA_ENV: "staging" } as NodeJS.ProcessEnv;
+    expect(requiereProveedor(pruebas)).toBe(false);
+    expect(() => assertEmailConfigured(pruebas)).not.toThrow();
+  });
+
+  it("SIN KORA_ENV se comporta como producción: la guarda protege por omisión", () => {
+    // Si alguien monta un entorno nuevo y olvida definirlo, el fallo correcto
+    // es no arrancar — no arrancar callado sin poder enviar.
+    expect(requiereProveedor(sinProveedor)).toBe(true);
+    expect(() => assertEmailConfigured(sinProveedor)).toThrow(EmailConfigError);
+    // Y un valor cualquiera tampoco desactiva la guarda: solo "staging".
+    const raro = { NODE_ENV: "production", KORA_ENV: "pruebas" } as NodeJS.ProcessEnv;
+    expect(requiereProveedor(raro)).toBe(true);
   });
 
   it("con proveedor configurado, producción arranca", () => {
