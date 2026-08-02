@@ -35,9 +35,10 @@ Perder la venta porque no salió el correo es cambiar un problema pequeño por e
 peor de todos. **Hay una prueba que lo fija**, comprobando que esos archivos no
 importan el módulo de envío — por si alguien "simplifica" mañana.
 
-Los eventos se llaman `order.created`, `order.shipped`, `order.cancelled`: lo que
-pasó en el negocio, no lo que se quiere hacer con ello. Mañana puede colgar de
-ahí un aviso por WhatsApp sin tocar a quien lo emite.
+Los eventos se llaman `order.created`, `order.preparing`, `order.shipped`,
+`order.delivered`, `order.cancelled`: lo que pasó en el negocio, no lo que se
+quiere hacer con ello. Mañana puede colgar de ahí un aviso por WhatsApp sin
+tocar a quien lo emite.
 
 ## Se reserva antes de enviar
 
@@ -55,13 +56,27 @@ correo no saldría nunca.
 
 ## Los correos
 
+**Uno por cada estado del pedido** — decisión del cliente (1 ago 2026). Se había
+propuesto avisar solo en los momentos "importantes"; la respuesta fue la
+contraria, y el motivo es bueno: el comprador no tiene otra ventana a su pedido,
+así que cada cambio sin avisar es una pregunta por WhatsApp que alguien contesta
+a mano.
+
 | Tipo | Para | Qué lleva |
 |---|---|---|
 | `BUYER_CREATED` | Comprador | Resumen y **enlace de WhatsApp** para cerrar el pago |
 | `BUYER_CONFIRMED` | Comprador | Pago confirmado, cashback ganado y su vencimiento |
+| `BUYER_PREPARING` | Comprador | Ya lo estamos armando |
 | `BUYER_SHIPPED` | Comprador | Va en camino |
+| `BUYER_DELIVERED` | Comprador | Entregado, con el cashback y la **ventana de cambios de 30 días** |
 | `BUYER_CANCELLED` | Comprador | Cancelado o expirado, con el cashback devuelto |
 | `STAFF_NEW_ORDER` | Operador | Enlace directo al pedido en el panel |
+
+El evento de cada estado se escribe **dentro de la transacción** que lo cambia
+(`EVENTO_POR_ESTADO` en `orders/actions.ts`), así que una transición rechazada
+por la máquina de estados no genera correo. Si mañana se añade un estado nuevo,
+hay que añadirlo a ese mapa — una prueba comprueba que todos los eventos tienen
+manejador registrado.
 
 El del comprador va a `contactEmail` **del pedido**, no a la ficha del cliente:
 el pedido guarda su propio snapshot, y si el cliente cambia de correo después,
@@ -88,7 +103,7 @@ que no recibe avisos tiene que poder enterarse.
 **No sale ni un correo todavía:** `korashopp.com` no tiene SPF, DKIM ni DMARC y
 no hay cuenta de proveedor. Insumo del cliente desde el 31 jul.
 
-Mientras tanto todo funciona contra disco: `pnpm emails:preview` genera los cinco
+Mientras tanto todo funciona contra disco: `pnpm emails:preview` genera los siete
 en `.emails/` y se abren con doble clic, así que **el cliente puede aprobarlos
 antes de que el dominio exista**. Activar el envío es configuración, no
 desarrollo.

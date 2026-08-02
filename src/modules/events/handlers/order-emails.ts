@@ -85,9 +85,19 @@ export const orderConfirmedBuyerEmail: EventHandler = {
   handle: (event) => alComprador(event, "BUYER_CONFIRMED"),
 };
 
+export const orderPreparingBuyerEmail: EventHandler = {
+  name: "order-preparing-buyer-email",
+  handle: (event) => alComprador(event, "BUYER_PREPARING"),
+};
+
 export const orderShippedBuyerEmail: EventHandler = {
   name: "order-shipped-buyer-email",
   handle: (event) => alComprador(event, "BUYER_SHIPPED"),
+};
+
+export const orderDeliveredBuyerEmail: EventHandler = {
+  name: "order-delivered-buyer-email",
+  handle: (event) => alComprador(event, "BUYER_DELIVERED"),
 };
 
 export const orderCancelledBuyerEmail: EventHandler = {

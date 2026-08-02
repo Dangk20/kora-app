@@ -96,6 +96,17 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
       });
     }
 
+    case "BUYER_PREPARING":
+      return base(data, {
+        subject: `Estamos preparando tu pedido ${data.orderNumber}`,
+        preheader: "Ya lo estamos armando.",
+        title: "Manos a la obra",
+        body:
+          "Tu pedido ya está en preparación: lo estamos armando y revisando antes de " +
+          "despacharlo. Te escribimos otra vez en cuanto salga.",
+        cta: { label: "Ver mi pedido", url: `${storeUrl()}/cuenta` },
+      });
+
     case "BUYER_SHIPPED":
       return base(data, {
         subject: `Tu pedido ${data.orderNumber} va en camino`,
@@ -106,6 +117,34 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
           "entrega, escríbenos por WhatsApp y lo vemos.",
         cta: data.whatsappUrl ? { label: "Escribirnos", url: data.whatsappUrl } : null,
       });
+
+    case "BUYER_DELIVERED": {
+      const notes: string[] = [];
+      if (data.cashbackEarned && data.cashbackEarned > 0) {
+        notes.push(
+          `Tienes ${formatMoney(data.cashbackEarned, c)} de Kora Cashback de esta compra` +
+            (data.cashbackExpiresAt
+              ? `, disponible hasta el ${fecha(data.cashbackExpiresAt)}.`
+              : "."),
+        );
+      }
+      // La ventana de cambios es de 30 días y se cuenta desde la compra. Si no
+      // se la recordamos aquí, el comprador se entera cuando ya pasó.
+      notes.push(
+        "Si necesitas cambiar el producto, tienes 30 días calendario desde tu compra: debe " +
+          "estar nuevo, con sus etiquetas y su empaque original.",
+      );
+      return base(data, {
+        subject: `Tu pedido ${data.orderNumber} fue entregado`,
+        preheader: "Gracias por comprar en KORA.",
+        title: "Tu pedido llegó",
+        body:
+          "Tu pedido fue entregado. Gracias por comprar en KORA — si algo no está como " +
+          "esperabas, escríbenos por WhatsApp y lo resolvemos.",
+        cta: data.whatsappUrl ? { label: "Escribirnos", url: data.whatsappUrl } : null,
+        notes,
+      });
+    }
 
     case "BUYER_CANCELLED": {
       const expirado = data.cancelReason === "EXPIRED";

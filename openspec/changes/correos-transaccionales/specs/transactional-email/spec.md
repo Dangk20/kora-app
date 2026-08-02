@@ -80,13 +80,17 @@ El registro SHALL escribirse **antes** de entregar al proveedor. Si algo falla e
 - **WHEN** se registra el envío y el proveedor falla
 - **THEN** el correo se reintenta sin duplicar el registro
 
-### Requirement: El comprador recibe los momentos de su pedido
+### Requirement: El comprador recibe un correo en CADA cambio de estado de su pedido
 
-SHALL enviarse al comprador un correo cuando su pedido: **se crea**, **se confirma**, **se envía** y **se cancela o expira**.
+SHALL enviarse al comprador un correo en **todos** los momentos de su pedido: cuando **se crea**, **se confirma**, **entra en preparación**, **se despacha**, **se entrega**, y cuando **se cancela o expira**.
 
 El de creación SHALL incluir el número de pedido, el detalle de lo comprado, el total en **su moneda** y el **enlace de WhatsApp** para retomar el pago. El de confirmación SHALL indicar el cashback acreditado y cuándo vence. El de cancelación SHALL indicar el cashback devuelto, si lo hubo.
 
-**Invariante:** el pago se acuerda por WhatsApp, fuera de la plataforma. Sin el enlace en el correo, un comprador que cerró la pestaña no tiene forma de volver — y su pedido expira en dos horas. El correo de creación no es un acuse: es el camino de vuelta a la venta.
+**Invariante:** el pago se acuerda por WhatsApp, fuera de la plataforma, y el comprador no tiene ninguna otra ventana a su pedido salvo entrar a su cuenta. Cada estado que el operador mueve en el panel es una pregunta que el comprador se está haciendo —¿lo recibieron?, ¿lo están armando?, ¿ya salió?, ¿llegó?— y cada correo que falta es un mensaje de WhatsApp que alguien tiene que contestar a mano.
+
+Se decidió **avisar en todos** y no solo en los momentos "importantes": la decisión es del cliente (1 ago 2026), y su motivo es que un comprador informado no escribe preguntando.
+
+Un cambio de estado que **no avanza** —una transición rechazada, o volver a guardar el mismo estado— NO SHALL generar correo.
 
 #### Scenario: Pedido recién creado
 
@@ -98,10 +102,30 @@ El de creación SHALL incluir el número de pedido, el detalle de lo comprado, e
 - **WHEN** el operador confirma un pedido que generó cashback
 - **THEN** el comprador recibe la confirmación con el importe acreditado y su vencimiento
 
+#### Scenario: Pedido en preparación
+
+- **WHEN** el operador marca el pedido como en preparación
+- **THEN** el comprador recibe el aviso de que ya lo están armando
+
+#### Scenario: Pedido despachado
+
+- **WHEN** el operador marca el pedido como enviado
+- **THEN** el comprador recibe el aviso de que va en camino
+
+#### Scenario: Pedido entregado
+
+- **WHEN** el operador marca el pedido como entregado
+- **THEN** el comprador recibe el aviso de entrega, con el recordatorio de su cashback y de la ventana de cambios
+
 #### Scenario: Pedido expirado
 
 - **WHEN** un pedido pendiente expira sin confirmarse
 - **THEN** el comprador recibe el aviso, con su cashback devuelto si había aplicado
+
+#### Scenario: Estado que no avanza
+
+- **WHEN** se intenta una transición que la máquina de estados rechaza
+- **THEN** no sale ningún correo
 
 #### Scenario: Importes en la moneda del pedido
 

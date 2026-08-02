@@ -14,10 +14,15 @@ import * as emailModule from "@/modules/email";
 import { renderCampaign } from "@/modules/email/template";
 import { registerAllHandlers } from "@/modules/events/handlers";
 import {
+  orderCancelledBuyerEmail,
+  orderConfirmedBuyerEmail,
   orderCreatedBuyerEmail,
   orderCreatedStaffEmail,
+  orderDeliveredBuyerEmail,
+  orderPreparingBuyerEmail,
+  orderShippedBuyerEmail,
 } from "@/modules/events/handlers/order-emails";
-import { resetRegistry } from "@/modules/events/registry";
+import { handlersFor, resetRegistry } from "@/modules/events/registry";
 import type { DomainEventRecord } from "@/modules/events/types";
 import { canSendMarketing, canSendTransactional } from "@/modules/notifications/guard";
 import { orderEmailContext } from "@/modules/notifications/order-data";
@@ -442,6 +447,85 @@ describe("EL CORREO NUNCA ROMPE LA VENTA", () => {
     expect(enviados).toHaveLength(0);
     const nota = await db.orderStatusHistory.findFirst({ where: { orderId: p.id } });
     expect(nota?.note).toContain("sin dirección del negocio");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe("UN CORREO POR CADA ESTADO DEL PEDIDO", () => {
+  // Decisión del cliente (1 ago 2026): el comprador no tiene otra ventana a su
+  // pedido, y cada cambio sin avisar es una pregunta por WhatsApp que alguien
+  // contesta a mano.
+  const MOMENTOS = [
+    { evento: "order.created", handler: orderCreatedBuyerEmail, tipo: "BUYER_CREATED" },
+    { evento: "order.confirmed", handler: orderConfirmedBuyerEmail, tipo: "BUYER_CONFIRMED" },
+    { evento: "order.preparing", handler: orderPreparingBuyerEmail, tipo: "BUYER_PREPARING" },
+    { evento: "order.shipped", handler: orderShippedBuyerEmail, tipo: "BUYER_SHIPPED" },
+    { evento: "order.delivered", handler: orderDeliveredBuyerEmail, tipo: "BUYER_DELIVERED" },
+    { evento: "order.cancelled", handler: orderCancelledBuyerEmail, tipo: "BUYER_CANCELLED" },
+  ] as const;
+
+  it("cada estado manda SU correo, y solo el suyo", async () => {
+    const enviados = driverFalso();
+    const c = await cliente();
+    const p = await pedido(c.id);
+
+    for (const m of MOMENTOS) {
+      await m.handler.handle({
+        id: `evt-${m.tipo}`,
+        type: m.evento,
+        payload: { orderId: p.id },
+        attempts: 1,
+        createdAt: new Date(),
+      });
+    }
+
+    // Seis correos al comprador, uno por momento, sin repetidos.
+    expect(enviados).toHaveLength(MOMENTOS.length);
+    const tipos = await db.orderEmail.findMany({
+      where: { orderId: p.id },
+      select: { type: true },
+    });
+    expect(tipos.map((t) => t.type).sort()).toEqual(MOMENTOS.map((m) => m.tipo).sort());
+  });
+
+  it("TODOS los estados tienen su tipo de correo registrado", () => {
+    // Si mañana se añade un estado al pedido y nadie le pone correo, el
+    // comprador se queda sin aviso y nada falla. Esto lo hace visible.
+    resetRegistry();
+    registerAllHandlers();
+
+    for (const m of MOMENTOS) {
+      const registrados = handlersFor(m.evento);
+      expect(registrados.length, `${m.evento} sin manejador`).toBeGreaterThan(0);
+    }
+    resetRegistry();
+  });
+
+  it("el correo de entrega recuerda el cashback y la ventana de cambios", async () => {
+    const c = await cliente();
+    const p = await pedido(c.id);
+    const ctx = (await orderEmailContext(p.id))!;
+
+    const email = renderOrderEmail("BUYER_DELIVERED", {
+      ...ctx,
+      cashbackEarned: 5_550,
+      cashbackExpiresAt: new Date("2027-08-01T05:00:00Z"),
+    });
+
+    expect(email.html).toContain("Kora Cashback");
+    // La ventana es de 30 días desde la compra: si no se recuerda aquí, el
+    // comprador se entera cuando ya pasó.
+    expect(email.html).toContain("30 días");
+  });
+
+  it("el de preparación no promete entrega ni pide nada", async () => {
+    const c = await cliente();
+    const p = await pedido(c.id);
+    const ctx = (await orderEmailContext(p.id))!;
+
+    const email = renderOrderEmail("BUYER_PREPARING", ctx);
+    expect(email.subject).toContain(ctx.orderNumber);
+    expect(email.html).toContain("preparación");
   });
 });
 

@@ -38,3 +38,11 @@
 - [x] 6.3 Anotar en `../notas-tecnicas-privado.md` que **esto es alcance nuevo, fuera de la cotización**, y que la decisión de cobrarlo o absorberlo es de Daniel.
 - [x] 6.4 Declarar el pendiente de escribir las HUs.
 - [x] 6.5 `pnpm typecheck && pnpm lint && pnpm build && pnpm test` en verde.
+
+## 7. Un correo por CADA estado (decisión del cliente, 1 ago 2026)
+
+- [x] 7.1 Añadir los tipos `BUYER_PREPARING` y `BUYER_DELIVERED`, con su migración.
+- [x] 7.2 `advanceOrderStatus()` emite el evento de **cada** estado al que avanza, no solo de "enviado". Solo cuando la transición ocurre de verdad.
+- [x] 7.3 Redactar los dos correos nuevos: "en preparación" y "entregado". El de entrega recuerda el cashback ganado y la ventana de cambios de 30 días.
+- [x] 7.4 Registrar los manejadores nuevos.
+- [x] 7.5 Pruebas: cada estado manda su correo y **solo** el suyo; una transición rechazada no manda nada; `emails:preview` genera los siete.

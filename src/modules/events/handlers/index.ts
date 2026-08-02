@@ -10,6 +10,8 @@ import {
   orderConfirmedBuyerEmail,
   orderCreatedBuyerEmail,
   orderCreatedStaffEmail,
+  orderDeliveredBuyerEmail,
+  orderPreparingBuyerEmail,
   orderShippedBuyerEmail,
 } from "./order-emails";
 
@@ -34,10 +36,15 @@ export function registerAllHandlers(): void {
   // Correos. Van DESPUÉS del cashback en el orden de registro para que el
   // correo de confirmación encuentre el saldo ya acreditado y pueda decir
   // cuánto ganó el comprador.
+  // Uno por CADA estado del pedido: el comprador no tiene otra ventana a su
+  // compra, y cada cambio sin avisar es una pregunta por WhatsApp que alguien
+  // contesta a mano (decisión del cliente, 1 ago 2026).
   registrar("order.created", orderCreatedBuyerEmail);
   registrar("order.created", orderCreatedStaffEmail);
   registrar("order.confirmed", orderConfirmedBuyerEmail);
+  registrar("order.preparing", orderPreparingBuyerEmail);
   registrar("order.shipped", orderShippedBuyerEmail);
+  registrar("order.delivered", orderDeliveredBuyerEmail);
   registrar("order.cancelled", orderCancelledBuyerEmail);
 }
 

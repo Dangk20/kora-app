@@ -120,5 +120,5 @@ tests/notifications.test.ts
 
 ## Open Questions
 
-- **¿Quiere el cliente un correo cuando el pedido pasa a "en preparación"?** Se asume que no: son cuatro avisos y añadir uno más por cada estado intermedio cansa al comprador. Fácil de añadir si lo pide.
+- ~~¿Quiere el cliente un correo cuando el pedido pasa a "en preparación"?~~ **RESUELTO (1 ago 2026): sí, y en todos los estados.** Se había asumido que no —un aviso por cada estado cansa— y la decisión del cliente fue la contraria: prefiere que el comprador esté informado a que escriba preguntando. Se añaden "en preparación" y "entregado".
 - **¿A cuántas direcciones debe llegar el aviso de pedido nuevo?** Se construye para una. Varias es un cambio pequeño, pero conviene saber si lo necesitan antes de inventarlo.

@@ -34,10 +34,13 @@ const EJEMPLO: OrderEmailData = {
   cashbackRefunded: 5_000,
 };
 
+// Los siete, en el orden en que un comprador los recibiría.
 const TODOS: OrderEmailType[] = [
   "BUYER_CREATED",
   "BUYER_CONFIRMED",
+  "BUYER_PREPARING",
   "BUYER_SHIPPED",
+  "BUYER_DELIVERED",
   "BUYER_CANCELLED",
   "STAFF_NEW_ORDER",
 ];

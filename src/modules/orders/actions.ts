@@ -21,6 +21,20 @@ export type OrderActionResult =
 
 const ADMIN_PATH = "/admin/pedidos";
 
+/**
+ * Qué evento emite cada estado al que avanza un pedido.
+ *
+ * `CONFIRMED` no está: lo emite `confirmOrder()`, que hace mucho más que
+ * cambiar el estado —descuenta stock y dispara el cashback— y ya escribe su
+ * `order.confirmed`. `PENDING` tampoco: no se "avanza" hacia él.
+ */
+const EVENTO_POR_ESTADO: Partial<Record<OrderStatus, string>> = {
+  PREPARING: "order.preparing",
+  SHIPPED: "order.shipped",
+  DELIVERED: "order.delivered",
+  CANCELLED: "order.cancelled",
+};
+
 function revalidate(orderId: string) {
   revalidatePath(ADMIN_PATH);
   revalidatePath(`${ADMIN_PATH}/${orderId}`);
@@ -189,12 +203,16 @@ export async function advanceOrderStatus(
     await tx.orderStatusHistory.create({
       data: { orderId, from: order.status, to, actorId: session.user.id },
     });
-    // Solo "enviado" avisa al comprador: un correo por cada estado intermedio
-    // cansa, y "en preparación" no le pide nada ni le dice dónde está su cosa.
-    if (to === "SHIPPED") {
-      await tx.domainEvent.create({
-        data: { type: "order.shipped", payload: { orderId } },
-      });
+
+    // CADA estado avisa al comprador (decisión del cliente, 1 ago 2026). Él no
+    // tiene otra ventana a su pedido: cada cambio que no se avisa es una
+    // pregunta por WhatsApp que alguien contesta a mano.
+    //
+    // El evento se escribe AQUÍ dentro, así que solo sale si la transición
+    // ocurrió de verdad: una rechazada por `canTransition()` ni siquiera llega.
+    const evento = EVENTO_POR_ESTADO[to];
+    if (evento) {
+      await tx.domainEvent.create({ data: { type: evento, payload: { orderId } } });
     }
   });
 

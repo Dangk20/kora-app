@@ -818,10 +818,15 @@ model Setting {
 // peor caso es que alguien no reciba un correo; nunca que lo reciba dos veces.
 // ─────────────────────────────────────────────────────────────
 
+// Uno por CADA estado del pedido (decisión del cliente, 1 ago 2026): el
+// comprador no tiene otra ventana a su pedido, y cada estado que no se avisa es
+// un mensaje de WhatsApp que alguien contesta a mano.
 enum OrderEmailType {
   BUYER_CREATED // al comprador: pedido recibido, con el enlace de WhatsApp
   BUYER_CONFIRMED // al comprador: pago confirmado y cashback acreditado
-  BUYER_SHIPPED // al comprador: pedido enviado
+  BUYER_PREPARING // al comprador: ya lo estamos armando
+  BUYER_SHIPPED // al comprador: va en camino
+  BUYER_DELIVERED // al comprador: entregado
   BUYER_CANCELLED // al comprador: cancelado o expirado
   STAFF_NEW_ORDER // al operador: entró un pedido
 }
