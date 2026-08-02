@@ -38,6 +38,7 @@ Next.js 15 (App Router) + TypeScript · Tailwind 4 + shadcn/ui · PostgreSQL 16 
 pnpm db:up          # Postgres (puerto 5433) + Redis (6380) — puertos no estándar a propósito
 pnpm db:migrate     # migraciones (nunca cambios de esquema a mano)
 pnpm db:seed        # roles, permisos, admin dev, catálogo demo
+pnpm rbac:sync      # aplica la matriz de permisos a la base (lo corre el despliegue)
 pnpm dev            # desarrollo · pnpm start = build de producción
 pnpm test           # Vitest (integración contra el Postgres local — debe estar arriba)
 pnpm typecheck && pnpm lint && pnpm build   # lo que corre el CI
@@ -58,7 +59,8 @@ Login dev: `admin@kora.local` / `kora-dev-2026` · cajero: `caja@kora.local` / `
 4. **Toda Server Action protegida usa `requirePermission("modulo:accion")`** (verifica contra la BASE, no el JWT — revocación inmediata). La matriz de permisos está fijada por tests (`tests/rbac.test.ts`).
 5. **Fidelidad de diseño:** toda pantalla nueva se construye mirando su equivalente en el prototipo aprobado (`Kora.dc.html`) — layout y patrones del prototipo; **color y tipografía del manual de marca** (tokens en `src/app/globals.css`: gradiente `bg-kora-gradient` 135°, neutros kora-*, Manrope/Allura). Botón principal = variant `brand`.
 6. **La lógica vive en `src/modules/<dominio>/`** (ver su README); las rutas de `src/app/` son delgadas. Slide-overs controlados por URL (`?nuevo=1`, `?editar=id`, `?ajustar=id`).
-7. Migraciones versionadas siempre; ningún secreto en el repo (`.env` ignorado, plantilla en `.env.example`).
+7. **La matriz de permisos vive en `prisma/rbac.ts`, NO en el seed**, y el contenedor de migraciones la sincroniza en cada despliegue. El seed solo corre en bases nuevas: cuando la matriz vivía ahí, un permiso añadido **nunca llegaba a un entorno existente** y su módulo quedaba invisible en el menú, sin error. Le pasó a Cupones y a Ventas a la vez en pruebas. Añadir un permiso = tocar esa matriz y desplegar; nada más.
+8. Migraciones versionadas siempre; ningún secreto en el repo (`.env` ignorado, plantilla en `.env.example`).
 
 ## Estado y pendientes
 

@@ -6,57 +6,13 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+// La matriz vive en `rbac.ts`: el despliegue la aplica en cada migración, y el
+// seed usa LA MISMA. Dos matrices serían dos verdades que se desincronizan.
+import { syncRbac } from "./rbac";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
-
-// ── Matriz de permisos módulo × acción ──────────────────────
-const MATRIX: Record<string, string[]> = {
-  catalog: ["view", "create", "edit", "delete"],
-  inventory: ["view", "adjust"],
-  orders: ["view", "create", "edit", "confirm", "cancel"],
-  // "sales" es distinto de "orders" a propósito: ver pedidos es atender; ver
-  // ventas es ver cuánto factura el negocio. El cajero necesita lo primero y no
-  // tiene por qué saber lo segundo.
-  sales: ["view", "export"],
-  pos: ["view", "sell"],
-  // "customers" y NO "crm": la nomenclatura acordada con el cliente prohíbe esa
-  // palabra — un CRM implica un alcance mucho mayor del que se vendió.
-  customers: ["view", "create", "edit", "export"],
-  coupons: ["view", "create", "edit"],
-  dashboard: ["view"],
-  loyalty: ["view", "adjust"],
-  marketing: ["view", "create", "send"],
-  users: ["view", "create", "edit", "delete"],
-  settings: ["view", "edit"],
-};
-
-const ROLES: Record<string, { description: string; grants: string[] | "ALL" }> = {
-  admin: { description: "Acceso total", grants: "ALL" },
-  operador: {
-    description: "Opera pedidos, inventario y clientes",
-    grants: [
-      "catalog:view", "catalog:edit",
-      "inventory:view", "inventory:adjust",
-      "orders:view", "orders:create", "orders:edit", "orders:confirm", "orders:cancel",
-      "customers:view", "customers:create", "customers:edit",
-      "coupons:view", "coupons:create", "coupons:edit",
-      "dashboard:view", "loyalty:view",
-      // Ve la facturación, pero NO puede sacarla del sistema: exportar es
-      // llevarse los datos del negocio, y eso queda en el administrador.
-      "sales:view",
-    ],
-  },
-  cajero: {
-    description: "Punto de venta",
-    grants: ["pos:view", "pos:sell", "catalog:view", "orders:view"],
-  },
-  marketing: {
-    description: "Campañas y clientes",
-    grants: ["customers:view", "customers:export", "marketing:view", "marketing:create", "marketing:send", "dashboard:view", "sales:view"],
-  },
-};
 
 // ── Catálogo demo: 20 productos, 4 categorías ───────────────
 type DemoProduct = {
@@ -124,37 +80,7 @@ const slugify = (s: string) =>
 const online = (store: number) => Math.round((store * 0.95) / 100) * 100;
 
 async function main() {
-  // Permisos
-  const permIds = new Map<string, string>();
-  for (const [module, actions] of Object.entries(MATRIX)) {
-    for (const action of actions) {
-      const p = await db.permission.upsert({
-        where: { module_action: { module, action } },
-        update: {},
-        create: { module, action },
-      });
-      permIds.set(`${module}:${action}`, p.id);
-    }
-  }
-
-  // Roles + asignaciones
-  for (const [name, def] of Object.entries(ROLES)) {
-    const role = await db.role.upsert({
-      where: { name },
-      update: { description: def.description },
-      create: { name, description: def.description },
-    });
-    const grants = def.grants === "ALL" ? [...permIds.keys()] : def.grants;
-    for (const key of grants) {
-      const permissionId = permIds.get(key);
-      if (!permissionId) throw new Error(`Permiso inexistente en la matriz: ${key}`);
-      await db.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: role.id, permissionId } },
-        update: {},
-        create: { roleId: role.id, permissionId },
-      });
-    }
-  }
+  await syncRbac(db);
 
   // Usuario admin de desarrollo
   const adminRole = await db.role.findUniqueOrThrow({ where: { name: "admin" } });

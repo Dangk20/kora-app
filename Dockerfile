@@ -76,11 +76,19 @@ COPY prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 USER node
 
+# Migrar Y SINCRONIZAR PERMISOS, en ese orden y en el mismo contenedor.
+#
+# Lo segundo no es un extra: la matriz de permisos vivía solo en el seed, que
+# únicamente corre en bases nuevas, así que un permiso añadido nunca llegaba a
+# un entorno existente. Cupones y Ventas quedaron invisibles en pruebas —
+# desplegados, probados y sin forma de abrirlos, sin ningún error. Atándolo al
+# mismo comando, no se puede olvidar.
+#
 # El binario directo, NO `pnpm prisma`: `prisma` no es un script de package.json,
 # así que pnpm intenta resolverlo contra el registro de npm antes de ejecutarlo.
 # Este contenedor corre en una red sin salida a internet (`internal: true`), así
 # que esa consulta falla y se lleva por delante la migración entera.
-CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/sync-rbac.ts"]
 
 # ─────────────────────────────────────────────────────────────
 # worker — consumidor de la bandeja de salida de eventos

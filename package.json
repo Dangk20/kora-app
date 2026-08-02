@@ -12,6 +12,7 @@
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "rbac:sync": "tsx prisma/sync-rbac.ts",
     "db:studio": "prisma studio",
     "ledger:verify": "tsx scripts/verify-ledger.ts",
     "cashback:verify": "tsx scripts/verify-cashback.ts",

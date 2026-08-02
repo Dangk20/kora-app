@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { checkPermission, PermissionError } from "@/modules/auth/permissions";
 import { verifyCredentials } from "@/modules/auth/verify";
+import { MATRIX, ROLES, syncRbac } from "../prisma/rbac";
 
 const TEST_EMAIL = "test-rbac-cajero@kora.local";
 const TEST_PASSWORD = "test-rbac-12345678";
@@ -162,5 +163,75 @@ describe("nomenclatura de la matriz de permisos", () => {
   it('existe el módulo "customers" con sus cuatro acciones', async () => {
     const perms = await db.permission.findMany({ where: { module: "customers" } });
     expect(perms.map((p) => p.action).sort()).toEqual(["create", "edit", "export", "view"]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe("LA MATRIZ LLEGA A LA BASE EN CADA DESPLIEGUE", () => {
+  // Esto existe por un fallo real: la matriz vivía solo en el seed, que únicamente
+  // corre en bases NUEVAS, y el despliegue solo aplica migraciones. Cupones y
+  // Ventas quedaron invisibles en pruebas —desplegados, probados, sin forma de
+  // abrirlos— y sin ningún error que mirar. Ahora el contenedor de migraciones
+  // sincroniza, y esto lo fija.
+
+  it("todo permiso de la matriz existe en la base", async () => {
+    const enBase = new Set(
+      (await db.permission.findMany({ select: { module: true, action: true } })).map(
+        (p) => `${p.module}:${p.action}`,
+      ),
+    );
+    const faltan: string[] = [];
+    for (const [modulo, acciones] of Object.entries(MATRIX)) {
+      for (const accion of acciones) {
+        if (!enBase.has(`${modulo}:${accion}`)) faltan.push(`${modulo}:${accion}`);
+      }
+    }
+    expect(faltan, `permisos de la matriz que no llegaron a la base: ${faltan.join(", ")}`).toEqual([]);
+  });
+
+  it("cada rol tiene EXACTAMENTE lo que declara la matriz", async () => {
+    for (const [nombre, def] of Object.entries(ROLES)) {
+      const grants = await db.rolePermission.findMany({
+        where: { role: { name: nombre } },
+        include: { permission: true },
+      });
+      const enBase = grants
+        .map((g) => `${g.permission.module}:${g.permission.action}`)
+        .sort();
+      const esperados = (
+        def.grants === "ALL"
+          ? Object.entries(MATRIX).flatMap(([m, as]) => as.map((a) => `${m}:${a}`))
+          : def.grants
+      ).sort();
+      expect(enBase, `el rol ${nombre} no coincide con la matriz`).toEqual(esperados);
+    }
+  });
+
+  it("SINCRONIZAR DOS VECES no cambia nada: es idempotente", async () => {
+    // El despliegue la corre en cada migración. Si no fuera idempotente,
+    // cada despliegue movería permisos.
+    const segunda = await syncRbac(db);
+    expect(segunda.permisosCreados).toEqual([]);
+    expect(segunda.concedidos).toEqual([]);
+    expect(segunda.revocados).toEqual([]);
+  });
+
+  it("REVOCA lo que sobra: un permiso quitado de la matriz no se queda concedido", async () => {
+    // Un acceso que nadie recuerda haber dado es peor que uno que falta.
+    const rol = await db.role.findUniqueOrThrow({ where: { name: "cajero" } });
+    const sobrante = await db.permission.findFirstOrThrow({
+      where: { module: "users", action: "delete" },
+    });
+    await db.rolePermission.create({
+      data: { roleId: rol.id, permissionId: sobrante.id },
+    });
+
+    const r = await syncRbac(db);
+
+    expect(r.revocados).toContainEqual({ rol: "cajero", permiso: "users:delete" });
+    const sigue = await db.rolePermission.findFirst({
+      where: { roleId: rol.id, permissionId: sobrante.id },
+    });
+    expect(sigue).toBeNull();
   });
 });
