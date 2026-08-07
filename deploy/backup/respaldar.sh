@@ -40,6 +40,12 @@ CLAVE_PUBLICA="${KORA_BACKUP_AGE_RECIPIENT:-}"
 DIAS_RETENCION="${KORA_BACKUP_RETENTION_DAYS:-30}"
 REGISTRO="${KORA_BACKUP_LOG:-/var/log/kora-backup.log}"
 
+# Volumen de Docker donde viven las imágenes de producto. Solo aplica cuando
+# el almacenamiento es el disco del servidor (KORA_STORAGE_DRIVER=disk); con
+# almacenamiento remoto aquí no vive nada.
+VOLUMEN_IMAGENES="${KORA_BACKUP_UPLOADS_VOLUME:-kora-prod_uploads}"
+DRIVER_ALMACENAMIENTO="${KORA_STORAGE_DRIVER:-disk}"
+
 # ─────────────────────────────────────────────────────────────
 # Registro
 # ─────────────────────────────────────────────────────────────
@@ -107,35 +113,71 @@ trap limpiar EXIT INT TERM
 # ─────────────────────────────────────────────────────────────
 
 SELLO="$(date -u +%Y%m%dT%H%M%SZ)"
-NOMBRE="kora-${SELLO}.dump.age"
+NOMBRE="kora-${SELLO}.tar.age"
 LOCAL="$TRABAJO/$NOMBRE"
 
 anotar INFO "iniciando respaldo de '$CONTENEDOR'"
 
+# ── 1. La base ───────────────────────────────────────────────
+#
 # `-Fc` (formato personalizado) y no SQL plano: comprime, permite restaurar en
 # paralelo y —lo que importa— `pg_restore` DETECTA un archivo truncado. Un .sql
 # truncado se restaura "bien" hasta donde llega y deja una base a medias sin que
 # nada falle: la forma más silenciosa de perder datos durante una recuperación.
 #
 # No bloquea escrituras (MVCC): la tienda sigue vendiendo mientras corre.
+if ! docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "$CONTENEDOR" \
+      pg_dump -Fc -U "${POSTGRES_USER:-kora}" -d "${POSTGRES_DB:-kora}" \
+      > "$TRABAJO/base.dump" 2> "$TRABAJO/pg_dump.err"; then
+  morir "pg_dump falló: $(head -c 500 "$TRABAJO/pg_dump.err")"
+fi
+
+[[ -s "$TRABAJO/base.dump" ]] || morir "el volcado de la base salió vacío"
+
+# ── 2. Las imágenes de producto ──────────────────────────────
 #
-# La tubería se comprueba etapa por etapa con PIPESTATUS: sin eso, un `pg_dump`
-# que muere a mitad devuelve éxito porque `age` sí terminó bien, y se subiría un
+# Sin ellas, restaurar devolvería el catálogo completo y ni una sola foto — y
+# las fotos son un insumo del cliente que costó semanas conseguir.
+#
+# Se leen con un contenedor efímero montando el volumen, y no por una ruta del
+# anfitrión: un volumen de Docker vive bajo /var/lib/docker con permisos de
+# root, y un bind mount traería el problema de que el usuario del contenedor y
+# el del anfitrión coincidan. Esto no depende de ninguna de las dos cosas.
+if [[ "$DRIVER_ALMACENAMIENTO" == "disk" ]]; then
+  if ! docker volume inspect "$VOLUMEN_IMAGENES" >/dev/null 2>&1; then
+    morir "el volumen de imágenes '$VOLUMEN_IMAGENES' no existe. Sin él las fotos no están en ningún sitio persistente."
+  fi
+
+  if ! docker run --rm -v "$VOLUMEN_IMAGENES":/data:ro alpine:3 \
+        tar -cf - -C /data . > "$TRABAJO/imagenes.tar" 2> "$TRABAJO/tar.err"; then
+    morir "no se pudieron leer las imágenes: $(head -c 500 "$TRABAJO/tar.err")"
+  fi
+
+  anotar INFO "imágenes empaquetadas ($(wc -c < "$TRABAJO/imagenes.tar" | tr -d ' ') bytes)"
+else
+  # Con almacenamiento remoto no hay imágenes locales que respaldar, y decirlo
+  # evita que alguien lea el tamaño del respaldo y crea que están dentro.
+  : > "$TRABAJO/imagenes.tar"
+  anotar INFO "almacenamiento remoto: el respaldo NO incluye imágenes (viven fuera del servidor)"
+fi
+
+# ── 3. Un solo archivo cifrado ───────────────────────────────
+#
+# Base e imágenes van juntas a propósito. Dos archivos separados pueden
+# desincronizarse —la base de hoy con las imágenes de ayer— y obligan a acertar
+# la pareja durante una recuperación, con prisa. Uno solo hace imposible
+# restaurar mitades que no se corresponden.
+#
+# La tubería se comprueba etapa por etapa con PIPESTATUS: sin eso, un `tar` que
+# muere a mitad devuelve éxito porque `age` sí terminó bien, y se subiría un
 # archivo truncado como si fuera un respaldo bueno.
 set +e
-docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "$CONTENEDOR" \
-  pg_dump -Fc -U "${POSTGRES_USER:-kora}" -d "${POSTGRES_DB:-kora}" \
-  2> "$TRABAJO/pg_dump.err" \
-  | age -r "$CLAVE_PUBLICA" -o "$LOCAL"
+tar -cf - -C "$TRABAJO" base.dump imagenes.tar | age -r "$CLAVE_PUBLICA" -o "$LOCAL"
 ESTADOS=("${PIPESTATUS[@]}")
 set -e
 
-if [[ "${ESTADOS[0]}" -ne 0 ]]; then
-  morir "pg_dump falló (código ${ESTADOS[0]}): $(head -c 500 "$TRABAJO/pg_dump.err")"
-fi
-if [[ "${ESTADOS[1]}" -ne 0 ]]; then
-  morir "el cifrado falló (código ${ESTADOS[1]})"
-fi
+[[ "${ESTADOS[0]}" -eq 0 ]] || morir "el empaquetado falló (código ${ESTADOS[0]})"
+[[ "${ESTADOS[1]}" -eq 0 ]] || morir "el cifrado falló (código ${ESTADOS[1]})"
 
 [[ -s "$LOCAL" ]] || morir "el respaldo salió vacío"
 

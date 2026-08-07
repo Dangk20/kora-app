@@ -1,19 +1,23 @@
 // Punto de entrada del almacenamiento: elige el driver por entorno y expone
 // las utilidades de validación e identidad de archivos.
 import { randomUUID } from "node:crypto";
-import { assertStorageConfigured, missingR2Vars } from "./config";
+import { assertStorageConfigured, configuredDriver } from "./config";
 import type { StorageDriver } from "./driver";
 import { LocalStorageDriver } from "./local-driver";
 import { R2StorageDriver } from "./r2-driver";
 
 export type { StorageDriver, StoredObject } from "./driver";
-export { resolveUploadPath, UPLOADS_DIR } from "./local-driver";
+export { resolveUploadPath, uploadsRoot } from "./local-driver";
 export {
   assertStorageConfigured,
+  configuredDriver,
   missingR2Vars,
   R2_REQUIRED_VARS,
+  STORAGE_DRIVERS,
   StorageConfigError,
+  uploadsDir,
 } from "./config";
+export type { StorageDriverName } from "./config";
 
 /** Formatos que aceptamos para foto de producto. */
 export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
@@ -30,21 +34,29 @@ export const MAX_IMAGES_PER_PRODUCT = 8;
 let cached: StorageDriver | undefined;
 
 /**
- * R2 si están todas sus variables; disco local en cualquier otro caso.
+ * El driver que se ELIGIÓ, no el que se pueda montar con lo que haya.
  *
- * En producción una configuración incompleta es un error. La comprobación de
- * verdad ocurre AL ARRANCAR (`src/instrumentation.ts`), no aquí: para cuando
- * alguien llama a esta función ya hay tráfico y el proceso no debería estar
- * vivo. El `assertStorageConfigured` de abajo es la segunda línea de defensa,
- * por si se invoca desde un contexto que no pasó por el arranque del servidor
- * (un script, una tarea programada, una prueba).
+ * Antes esta función decía "si están todas las variables de R2, R2; si no,
+ * disco". Ese respaldo automático era una trampa en producción: un error de
+ * tecleo en una credencial de R2 no daba ningún error — las imágenes se
+ * guardaban en el sistema de archivos del contenedor y el siguiente despliegue
+ * las borraba todas. Ahora la elección es explícita y su configuración
+ * incompleta tumba el arranque.
+ *
+ * La comprobación de verdad ocurre AL ARRANCAR (`src/instrumentation.ts`), no
+ * aquí: para cuando alguien llama a esta función ya hay tráfico y el proceso no
+ * debería estar vivo. El `assertStorageConfigured` de abajo es la segunda línea
+ * de defensa, por si se invoca desde un contexto que no pasó por el arranque
+ * del servidor (un script, una tarea programada, una prueba).
  */
 export function storage(): StorageDriver {
   if (cached) return cached;
 
   assertStorageConfigured();
 
-  if (missingR2Vars().length === 0) {
+  // En desarrollo `configuredDriver()` devuelve "disk" cuando no se eligió;
+  // en producción no llega aquí sin elección, porque la línea de arriba lanza.
+  if (configuredDriver() === "r2") {
     cached = new R2StorageDriver({
       accountId: process.env.R2_ACCOUNT_ID!,
       accessKeyId: process.env.R2_ACCESS_KEY_ID!,

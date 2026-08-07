@@ -9,10 +9,14 @@
 # momento en que nadie puede permitírselo.
 #
 # Uso:
-#   ./restaurar.sh --archivo kora-2026....dump.age \
+#   ./restaurar.sh --archivo kora-2026....tar.age \
 #                  --clave ~/kora-backup.key \
 #                  --base kora_restaurada \
-#                  [--contenedor kora-prod-postgres]
+#                  [--contenedor kora-prod-postgres] [--volumen kora-prod_uploads]
+#
+# El respaldo trae la base Y las imágenes de producto en un solo archivo
+# cifrado: separarlos permitiría restaurar la base de hoy con las fotos de
+# ayer, y decidir la pareja correcta con prisa.
 #
 # La clave PRIVADA no vive en el servidor: se trae para restaurar y se lleva.
 # Ver README.md de este directorio.
@@ -25,16 +29,19 @@ ARCHIVO=""
 CLAVE=""
 BASE=""
 CONTENEDOR="${KORA_BACKUP_CONTAINER:-kora-prod-postgres}"
+VOLUMEN_IMAGENES="${KORA_BACKUP_UPLOADS_VOLUME:-kora-prod_uploads}"
 SI_A_TODO="no"
 
 uso() {
   cat >&2 <<'EOF'
 Restauración de un respaldo cifrado de KORA.
 
-  --archivo   <ruta>   Respaldo cifrado (.dump.age). Obligatorio.
+  --archivo   <ruta>   Respaldo cifrado (.tar.age). Obligatorio.
   --clave     <ruta>   Clave PRIVADA de age. Obligatoria.
   --base      <nombre> Base de destino. Obligatoria, SIN valor por defecto.
   --contenedor <nombre> Contenedor de PostgreSQL (por omisión: kora-prod-postgres).
+  --volumen   <nombre> Volumen de Docker de las imágenes de producto
+                       (por omisión: kora-prod_uploads). Cadena vacía para omitirlas.
   --si                 No preguntar aunque la base tenga datos.
 
 No hay destino por defecto a propósito: restaurar sobre la base equivocada
@@ -49,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --clave)       CLAVE="${2:-}"; shift 2 ;;
     --base)        BASE="${2:-}"; shift 2 ;;
     --contenedor)  CONTENEDOR="${2:-}"; shift 2 ;;
+    --volumen)     VOLUMEN_IMAGENES="${2:-}"; shift 2 ;;
     --si)          SI_A_TODO="si"; shift ;;
     -h|--help)     uso ;;
     *) echo "Argumento desconocido: $1" >&2; uso ;;
@@ -108,22 +116,53 @@ chmod 700 "$TRABAJO"
 trap 'rm -rf "$TRABAJO"' EXIT INT TERM
 
 echo "→ Descifrando…"
-age -d -i "$CLAVE" -o "$TRABAJO/kora.dump" "$ARCHIVO" \
+age -d -i "$CLAVE" -o "$TRABAJO/kora.tar" "$ARCHIVO" \
   || { echo "✖ No se pudo descifrar. ¿Es la clave privada correcta?" >&2; exit 1; }
 
-echo "→ Restaurando en '$BASE'…"
+tar -xf "$TRABAJO/kora.tar" -C "$TRABAJO" \
+  || { echo "✖ El respaldo está corrupto: no se pudo desempaquetar." >&2; exit 1; }
+
+[[ -s "$TRABAJO/base.dump" ]] || { echo "✖ El respaldo no contiene el volcado de la base." >&2; exit 1; }
+
+echo "→ Restaurando la base en '$BASE'…"
 # `--clean --if-exists`: la restauración es repetible. `--exit-on-error` para
 # que un fallo a mitad se note ahora y no dentro de un mes.
 docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "$CONTENEDOR" \
   pg_restore -U "$USUARIO" -d "$BASE" --clean --if-exists --no-owner --exit-on-error \
-  < "$TRABAJO/kora.dump"
+  < "$TRABAJO/base.dump"
 
-FILAS="$(psql_en "$BASE" -tAc \
+TABLAS_OK="$(psql_en "$BASE" -tAc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")"
 
+# ── Imágenes de producto ─────────────────────────────────────
+#
+# Restaurar solo la base dejaría el catálogo completo y ninguna ficha con foto,
+# y además la aplicación NO ARRANCARÍA: comprueba al iniciar que las imágenes
+# que la base registra existan de verdad (src/modules/storage/persistence.ts).
+if [[ -s "$TRABAJO/imagenes.tar" ]]; then
+  if [[ -z "$VOLUMEN_IMAGENES" ]]; then
+    echo ""
+    echo "⚠ El respaldo trae imágenes pero no se indicó --volumen. Sáltatelo solo si"
+    echo "  el almacenamiento es remoto; si no, la aplicación no arrancará."
+  else
+    echo "→ Restaurando imágenes en el volumen '$VOLUMEN_IMAGENES'…"
+    docker volume create "$VOLUMEN_IMAGENES" >/dev/null
+    docker run --rm -i -v "$VOLUMEN_IMAGENES":/data alpine:3 \
+      tar -xf - -C /data < "$TRABAJO/imagenes.tar" \
+      || { echo "✖ No se pudieron restaurar las imágenes." >&2; exit 1; }
+
+    ARCHIVOS="$(docker run --rm -v "$VOLUMEN_IMAGENES":/data:ro alpine:3 \
+      sh -c 'find /data -type f | wc -l' | tr -d ' ')"
+    echo "  $ARCHIVOS archivo(s) de imagen restaurados"
+  fi
+else
+  echo "→ El respaldo no trae imágenes (almacenamiento remoto)."
+fi
+
 echo ""
-echo "✓ Restaurado en '$BASE': $FILAS tabla(s)."
+echo "✓ Restaurado en '$BASE': $TABLAS_OK tabla(s)."
 echo "  Comprueba antes de apuntar la aplicación aquí:"
 echo "    SELECT count(*) FROM orders;"
 echo "    SELECT count(*) FROM cashback_movements;"
 echo "    SELECT count(*) FROM stock_movements;"
+echo "    SELECT count(*) FROM product_images;   -- debe cuadrar con los archivos restaurados"

@@ -1,10 +1,22 @@
-// Sirve las imágenes del driver local SOLO en desarrollo. En producción las
-// imágenes viven en R2 detrás del CDN y esta ruta no se usa (responde 404):
-// el VPS nunca sirve archivos estáticos de producto.
+// Sirve las imágenes de producto cuando viven en el disco del servidor.
+//
+// La condición para servir NO es el entorno sino el driver elegido: con
+// almacenamiento remoto esta ruta responde 404 en cualquier entorno —la
+// garantía original de que el servidor no sirve imágenes de producto—, y con
+// disco sirve en cualquiera, incluido producción.
+//
+// Antes la condición era `NODE_ENV === "production" → 404`, que era correcta
+// mientras producción significaba R2. Ya no.
+//
+// Ver openspec/changes/imagenes-en-vps-con-cdn — design.md decisión 4.
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { resolveUploadPath } from "@/modules/storage";
+import { configuredDriver, resolveUploadPath } from "@/modules/storage";
+
+// El driver se lee por petición, no al construir: es lo que decide si esta
+// ruta existe, y en producción se resuelve desde el entorno del contenedor.
+export const dynamic = "force-dynamic";
 
 const CONTENT_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -18,7 +30,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ key: string[] }> },
 ) {
-  if (process.env.NODE_ENV === "production") {
+  // Con almacenamiento remoto el servidor no sirve ni una imagen de producto.
+  if (configuredDriver() !== "disk") {
     return new Response("No encontrado", { status: 404 });
   }
 
@@ -38,7 +51,9 @@ export async function GET(
     headers: {
       "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream",
       "Content-Length": String(info.size),
-      // Las keys son únicas e inmutables (uuid por subida).
+      // Las claves son únicas e inmutables (uuid por subida), así que un objeto
+      // nunca cambia de contenido. Esto es lo que hace que el CDN pregunte UNA
+      // vez por imagen: sin ello, ponerlo delante no ahorraría nada.
       "Cache-Control": "public, max-age=31536000, immutable",
     },
   });

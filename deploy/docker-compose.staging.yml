@@ -24,6 +24,14 @@ services:
     # Nombre fijo: es el que resuelve el `reverse_proxy` del Caddyfile.
     container_name: kora-staging-app
     restart: unless-stopped
+    # Las imágenes de producto viven aquí, y TIENE que ser un volumen.
+    # Sin él viven en la capa efímera del contenedor: se escriben sin error y
+    # `up -d --force-recreate` las borra todas, dejando la tienda con el
+    # catálogo completo y ninguna foto. La aplicación lo comprueba al arrancar
+    # (src/modules/storage/persistence.ts) y se niega a levantar si detecta
+    # que la base registra imágenes y el directorio está vacío.
+    volumes:
+      - uploads:/data/uploads
     env_file:
       - .env.staging
     depends_on:
@@ -129,6 +137,8 @@ services:
 volumes:
   pgdata:
   redisdata:
+  # Imágenes de producto. Ver el comentario del servicio `app`.
+  uploads:
   # Los correos que el worker escribe en pruebas, para poder abrirlos.
   correos:
 

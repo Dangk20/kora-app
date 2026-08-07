@@ -5,11 +5,15 @@
 
 ## Qué protege esto, y qué no
 
-Un volcado diario cifrado de la base de producción, con retención de 30 días.
+Un archivo diario cifrado con **la base de producción Y las imágenes de producto**, con retención de 30 días.
+
+**Van juntos en un solo archivo a propósito.** Separados podrían desincronizarse —la base de hoy con las fotos de ayer— y obligarían a acertar la pareja durante una recuperación, con prisa. Además, restaurar solo la base dejaría el catálogo completo sin una sola foto, y la aplicación **ni siquiera arrancaría**: comprueba al iniciar que las imágenes que la base registra existan de verdad.
+
+Con `KORA_STORAGE_DRIVER=r2` las imágenes viven fuera del servidor y el respaldo no las incluye; lo anota en su registro para que nadie lea el tamaño del archivo y suponga que están dentro.
 
 **En el peor caso se pierde hasta un día de pedidos.** No hay recuperación a un punto intermedio del día (PITR): eso exige archivado de WAL y no está construido. La pérdida es acotable porque el cobro ocurre por WhatsApp — los pedidos del día se pueden reconstruir desde esas conversaciones. **Se dice aquí en vez de disimularlo.**
 
-No cubre: imágenes de producto (viven en R2 y no se recuperan desde la base), Redis (no guarda nada irrecuperable) ni el entorno de pruebas (datos de demostración).
+No cubre: Redis (no guarda nada irrecuperable) ni el entorno de pruebas (datos de demostración).
 
 ## La decisión que hay que entender antes de tocar nada
 
@@ -45,21 +49,40 @@ sudo apt-get update && sudo apt-get install -y age rclone
 
 ### 3. Configurar el destino remoto
 
+El destino tiene que estar **fuera del servidor**. Un respaldo en el mismo disco que protege no es un respaldo: el escenario principal es perder la máquina.
+
+**Sin tarjeta (situación actual, 7 ago 2026):** Cloudflare R2 exige registrar una tarjeta y se descartó por eso, así que el destino tampoco puede ser R2. La opción viable es **Google Drive**, que `rclone` soporta de forma nativa: 15 GB gratuitos, sin tarjeta, y basta con la cuenta de Google que ya existe.
+
+```bash
+rclone config
+# tipo: drive · autorizar con la cuenta de Google
+# nombre del remoto: respaldos
+```
+
+Que Google no pueda leerlos está garantizado por el cifrado: los archivos salen del servidor ya cifrados con la clave pública, así que el proveedor almacena bytes que no puede abrir. Esa es otra razón por la que el cifrado va antes del envío y no en el destino.
+
+**Con tarjeta**, si algún día la hay:
+
 ```bash
 rclone config
 # tipo: s3 · proveedor: Cloudflare R2 · endpoint: https://<cuenta>.r2.cloudflarestorage.com
 # nombre del remoto: r2
 ```
 
+⚠️ **Cuidado con el cupo:** con las imágenes dentro, el respaldo pasa de ~85 KiB a algunos GB. Con 1,2 GB de fotos y 30 días de retención se rozan los 15 GB de Drive. Dos salidas, ambas de una línea: bajar la retención a 14 días, o separar las imágenes en un respaldo semanal. **Revisar el cupo cuando entre el catálogo real.**
+
 ### 4. Variables en `.env.production`
 
 ```
 KORA_BACKUP_CONTAINER=kora-prod-postgres
-KORA_BACKUP_REMOTE=r2:kora-respaldos/produccion
+KORA_BACKUP_REMOTE=respaldos:kora-respaldos/produccion
 KORA_BACKUP_AGE_RECIPIENT=age1xxxxxxxx...      # la PÚBLICA
 KORA_BACKUP_RETENTION_DAYS=30
 KORA_BACKUP_LOG=/var/log/kora-backup.log
+KORA_BACKUP_UPLOADS_VOLUME=kora-prod_uploads
 ```
+
+> El volumen de imágenes se lee con un contenedor efímero (`docker run --rm -v … alpine tar`) y no por una ruta del anfitrión: un volumen de Docker vive bajo `/var/lib/docker` con permisos de root, y un bind mount traería el problema de que el usuario del contenedor y el del anfitrión coincidan. Así no depende de ninguna de las dos cosas.
 
 ### 5. Programarlo
 
@@ -78,7 +101,7 @@ crontab -e
 
 ```bash
 ./respaldar.sh                       # debe terminar en 0 y dejar una línea OK
-rclone lsf r2:kora-respaldos/produccion | tail -3
+rclone lsf respaldos:kora-respaldos/produccion | tail -3
 pnpm backup:status                   # debe decir "Último respaldo: …"
 ```
 
@@ -87,10 +110,11 @@ pnpm backup:status                   # debe decir "Último respaldo: …"
 ### 7. Restaurar de verdad, y anotar la fecha arriba
 
 ```bash
-rclone copy r2:kora-respaldos/produccion/kora-<sello>.dump.age .
-./restaurar.sh --archivo kora-<sello>.dump.age \
+rclone copy <remoto>:kora-respaldos/produccion/kora-<sello>.tar.age .
+./restaurar.sh --archivo kora-<sello>.tar.age \
                --clave ~/kora-backup.key \
-               --base kora_prueba_restauracion
+               --base kora_prueba_restauracion \
+               --volumen kora_prueba_uploads
 ```
 
 Comprobar que los datos están:
@@ -99,6 +123,7 @@ Comprobar que los datos están:
 SELECT count(*) FROM orders;
 SELECT count(*) FROM customers;
 SELECT count(*) FROM cashback_movements;
+SELECT count(*) FROM product_images;   -- debe cuadrar con los archivos restaurados
 ```
 
 Contrastar contra la base de producción. Si cuadran, **escribe la fecha en la primera línea de este documento** y borra `kora_prueba_restauracion`.
@@ -112,8 +137,8 @@ Escrito para que lo siga alguien que no construyó esto, con prisa.
 3. **Instalar `age` y `rclone`**, y configurar el remoto (pasos 2 y 3 de arriba).
 4. **Bajar el respaldo más reciente**:
    ```bash
-   rclone lsf r2:kora-respaldos/produccion | sort | tail -1
-   rclone copy r2:kora-respaldos/produccion/<ese archivo> .
+   rclone lsf respaldos:kora-respaldos/produccion | sort | tail -1
+   rclone copy respaldos:kora-respaldos/produccion/<ese archivo> .
    ```
 5. **Levantar solo la base**:
    ```bash
@@ -121,8 +146,11 @@ Escrito para que lo siga alguien que no construyó esto, con prisa.
    ```
 6. **Restaurar sobre la base de producción**, indicándola explícitamente:
    ```bash
-   ./restaurar.sh --archivo <archivo>.dump.age --clave <clave> --base kora
+   ./restaurar.sh --archivo <archivo>.tar.age --clave <clave> --base kora \
+                  --volumen kora-prod_uploads
    ```
+   Esto restaura la base **y** las imágenes. Si se omite el volumen, la
+   aplicación no arrancará: detecta que la base registra fotos que no existen.
 7. **Comprobar antes de abrir la tienda**: conteos de `orders`, `customers`, `cashback_movements` y `stock_movements`, y que el último pedido tenga la fecha esperada.
 8. **Levantar el resto** (`app`, `worker`, `redis`) y verificar el acceso al panel.
 9. **Reconstruir el día perdido** desde las conversaciones de WhatsApp: los pedidos posteriores al respaldo no están.

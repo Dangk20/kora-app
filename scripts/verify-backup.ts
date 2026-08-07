@@ -107,15 +107,34 @@ function main(): void {
 
     const { publica, privada } = generarClaves();
 
-    // 1. Volcar y cifrar, exactamente como lo hace respaldar.sh.
-    console.log("→ Volcando y cifrando…");
+    // 1. Volcar, empaquetar y cifrar, exactamente como lo hace respaldar.sh:
+    //    base + imágenes dentro de UN solo archivo cifrado. Si esto se
+    //    desviara del guion real, la verificación estaría validando un formato
+    //    que nadie produce — peor que no verificar, porque da confianza.
+    console.log("→ Volcando, empaquetando y cifrando…");
     const volcado = docker([
       "exec", "-e", `PGPASSWORD=${process.env.POSTGRES_PASSWORD ?? "kora"}`,
       CONTENEDOR, "pg_dump", "-Fc", "-U", USUARIO, "-d", BASE,
     ]);
 
-    const cifrado = join(trabajo, "kora.dump.age");
-    execFileSync("age", ["-r", publica, "-o", cifrado], { input: volcado });
+    const paquete = join(trabajo, "paquete");
+    mkdirSync(paquete, { recursive: true });
+    writeFileSync(join(paquete, "base.dump"), volcado);
+
+    // Las imágenes del entorno local: en desarrollo viven en `.uploads/`.
+    // Se empaquetan aunque estén vacías, para ejercitar la misma forma.
+    const imagenes = join(process.cwd(), ".uploads");
+    mkdirSync(imagenes, { recursive: true });
+    execFileSync("tar", ["-cf", join(paquete, "imagenes.tar"), "-C", imagenes, "."]);
+
+    const sinCifrar = execFileSync(
+      "tar",
+      ["-cf", "-", "-C", paquete, "base.dump", "imagenes.tar"],
+      { maxBuffer: 512 * 1024 * 1024 },
+    );
+
+    const cifrado = join(trabajo, "kora.tar.age");
+    execFileSync("age", ["-r", publica, "-o", cifrado], { input: sinCifrar });
 
     const bytes = statSync(cifrado).size;
     if (bytes === 0) throw new Error("el respaldo cifrado salió vacío");
@@ -144,10 +163,24 @@ function main(): void {
       throw new Error("el volcado no parece un archivo de pg_dump: la comprobación de cifrado no es concluyente");
     }
 
-    // 3. Descifrar y restaurar en una base desechable.
+    // 3. Descifrar, desempaquetar y restaurar en una base desechable.
     console.log(`→ Descifrando y restaurando en '${BASE_PRUEBA}'…`);
-    const descifrado = join(trabajo, "kora.dump");
-    execFileSync("age", ["-d", "-i", privada, "-o", descifrado, cifrado]);
+    const salida = join(trabajo, "salida");
+    mkdirSync(salida, { recursive: true });
+
+    execFileSync("age", ["-d", "-i", privada, "-o", join(trabajo, "kora.tar"), cifrado]);
+    execFileSync("tar", ["-xf", join(trabajo, "kora.tar"), "-C", salida]);
+
+    // Ambas piezas tienen que estar: un respaldo con la base y sin las
+    // imágenes restauraría el catálogo entero sin una sola foto, y la
+    // aplicación ni siquiera arrancaría (storage/persistence.ts).
+    for (const pieza of ["base.dump", "imagenes.tar"]) {
+      if (!existsSync(join(salida, pieza))) {
+        throw new Error(`el respaldo no contiene '${pieza}'`);
+      }
+    }
+
+    const descifrado = join(salida, "base.dump");
 
     psql("postgres", `DROP DATABASE IF EXISTS "${BASE_PRUEBA}"`);
     psql("postgres", `CREATE DATABASE "${BASE_PRUEBA}"`);
@@ -188,6 +221,7 @@ function main(): void {
     const truncado = join(trabajo, "truncado.dump");
     writeFileSync(truncado, readFileSync(descifrado).subarray(0, Math.floor(volcado.length / 2)));
 
+
     psql("postgres", `DROP DATABASE IF EXISTS "${BASE_PRUEBA}"`);
     psql("postgres", `CREATE DATABASE "${BASE_PRUEBA}"`);
 
@@ -213,7 +247,7 @@ function main(): void {
     const total = Object.values(origen).reduce((a, b) => a + b, 0);
     console.log(
       `\n✓ Ciclo completo verificado: ${TABLAS_CRITICAS.length} tablas críticas, ` +
-        `${total} filas, idénticas tras restaurar. Respaldo truncado rechazado.\n`,
+        `${total} filas, idénticas tras restaurar. Imágenes incluidas. Respaldo truncado rechazado.\n`,
     );
   } catch (error) {
     fallo = error;

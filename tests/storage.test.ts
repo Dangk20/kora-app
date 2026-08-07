@@ -16,7 +16,7 @@ import {
   sniffImageType,
   StorageConfigError,
   storage,
-  UPLOADS_DIR,
+  uploadsRoot,
 } from "@/modules/storage";
 import { LocalStorageDriver } from "@/modules/storage/local-driver";
 
@@ -38,7 +38,7 @@ const AVIF = Buffer.concat([
 ]);
 
 afterAll(async () => {
-  await rm(path.join(UPLOADS_DIR, "productos", "test-storage"), {
+  await rm(path.join(uploadsRoot(), "productos", "test-storage"), {
     recursive: true,
     force: true,
   });
@@ -89,10 +89,10 @@ describe("driver de disco (desarrollo)", () => {
 
     const stored = await driver.put(key, PNG);
     expect(stored.url).toBe("/media/productos/test-storage/imagen.png");
-    expect(await readFile(path.join(UPLOADS_DIR, key))).toEqual(PNG);
+    expect(await readFile(path.join(uploadsRoot(), key))).toEqual(PNG);
 
     await driver.delete(key);
-    await expect(readFile(path.join(UPLOADS_DIR, key))).rejects.toThrow();
+    await expect(readFile(path.join(uploadsRoot(), key))).rejects.toThrow();
   });
 
   it("borrar algo que no existe no es un error", async () => {
@@ -127,9 +127,12 @@ describe("selección de driver por entorno", () => {
     }
   });
 
-  it("con R2 configurado usa R2 y arma la URL pública del CDN", () => {
+  it("con R2 elegido y configurado usa R2 y arma la URL pública del CDN", () => {
     resetStorage();
     const vars = {
+      // La elección es explícita: tener las credenciales ya no basta, hay que
+      // decir que se quiere R2 (ver imagenes-en-vps-con-cdn, decisión 1).
+      KORA_STORAGE_DRIVER: "r2",
       R2_ACCOUNT_ID: "cuenta",
       R2_ACCESS_KEY_ID: "key",
       R2_SECRET_ACCESS_KEY: "secreto",
@@ -160,8 +163,11 @@ describe("selección de driver por entorno", () => {
 describe("guarda de arranque del almacenamiento", () => {
   // Anotado como ProcessEnv a propósito: NODE_ENV es una unión literal
   // ("development" | "production" | "test"), no un string cualquiera.
+  // Desde `imagenes-en-vps-con-cdn` el destino se ELIGE: producción exige
+  // KORA_STORAGE_DRIVER y ya no hay respaldo automático a disco.
   const COMPLETO: NodeJS.ProcessEnv = {
     NODE_ENV: "production",
+    KORA_STORAGE_DRIVER: "r2",
     R2_ACCOUNT_ID: "cuenta",
     R2_ACCESS_KEY_ID: "key",
     R2_SECRET_ACCESS_KEY: "secreto",
@@ -177,7 +183,7 @@ describe("guarda de arranque del almacenamiento", () => {
 
   it("el error nombra TODAS las variables que faltan", () => {
     try {
-      assertStorageConfigured({ NODE_ENV: "production" });
+      assertStorageConfigured({ NODE_ENV: "production", KORA_STORAGE_DRIVER: "r2" });
       expect.unreachable("debió lanzar");
     } catch (error) {
       expect(error).toBeInstanceOf(StorageConfigError);

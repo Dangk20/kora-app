@@ -1,22 +1,39 @@
-// Driver de disco para desarrollo. Los archivos van a `.uploads/` (ignorado
-// por git) y se sirven por `/media/<key>`, una ruta de Next que valida la key
-// antes de leer. No se usa en producción: allá manda R2 + CDN.
+// Driver de disco. En desarrollo escribe en `.uploads/` (ignorado por git); en
+// producción, en el directorio de `KORA_UPLOADS_DIR`, que DEBE ser un volumen
+// montado — si no, las imágenes viven en la capa efímera del contenedor y cada
+// despliegue las borra todas. Esa es la razón de `persistence.ts`.
+//
+// Los archivos se sirven por `/media/<key>`, una ruta de Next que valida la
+// clave antes de leer, con caché inmutable de un año para que el CDN pregunte
+// una sola vez por imagen.
+//
+// Ver openspec/changes/imagenes-en-vps-con-cdn — design.md decisiones 3 y 4.
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { uploadsDir } from "./config";
 import type { StorageDriver, StoredObject } from "./driver";
 
-export const UPLOADS_DIR = path.join(process.cwd(), ".uploads");
+/**
+ * Directorio de subidas del entorno actual.
+ *
+ * Es una función y no una constante a propósito: como constante se evaluaría al
+ * importar el módulo, antes de que las pruebas puedan cambiar el entorno, y
+ * quedaría fijada la ruta de desarrollo para todo el proceso.
+ */
+export function uploadsRoot(): string {
+  return uploadsDir();
+}
 
 /**
- * Resuelve una key a una ruta absoluta dentro de UPLOADS_DIR.
- * Rechaza cualquier key que intente escaparse (`..`, rutas absolutas):
- * la key llega de la base y no debe poder leer fuera de la carpeta.
+ * Resuelve una clave a una ruta absoluta dentro del directorio de subidas.
+ * Rechaza cualquier clave que intente escaparse (`..`, rutas absolutas): la
+ * clave llega de la base y no debe poder leer fuera de la carpeta.
  */
-export function resolveUploadPath(key: string): string | null {
+export function resolveUploadPath(key: string, root: string = uploadsRoot()): string | null {
   if (!key || key.startsWith("/") || key.includes("\0")) return null;
-  const full = path.resolve(UPLOADS_DIR, key);
-  const root = path.resolve(UPLOADS_DIR);
-  if (full !== root && !full.startsWith(root + path.sep)) return null;
+  const full = path.resolve(root, key);
+  const raiz = path.resolve(root);
+  if (full !== raiz && !full.startsWith(raiz + path.sep)) return null;
   return full;
 }
 

@@ -150,6 +150,41 @@ nuevo y lo olvida, la guarda protege en vez de callarse.
 Si alguna vez se invierte el criterio —que producción se declare y pruebas
 calle— se cambia ahí y en `.env.production`, no en cada módulo que pregunte.
 
+## Las imágenes de producto viven en el VPS, detrás del CDN
+
+**Se revirtió la decisión del plan técnico §3** (almacenamiento remoto obligatorio). Cloudflare R2 exige registrar una tarjeta aunque su plan sea gratuito, y esa exigencia tenía producción parada desde el 1 de agosto. El VPS tiene 96 GB y 1.000 productos con fotos ocupan ~1,2 GB: la capacidad nunca fue el problema.
+
+```
+KORA_STORAGE_DRIVER=disk
+KORA_UPLOADS_DIR=/data/uploads
+```
+
+Los dos reparos que justificaban el almacenamiento externo están resueltos:
+
+- **Ancho de banda** → el CDN gratuito de Cloudflare va delante y el VPS entrega cada imagen **una vez** (`/media/*` sale con `Cache-Control: immutable` de un año).
+- **Quedaban fuera del respaldo** → ya no: entran en el **mismo archivo cifrado** que la base (`backup/README.md`).
+
+### ⚠️ El volumen no es opcional
+
+`/data/uploads` **tiene** que ser un volumen. Sin él, las imágenes viven en la capa efímera del contenedor: se escriben sin error y `up -d --force-recreate` **las borra todas**, dejando la tienda con el catálogo completo y ninguna foto — un catálogo que el cliente cargó a mano.
+
+Por eso la aplicación **lo comprueba al arrancar**: si la base registra imágenes y el directorio está vacío, el proceso termina con error en vez de servir una tienda rota. Es la misma lección que R2, el correo y los datos del comerciante.
+
+### DNS en Cloudflare (tarea pendiente, gratuita y sin tarjeta)
+
+El plan gratuito de DNS/CDN de Cloudflare **no pide tarjeta** — la pide R2, que es otro producto.
+
+1. Crear cuenta en Cloudflare y añadir `korashopp.com`.
+2. Cambiar los nameservers en Hostinger por los que indique Cloudflare.
+3. Dejar `@`, `www` y `test` en **proxy activado** (nube naranja).
+4. SSL/TLS en modo **Full (strict)** — Caddy ya sirve un certificado válido.
+
+Sin este paso el sistema funciona igual, solo que el VPS sirve cada imagen cada vez. Es rendimiento, no corrección.
+
+### Volver a R2 el día que haya tarjeta
+
+`KORA_STORAGE_DRIVER=r2` con sus cinco credenciales, y copiar los archivos al bucket. Las claves guardadas en la base **no cambian de formato**, así que ninguna fila hay que reescribir.
+
 ## Producción no arranca sin los datos del comerciante
 
 `.env.production` **debe** llevar estas cuatro, o el contenedor termina al
@@ -233,4 +268,4 @@ El procedimiento completo —generación y custodia de claves, instalación, `cr
 - `pnpm backup:verify` recorre el ciclo entero (volcar → cifrar → descifrar → restaurar → comparar) y comprueba además que un respaldo **truncado falle**.
 - `pnpm backup:status` avisa cuando el respaldo dejó de ocurrir — el fallo que de otro modo es indistinguible de que todo va bien.
 
-⛔ **Sigue bloqueando el go-live del 30 oct**: falta el destino remoto (misma cuenta de R2 que bloquea el despliegue) y, sobre todo, **ejecutar una restauración real en el VPS**. Un respaldo que nunca se restauró no es un respaldo.
+⛔ **Sigue bloqueando el go-live del 30 oct**: falta configurar el destino remoto —**Google Drive vía rclone**, ya que R2 quedó descartado por exigir tarjeta— y, sobre todo, **ejecutar una restauración real en el VPS**. Un respaldo que nunca se restauró no es un respaldo.

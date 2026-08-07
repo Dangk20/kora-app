@@ -37,4 +37,13 @@ export async function register(): Promise<void> {
   // acredita nada. Es un fallo que no da error en ninguna pantalla.
   const { assertLegalConfiguredOrExit } = await import("./modules/legal/config");
   assertLegalConfiguredOrExit();
+
+  // Y la más silenciosa de todas: que las imágenes que la base cree que
+  // existen, existan. Sin volumen montado viven en el contenedor y el último
+  // despliegue se las llevó — la tienda respondería 200 con el catálogo
+  // completo y todas las fichas sin foto, que es un catálogo que el cliente
+  // cargó a mano. Va la última porque es la única que consulta la base.
+  const { assertStoragePersistsOrExit } = await import("./modules/storage/persistence");
+  const { db } = await import("./lib/db");
+  await assertStoragePersistsOrExit(() => db.productImage.count());
 }
