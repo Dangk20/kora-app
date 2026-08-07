@@ -7,3 +7,19 @@ allowBuilds:
   esbuild: true
   # Su postinstall solo imprime un tip de autocompletado del shell: no hace falta ejecutarlo.
   "@fission-ai/openspec": false
+
+# `sharp` es un binario nativo y el bloqueo se genera en macOS arm64, así que
+# solo guardaba ese binario. En el contenedor —linux x64— la instalación con
+# bloqueo congelado no traía el suyo y la app arrancaba bien pero MORÍA al
+# procesar la primera imagen: "Could not load the sharp module using the
+# linux-x64 runtime". Pasó en pruebas el 7 ago.
+#
+# Con esto el bloqueo guarda los binarios de las dos plataformas: la de quien
+# desarrolla y la del despliegue.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64

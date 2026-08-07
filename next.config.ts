@@ -19,6 +19,18 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: enImagenDocker },
   typescript: { ignoreBuildErrors: enImagenDocker },
 
+  // `sharp` carga su binario según la plataforma con un require DINÁMICO, y el
+  // rastreo de archivos de Next —que es estático— no lo ve: la salida
+  // standalone se llevaba `sharp` pero no `@img/sharp-linux-x64`, así que en el
+  // contenedor arrancaba bien y moría al procesar la primera imagen con
+  // "Could not load the sharp module using the linux-x64 runtime".
+  //
+  // Pasó en pruebas el 7 ago y en local no se veía: ahí el binario de macOS sí
+  // estaba, porque es el que instala quien desarrolla.
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/@img/**", "./node_modules/sharp/**"],
+  },
+
   experimental: {
     // Las imágenes se suben por Server Action, y Next las corta en 1 MB por
     // omisión. La aplicación acepta hasta 5 MB (`MAX_IMAGE_BYTES`), así que
