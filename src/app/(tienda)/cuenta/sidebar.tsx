@@ -12,22 +12,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Flame, Package, User } from "lucide-react";
-
-export const SECCIONES = [
-  { id: "pedidos", label: "Mis pedidos", icon: Package },
-  { id: "cashback", label: "Kora Cashback", icon: Flame },
-  { id: "datos", label: "Mis datos", icon: User },
-] as const;
-
-export type SeccionId = (typeof SECCIONES)[number]["id"];
-
-export const SECCION_POR_DEFECTO: SeccionId = "pedidos";
-
-/** Lee la sección de la URL, cayendo a la de por defecto si no se reconoce. */
-export function seccionDe(valor: string | undefined): SeccionId {
-  return SECCIONES.some((s) => s.id === valor) ? (valor as SeccionId) : SECCION_POR_DEFECTO;
-}
+import { SECCIONES, seccionDe } from "./secciones";
 
 export function CuentaSidebar({
   nombre,

@@ -6,7 +6,9 @@ import { buyerOrders } from "@/modules/buyer/orders";
 import { formatOrderNumber } from "@/modules/orders/message";
 import { CashbackPanel } from "./cashback-panel";
 import { DatosForm, PasswordForm, SalirButton } from "./cuenta-forms";
-import { CuentaSidebar, seccionDe } from "./sidebar";
+import { CuentaSidebar } from "./sidebar";
+import { CuentaMovil } from "./cuenta-movil";
+import { seccionDe } from "./secciones";
 import { EstadoPedido, money } from "./ui";
 
 export const metadata = { title: "Mi cuenta · KORA" };
@@ -32,7 +34,35 @@ export default async function CuentaPage({
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-[1100px] px-5 py-8 lg:py-10">
+    <main>
+      {/* Dos diseños distintos, no uno degradado: el móvil apila franja de
+          usuario, saldo y pedidos (diseño móvil §07); el de escritorio conserva
+          la barra lateral con pestañas del prototipo (§7). */}
+      <CuentaMovil
+        nombre={buyer.name}
+        email={buyer.email ?? ""}
+        resumen={resumen}
+        pedidos={pedidos}
+        salir={<SalirButton compacto />}
+        datos={
+          <div className="space-y-6">
+            <DatosForm
+              defaults={{
+                name: cliente?.name ?? buyer.name,
+                phone: cliente?.phone ?? "",
+                city: cliente?.city ?? "",
+                address: cliente?.address ?? "",
+              }}
+            />
+            <div>
+              <h3 className="mb-3 text-[14px] font-extrabold text-kora-black">Contraseña</h3>
+              <PasswordForm />
+            </div>
+          </div>
+        }
+      />
+
+      <div className="mx-auto hidden w-full max-w-[1100px] px-5 py-8 lg:block lg:py-10">
       <h1 className="mb-6 text-[26px] leading-tight font-extrabold tracking-tight text-kora-black lg:text-[30px]">
         Hola, {buyer.name.split(" ")[0]}
       </h1>
@@ -130,6 +160,7 @@ export default async function CuentaPage({
             </section>
           )}
         </div>
+      </div>
       </div>
     </main>
   );

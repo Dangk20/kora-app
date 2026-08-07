@@ -37,17 +37,17 @@
 
 ## 6. Cuenta
 
-- [ ] 6.1 Entrar / crear cuenta en móvil.
-- [ ] 6.2 Mis pedidos, detalle y saldo de Kora Cashback.
+- [x] 6.1 Entrar / crear cuenta en móvil.
+- [x] 6.2 Mis pedidos, detalle y saldo de Kora Cashback.
 
 ## 7. Estados
 
-- [ ] 7.1 Skeleton de carga del catálogo y de la ficha.
-- [ ] 7.2 Carrito vacío, producto agotado y error de red.
+- [x] 7.1 Skeleton de carga del catálogo. ⚠️ **La ficha NO lo lleva**: `loading.tsx` activa streaming, las cabeceras salen antes de saber que el producto no existe, y su 404 se convertía en 200 — un *soft 404* que deja en Google los productos despublicados. Medido contra build de producción y fijado en `tests/estados-http.test.ts`.
+- [x] 7.2 Carrito vacío, producto agotado y error de red.
 
 ## 8. Cierre
 
-- [ ] 8.1 Pruebas de la resolución del acceso activo de la barra inferior (incluida la ficha bajo "Catálogo").
+- [x] 8.1 Pruebas de la resolución del acceso activo de la barra inferior (incluida la ficha bajo "Catálogo").
 - [ ] 8.2 Recorrido completo a 360, 390 y 430 px: catálogo → ficha → carrito → checkout.
 - [ ] 8.3 🎯 Lighthouse móvil > 90.
 - [ ] 8.4 `pnpm typecheck && pnpm lint && pnpm build && pnpm test` en verde, y actualizar `../bitacora-sprints-kora.md`.

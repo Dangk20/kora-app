@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { LogOut } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,7 +116,23 @@ export function PasswordForm() {
   );
 }
 
-export function SalirButton() {
+export function SalirButton({ compacto = false }: { compacto?: boolean }) {
+  // En móvil va dentro de la franja oscura del usuario y es solo el icono,
+  // como el diseño (§07): ahí el ancho lo necesitan el nombre y el correo.
+  if (compacto) {
+    return (
+      <form action={salir}>
+        <button
+          type="submit"
+          aria-label="Cerrar sesión"
+          className="flex size-[30px] items-center justify-center text-[#A0A4AD] hover:text-white"
+        >
+          <LogOut className="size-[18px]" />
+        </button>
+      </form>
+    );
+  }
+
   return (
     <form action={salir}>
       <Button type="submit" variant="outline" size="sm">
