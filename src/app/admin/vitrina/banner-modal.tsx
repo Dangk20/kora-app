@@ -4,6 +4,9 @@
 // permite agregar, editar, reordenar y eliminar. Con varias piezas la tienda
 // las rota sola.
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { MAX_IMAGE_BYTES } from "@/modules/storage/limits";
+
+const MAX_MB = Math.round(MAX_IMAGE_BYTES / (1024 * 1024));
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -239,6 +242,8 @@ function BannerForm({
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /** Aviso de archivo demasiado grande, detectado antes de enviar. */
+  const [errorTamano, setErrorTamano] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = `banner-image-${def.slot}-${banner?.id ?? "nuevo"}`;
 
@@ -248,6 +253,23 @@ function BannerForm({
 
   const takeFile = (file: File | undefined) => {
     if (!file) return;
+
+    // Se avisa ANTES de enviar. Un archivo más grande lo corta Next en el
+    // borde con un 413, y lo que ve el operador es "Application error: a
+    // server-side exception has occurred" — una pantalla que parece que la
+    // aplicación se rompió, cuando lo único que pasa es que la pieza pesa
+    // demasiado. Ocurrió en pruebas el 7 ago, en esta misma pantalla.
+    if (file.size > MAX_IMAGE_BYTES) {
+      setErrorTamano(
+        `La imagen pesa ${(file.size / (1024 * 1024)).toFixed(1)} MB y el máximo es ${MAX_MB} MB. Redúcela e inténtalo de nuevo.`,
+      );
+      setFileName(null);
+      setPreview(null);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    setErrorTamano(null);
     setFileName(file.name);
     setPreview(URL.createObjectURL(file));
   };
@@ -376,6 +398,9 @@ function BannerForm({
 
         {state && !state.ok && (
           <p className="text-[12.5px] font-semibold text-destructive">{state.error}</p>
+        )}
+        {errorTamano && (
+          <p className="text-[12.5px] font-semibold text-destructive">{errorTamano}</p>
         )}
       </div>
 

@@ -11,6 +11,7 @@ import {
   sniffImageType,
   storage,
 } from "@/modules/storage";
+import { optimizarImagen } from "@/modules/storage/optimize";
 
 export type ImageActionResult =
   | { ok: true; images: { id: string; url: string; alt: string | null }[] }
@@ -69,8 +70,13 @@ export async function uploadProductImages(
         throw new Error(`"${file.name}" no es una imagen JPG, PNG, WebP o AVIF`);
       }
 
-      const key = imageKey(productId, realType);
-      await driver.put(key, buffer, realType);
+      // Se guarda la versión optimizada, no el original: la foto que sube el
+      // operador es la que descarga el comprador, y una de 4 MB por tarjeta
+      // hace que la tienda no cargue con datos móviles.
+      const optimizada = await optimizarImagen(buffer, "producto");
+
+      const key = imageKey(productId, optimizada.contentType);
+      await driver.put(key, optimizada.buffer, optimizada.contentType);
       uploaded.push(key);
       await db.productImage.create({
         data: { productId, url: key, alt: product.name, position: position++ },

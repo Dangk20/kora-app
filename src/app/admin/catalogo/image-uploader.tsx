@@ -9,6 +9,9 @@ import {
   uploadProductImages,
   type ImageActionResult,
 } from "@/modules/catalog/image-actions";
+import { MAX_IMAGE_BYTES } from "@/modules/storage/limits";
+
+const MAX_MB = Math.round(MAX_IMAGE_BYTES / (1024 * 1024));
 
 export type ProductImage = { id: string; url: string; alt: string | null };
 
@@ -151,12 +154,36 @@ export function ImageUploader({
         className="sr-only"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
-          if (files.length === 0) return;
-          const fd = new FormData();
-          fd.set("productId", productId);
-          for (const file of files) fd.append("images", file);
-          dispatch(upload, fd);
           e.target.value = "";
+          if (files.length === 0) return;
+
+          // Se avisa ANTES de enviar. Sin esto, un archivo demasiado grande lo
+          // corta Next en el borde con un 413 y el operador ve "Application
+          // error: a server-side exception has occurred" — una pantalla que no
+          // dice nada y que sugiere que la aplicación está rota, cuando lo
+          // único que pasa es que la foto pesa mucho.
+          const grandes = files.filter((f) => f.size > MAX_IMAGE_BYTES);
+          const validos = files.filter((f) => f.size <= MAX_IMAGE_BYTES);
+
+          setError(
+            grandes.length === 0
+              ? null
+              : grandes.length === files.length
+                ? `Ninguna foto se subió: superan ${MAX_MB} MB. Redúcelas e inténtalo de nuevo.`
+                : `${grandes.length} foto(s) no se subieron por superar ${MAX_MB} MB: ${grandes
+                    .map((f) => f.name)
+                    .join(", ")}.`,
+          );
+
+          // UNA petición por archivo, no todas juntas. Ocho fotos de 3 MB en un
+          // solo envío son 24 MB y el borde las rechaza en bloque; separadas,
+          // cada una entra por su cuenta y un fallo no se lleva las demás.
+          for (const file of validos) {
+            const fd = new FormData();
+            fd.set("productId", productId);
+            fd.append("images", file);
+            dispatch(upload, fd);
+          }
         }}
       />
     </div>

@@ -12,6 +12,7 @@ import {
   sniffImageType,
   storage,
 } from "@/modules/storage";
+import { optimizarImagen } from "@/modules/storage/optimize";
 import { MAX_SECTION_ITEMS } from "./sections";
 
 export type ShowcaseResult = { ok: true } | { ok: false; error: string };
@@ -180,9 +181,14 @@ export async function saveBanner(
     if (!realType || !ALLOWED_IMAGE_TYPES[realType]) {
       return { ok: false, error: "El archivo no es una imagen JPG, PNG, WebP o AVIF" };
     }
+    // Igual que las fotos de producto: se guarda la versión optimizada. Un
+    // banner de portada es lo PRIMERO que descarga cualquier visitante, así
+    // que es donde más pesa cada megabyte.
+    const optimizada = await optimizarImagen(buffer, "banner");
+
     const driver = storage();
-    const newKey = imageKey(`banners/${slot}`, realType);
-    await driver.put(newKey, buffer, realType);
+    const newKey = imageKey(`banners/${slot}`, optimizada.contentType);
+    await driver.put(newKey, optimizada.buffer, optimizada.contentType);
     // La anterior se borra solo si la subida nueva salió bien.
     if (existing?.imageUrl) await driver.delete(existing.imageUrl).catch(() => {});
     key = newKey;

@@ -19,17 +19,17 @@ export {
 } from "./config";
 export type { StorageDriverName } from "./config";
 
-/** Formatos que aceptamos para foto de producto. */
-export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/avif": "avif",
-};
+// Los límites viven en `limits.ts`, sin dependencias, porque también los
+// necesita el navegador. Se reexportan para no romper a quien ya los pedía
+// aquí — pero un componente cliente debe importarlos de `limits`, no del
+// barril: este arrastra los drivers, y con ellos `node:fs`.
+import { ALLOWED_IMAGE_TYPES } from "./limits";
 
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-export const MAX_IMAGES_PER_PRODUCT = 8;
+export {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGES_PER_PRODUCT,
+} from "./limits";
 
 let cached: StorageDriver | undefined;
 
