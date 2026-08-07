@@ -57,7 +57,11 @@ function Region({
   const control = editControl?.(id);
   return (
     <div
-      className={`${className ?? ""} ${
+      // `min-w-0`: cada Region es hija de una rejilla, y una hija de rejilla
+      // tiene `min-width: auto` — su contenido puede ESTIRAR la celda por
+      // encima del ancho disponible. Pasaba con los banners: la portada medía
+      // 708 px en una pantalla de 390 y la página se desplazaba de lado.
+      className={`min-w-0 ${className ?? ""} ${
         control
           ? "relative rounded-[20px] outline-2 outline-dashed outline-[#e2ddd6] outline-offset-4 transition-[outline-color] hover:outline-kora-coral"
           : ""
@@ -95,8 +99,8 @@ export function StoreHomeLayout({
   return (
     <>
       {/* HERO: banner principal + banner lateral + Top Categorías */}
-      <section className={`${CONTAINER} pt-6 pb-10`}>
-        <div className="rounded-3xl bg-white p-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+      <section className={`${CONTAINER} pt-4 pb-8 sm:pt-6 sm:pb-10`}>
+        <div className="rounded-2xl bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:rounded-3xl sm:p-[18px]">
           <div className="grid gap-4 lg:grid-cols-[1.4fr_0.85fr_1fr]">
             {/* El principal es cuadrado y marca la altura de la fila; el
                 lateral y las categorías se estiran a esa misma altura. */}
@@ -110,7 +114,11 @@ export function StoreHomeLayout({
             <Region id="banner:hero_lateral" editControl={editControl} className="h-full">
               <BannerSlot
                 banners={banners.get("hero_lateral")}
-                className="h-full min-h-[280px]"
+                // En móvil manda la proporción 4:5 del diseño. `h-full` solo
+                // desde `sm`: con la proporción puesta y sin altura de padre
+                // definida, `h-full` deja la altura sin resolver y el banner
+                // se reacomoda cuando cargan las imágenes.
+                className="aspect-[4/5] w-full sm:aspect-auto sm:h-full sm:min-h-[280px]"
                 placeholderLabel="Banner lateral — cárgalo desde Vitrina"
               />
             </Region>
@@ -174,7 +182,9 @@ export function StoreHomeLayout({
 
       {/* GARANTÍAS */}
       <section className={`${CONTAINER} pb-12`}>
-        <div className="grid gap-6 rounded-[20px] bg-white px-8 py-7 shadow-[0_4px_22px_rgba(0,0,0,0.05)] sm:grid-cols-3">
+        {/* 2×2 en móvil como el diseño (§02): en una sola columna estas cuatro
+            filas empujan el catálogo media pantalla hacia abajo. */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_4px_22px_rgba(0,0,0,0.05)] sm:grid-cols-3 sm:gap-6 sm:px-8 sm:py-7">
           {GUARANTEES.map(({ icon: Icon, title, text }) => (
             <div key={title} className="flex gap-3.5">
               <span className="flex size-[46px] shrink-0 items-center justify-center rounded-[13px] bg-[#FFE9DD] text-kora-coral">

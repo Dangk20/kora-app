@@ -14,7 +14,9 @@ import { productAmounts, type StoreProduct } from "./queries";
 import { ProductCard } from "./product-card";
 
 /** Contenedor de 1320px del prototipo. */
-export const CONTAINER = "mx-auto max-w-[1320px] px-[22px]";
+// 16 px de aire lateral en móvil y 22 en escritorio: 22 por lado en una
+// pantalla de 390 deja 346 útiles, y con dos columnas de tarjeta se nota.
+export const CONTAINER = "mx-auto max-w-[1320px] px-4 sm:px-[22px]";
 
 /** Espacio publicitario: puede tener varias piezas y rota solo. */
 export function BannerSlot({
@@ -42,12 +44,16 @@ export function CategoryCircles({
   categories: { id: string; name: string; slug: string; color: string; icon: string }[];
 }) {
   return (
-    <div className="grid grid-cols-2 gap-x-1.5 gap-y-4">
+    // Móvil: fila desplazable, como el diseño (§02) — en 390 px una rejilla de
+    // dos deja dos círculos enormes y obliga a bajar para ver el resto.
+    // Escritorio: la rejilla de dos columnas del prototipo, dentro de su
+    // columna de 1fr en el hero.
+    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-x-1.5 lg:gap-y-4 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
       {categories.map((c) => (
         <Link
           key={c.id}
           href={`/catalogo?categoria=${c.slug}`}
-          className="group flex flex-col items-center gap-2"
+          className="group flex w-[74px] shrink-0 flex-col items-center gap-2 lg:w-auto"
         >
           {/* Color plano neutro como el prototipo; el acento de marca
               aparece solo al pasar el cursor. */}
@@ -118,7 +124,7 @@ export function CompactProductRow({
   if (!carousel) return <div className="space-y-1">{cards}</div>;
 
   return (
-    <AutoCarousel perView={columns} gapClass="gap-3">
+    <AutoCarousel perView={columns} gapRem={0.75}>
       {cards}
     </AutoCarousel>
   );
@@ -135,15 +141,17 @@ export function DealsPanel({
   currency: Currency;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-kora-black p-8">
+    <div className="relative overflow-hidden rounded-3xl bg-kora-black p-5 sm:p-8">
       <span
         className="bg-kora-gradient pointer-events-none absolute -top-16 -left-16 size-56 rounded-full opacity-30 blur-3xl"
         aria-hidden
       />
-      <div className="relative grid items-center gap-7 lg:grid-cols-[240px_1fr]">
-        <div>
+      <div className="relative grid items-center gap-6 sm:gap-7 lg:grid-cols-[240px_1fr]">
+        <div className="min-w-0">
           <KoraFlame className="mb-3 size-12" variant="white" />
-          <h2 className="text-[30px] leading-[1.05] font-bold text-white">{title}</h2>
+          <h2 className="text-[24px] leading-[1.08] font-bold text-white text-balance sm:text-[30px] sm:leading-[1.05]">
+            {title}
+          </h2>
           <Link
             href="/catalogo"
             className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-[14px] font-bold text-kora-black transition-transform hover:-translate-y-0.5"
@@ -152,7 +160,7 @@ export function DealsPanel({
           </Link>
         </div>
 
-        <AutoCarousel perView={4} gapClass="gap-3.5" tone="dark">
+        <AutoCarousel perView={4} gapRem={0.875} perViewMobile={1.25} tone="dark">
           {products.map((p) => {
             const image = p.images[0];
             const amounts = productAmounts(p, currency);
@@ -162,7 +170,12 @@ export function DealsPanel({
               <Link
                 key={p.id}
                 href={`/producto/${p.slug}`}
-                className="rounded-2xl bg-white p-3 transition-transform hover:-translate-y-1"
+                // `flex flex-col` y no solo `block`: un <a> es inline por
+                // omisión, y antes lo estiraba la rejilla del carrusel. Al
+                // pasar a elementos de ancho propio dejó de hacerlo y la
+                // tarjeta se venía abajo — nombre pegado al precio y fondo
+                // blanco cortado.
+                className="flex h-full flex-col rounded-2xl bg-white p-3 transition-transform hover:-translate-y-1"
               >
                 <span
                   className="relative mb-2.5 flex h-[118px] items-center justify-center overflow-hidden rounded-[11px]"
@@ -181,7 +194,7 @@ export function DealsPanel({
                     <CategoryTile color="transparent" icon={p.category.icon} size={72} radius={0} />
                   )}
                 </span>
-                <span className="line-clamp-2 h-8 text-[12px] leading-tight text-kora-black">
+                <span className="line-clamp-2 block h-8 text-[12px] leading-tight text-kora-black">
                   {p.name}
                 </span>
                 <span className="mt-1 flex items-baseline gap-1.5">

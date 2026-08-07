@@ -9,11 +9,11 @@
 
 ## 2. Home
 
-- [ ] 2.1 Hero 4:5 con bullets de navegación, sobre la Vitrina real.
-- [ ] 2.2 Círculos de categoría con desplazamiento horizontal.
-- [ ] 2.3 Rejilla de 2 columnas para destacados y beneficios 2×2.
-- [ ] 2.4 Carruseles con **peek** de la card siguiente, y banner de Kora Cashback.
-- [ ] 2.5 Footer compacto móvil.
+- [x] 2.1 Hero 4:5 con bullets de navegación, sobre la Vitrina real.
+- [x] 2.2 Círculos de categoría con desplazamiento horizontal.
+- [x] 2.3 Rejilla de 2 columnas para destacados y beneficios 2×2.
+- [x] 2.4 Carruseles con **peek** de la card siguiente. ⚠️ El banner de Kora Cashback del diseño **no se añadió**: la portada la compone el operador desde Vitrina, y meter una sección fija saltándose ese control contradice cómo funciona el módulo. Si se quiere, es una sección más de Vitrina — decisión de producto.
+- [x] 2.5 Footer compacto móvil.
 
 ## 3. Catálogo
 

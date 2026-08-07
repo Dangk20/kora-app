@@ -80,7 +80,12 @@ export function BannerCarousel({
             }`}
           >
             {banner.href ? (
-              <Link href={banner.href} className="group/banner block size-full">
+              // `relative` no sobra: la imagen usa `fill`, que se posiciona
+              // contra el ancestro POSICIONADO más cercano. Sin esto el <a> es
+              // `static`, la imagen se ancla al carrusel entero saltándose la
+              // diapositiva, y Next lo avisa por consola en cada carga. El
+              // síntoma visible es un banner que salta al cargar.
+              <Link href={banner.href} className="group/banner relative block size-full">
                 {image}
                 {/* El botón aclara que la pieza lleva a algún lado: sin él,
                     la imagen no se lee como enlace. */}

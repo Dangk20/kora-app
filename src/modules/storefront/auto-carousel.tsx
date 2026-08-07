@@ -2,10 +2,16 @@
 
 // Carrusel automático de productos.
 //
-// Muestra `perView` elementos a la vez. Si hay más, avanza solo de página en
-// página; con los que caben se comporta como una fila normal, sin controles
-// ni movimiento. Se detiene mientras el cursor está encima para que nadie
-// pierda de vista lo que estaba mirando.
+// **En escritorio:** muestra `perView` elementos a la vez y avanza solo de
+// página en página. Con los que caben se comporta como una fila normal, sin
+// controles ni movimiento. Se detiene mientras el cursor está encima para que
+// nadie pierda de vista lo que estaba mirando.
+//
+// **En móvil:** deja de paginar y pasa a desplazamiento libre con *peek* — la
+// tarjeta siguiente se ve a medias, que es lo que le dice al pulgar que hay
+// más (diseño móvil §02). Repartir `perView` columnas en 390 px daría
+// tarjetas de 80 px donde no cabe ni el precio; y las flechas y los puntos se
+// ocultan, porque en táctil se arrastra.
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -14,13 +20,22 @@ const ROTATE_MS = 6000;
 export function AutoCarousel({
   children,
   perView,
-  gapClass = "gap-4",
+  gapRem = 1,
+  /**
+   * Cuántos se ven a la vez en móvil. Con decimales a propósito: 1.35 deja la
+   * siguiente tarjeta asomando un tercio, que es el *peek*.
+   */
+  perViewMobile = 1.35,
   /** Controles claros sobre fondo oscuro (panel de ofertas). */
   tone = "light",
 }: {
   children: React.ReactNode;
   perView: number;
-  gapClass?: string;
+  /** Separación entre elementos, en rem. UNA fuente: alimenta el `gap` y el
+   *  cálculo del ancho. Con dos, el ancho deja de cuadrar y el último elemento
+   *  se corta un poco — el defecto más difícil de ver de un carrusel. */
+  gapRem?: number;
+  perViewMobile?: number;
   tone?: "light" | "dark";
 }) {
   const items = Children.toArray(children);
@@ -59,22 +74,38 @@ export function AutoCarousel({
 
   return (
     <div
-      className="relative"
+      // `min-w-0` no es decorativo: un hijo de grid o flex tiene
+      // `min-width: auto`, así que el contenido que se desborda ESTIRA su
+      // columna. Sin esto, el carrusel ensancha la celda, el título de al lado
+      // se maqueta a un ancho mayor que el panel, y el panel —que recorta— se
+      // lo come. Se vio con "Ofertas que están encendidas" partido a la mitad.
+      className="relative min-w-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <div
         ref={trackRef}
-        // `snap` mantiene las páginas alineadas si el visitante arrastra.
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // Los elementos van planos, no agrupados en páginas: así el ancho de
+        // cada uno puede cambiar por punto de corte. `snap-start` mantiene la
+        // alineación cuando se arrastra.
+        //
+        // `snap-mandatory` solo en escritorio: en móvil, con peek, obliga a
+        // encajar la tarjeta a medias y pelea contra el dedo.
+        className="flex gap-[var(--gap)] overflow-x-auto scroll-smooth md:snap-x md:snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={
+          {
+            "--pv": perView,
+            "--pv-m": perViewMobile,
+            "--gap": `${gapRem}rem`,
+          } as React.CSSProperties
+        }
       >
-        {Array.from({ length: pages }, (_, p) => (
+        {items.map((item, i) => (
           <div
-            key={p}
-            className={`grid w-full shrink-0 snap-start ${gapClass}`}
-            style={{ gridTemplateColumns: `repeat(${perView}, minmax(0, 1fr))` }}
+            key={i}
+            className="w-[calc((100%-var(--gap)*(var(--pv-m)-1))/var(--pv-m))] shrink-0 snap-start md:w-[calc((100%-var(--gap)*(var(--pv)-1))/var(--pv))]"
           >
-            {items.slice(p * perView, (p + 1) * perView)}
+            {item}
           </div>
         ))}
       </div>
@@ -85,7 +116,7 @@ export function AutoCarousel({
             type="button"
             aria-label="Anterior"
             onClick={() => goTo((page - 1 + pages) % pages)}
-            className={`absolute top-1/2 -left-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors ${arrowCls}`}
+            className={`absolute top-1/2 -left-3 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors md:flex ${arrowCls}`}
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -93,12 +124,12 @@ export function AutoCarousel({
             type="button"
             aria-label="Siguiente"
             onClick={() => goTo((page + 1) % pages)}
-            className={`absolute top-1/2 -right-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors ${arrowCls}`}
+            className={`absolute top-1/2 -right-3 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors md:flex ${arrowCls}`}
           >
             <ChevronRight className="size-5" />
           </button>
 
-          <div className="mt-3 flex justify-center gap-1.5">
+          <div className="mt-3 hidden justify-center gap-1.5 md:flex">
             {Array.from({ length: pages }, (_, p) => (
               <button
                 key={p}
