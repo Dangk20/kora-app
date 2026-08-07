@@ -14,6 +14,7 @@ import { startOfBusinessDay, startOfBusinessMonth } from "@/lib/business-time";
 import { CurrencyTabs } from "./currency-tabs";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { salesLastWeek, topProducts as topProductsQuery } from "@/modules/dashboard/queries";
+import { STATUS_LABEL, STATUS_STYLE } from "@/modules/orders/status";
 
 function MetricCard({
   label,
@@ -246,7 +247,22 @@ export default async function AdminPage({
                     {o.currency}
                   </span>
                 </span>
-                <span className="text-muted-foreground">{o.status}</span>
+                {/* El mismo par etiqueta+estilo que usa Pedidos, no una copia:
+                    esta celda imprimía `{o.status}` —el enum de la base, en
+                    inglés— teniendo el formateador al lado. Duplicarlo aquí
+                    crearía una segunda tabla de etiquetas que se desincroniza
+                    en cuanto se añada un estado. */}
+                <span>
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={{
+                      background: STATUS_STYLE[o.status].bg,
+                      color: STATUS_STYLE[o.status].color,
+                    }}
+                  >
+                    {STATUS_LABEL[o.status]}
+                  </span>
+                </span>
               </div>
             ))}
           </div>

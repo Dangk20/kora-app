@@ -9,6 +9,7 @@ import { PriceTag } from "@/modules/storefront/price-tag";
 import type { StoreProduct } from "@/modules/storefront/queries";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { useCart } from "@/modules/cart/cart-context";
+import { ProductGuarantees } from "@/modules/storefront/product-guarantees";
 
 /**
  * Bloque principal de la ficha: galería + selección de variante.
@@ -222,17 +223,10 @@ export function ProductDetail({
           </div>
         )}
 
-        {/* Comprar ahora lleva al checkout; el pedido se envía por WhatsApp
-            al final del formulario (PED_HU001/002). */}
+        {/* Orden del prototipo (§3): primero agregar al carrito, después
+            comprar ahora. "Comprar ahora" lleva al checkout; el pedido se
+            envía por WhatsApp al final del formulario (PED_HU001/002). */}
         <div className="space-y-2.5">
-          <button
-            type="button"
-            onClick={buyNow}
-            disabled={soldOut}
-            className="bg-kora-gradient flex w-full items-center justify-center rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
-          >
-            {soldOut ? "Agotado" : "Comprar ahora"}
-          </button>
           <button
             type="button"
             onClick={addToCart}
@@ -249,10 +243,22 @@ export function ProductDetail({
               </>
             )}
           </button>
+          <button
+            type="button"
+            onClick={buyNow}
+            disabled={soldOut}
+            className="bg-kora-gradient flex w-full items-center justify-center rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+          >
+            {soldOut ? "Agotado" : "Comprar ahora"}
+          </button>
         </div>
         <p className="mt-2.5 text-center text-[11.5px] text-[#8a8f98]">
           Completas tus datos y finalizas el pedido por WhatsApp.
         </p>
+
+        {/* Las mismas tres del home, desde una sola lista: lo que no puede
+            divergir es QUÉ se promete (prototipo §3). */}
+        <ProductGuarantees />
       </div>
     </div>
   );

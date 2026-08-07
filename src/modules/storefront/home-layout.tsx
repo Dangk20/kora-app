@@ -4,7 +4,6 @@
 // Vitrina. Por eso vive aquí y no dentro de una página: el panel es un espejo
 // exacto porque literalmente renderiza lo mismo.
 import Link from "next/link";
-import { MessageCircle, Store, Truck } from "lucide-react";
 import type { Currency } from "@/modules/pricing";
 import type { ResolvedBanner, ResolvedSection } from "@/modules/showcase/queries";
 import type { BannerSlot as SlotKey } from "@/modules/showcase/sections";
@@ -19,24 +18,7 @@ import {
   EmptySection,
   ProductGrid,
 } from "./home-sections";
-
-const GUARANTEES = [
-  {
-    icon: MessageCircle,
-    title: "Atención por WhatsApp",
-    text: "Confirmamos tu pedido y resolvemos tus dudas por chat.",
-  },
-  {
-    icon: Store,
-    title: "Tienda física y online",
-    text: "El mismo inventario, sincronizado en los dos canales.",
-  },
-  {
-    icon: Truck,
-    title: "Envíos a todo el país",
-    text: "Coordinamos el envío contigo al confirmar el pedido.",
-  },
-];
+import { GUARANTEES } from "./guarantees";
 
 export type HomeData = {
   currency: Currency;

@@ -1,5 +1,9 @@
 # Auditoría de fidelidad — escritorio
 
+> **Estado al 7 ago 2026, tras el change `correcciones-fidelidad-escritorio`:**
+> ✅ Corregidos **D1**, **D2**, **F4** y **F5**. Fijados por prueba en `tests/fidelidad.test.ts`.
+> 🕓 Abiertos: **F1** (filtros, S6), **F2** (banner) y **F3** (fila del header) — necesitan decisión de producto; **F6**, **F7** y **F8** — planificados.
+
 **Fecha:** 7 ago 2026 · **Método:** recorrido pantalla por pantalla a 1440 px, comparando la aplicación en ejecución contra el prototipo aprobado `../../design-handoff/Kora.dc.html` servido en local.
 
 **Alcance:** tienda pública y panel de administración, en escritorio. El móvil va aparte (change `tienda-movil`).
@@ -22,7 +26,7 @@ Un prototipo de junio no es la especificación de agosto: entre medias se decidi
 
 ## 🔴 Defectos
 
-### D1 · El dashboard muestra el estado del pedido en inglés y en crudo
+### D1 · El dashboard muestra el estado del pedido en inglés y en crudo — ✅ CORREGIDO
 
 **Dónde:** `src/app/admin/page.tsx:249` — tabla *Últimos pedidos*.
 
@@ -34,7 +38,7 @@ El prototipo especifica `statusStyle(status)` → badge de color por estado. Aqu
 
 **Impacto:** es la primera pantalla que ve el operador al entrar. Corregir es una línea.
 
-### D2 · Las cards de producto llevan botón, contra la regla escrita del proyecto
+### D2 · Las cards de producto llevan botón, contra la regla escrita del proyecto — ✅ CORREGIDO
 
 **Dónde:** `src/modules/storefront/product-card.tsx:105-108`.
 
@@ -51,6 +55,8 @@ No es un detalle de gusto. El diseño móvil nuevo (7 ago) evalúa exactamente e
 **Aquí hay que decidir, no solo corregir.** El prototipo de junio **sí** tiene botón en las cards del home; el diseño móvil de agosto dice que no. Las dos referencias son legítimas y se contradicen. Lo que no puede quedarse es el estado actual: una regla escrita en `CLAUDE.md` que el código incumple, porque a partir de ahí ninguna de las dos es fiable.
 
 **Recomendación:** quitar el botón y alinear con el diseño nuevo, que además razona el caso concreto de KORA. Si se prefiere conservarlo, corregir `CLAUDE.md`.
+
+**Decisión de Daniel (7 ago): se quita.** Toda la tarjeta pasa a ser el enlace a la ficha. Efecto lateral que apareció al hacerlo: la tarjeta dejó de necesitar el contexto del carrito, así que el listado ya no instancia un componente cliente por producto.
 
 ---
 
@@ -79,13 +85,13 @@ Hoy: las categorías reales del catálogo.
 
 Se cambió porque **ninguna de esas cinco páginas existe** en el alcance, y enlazar a páginas inexistentes es peor que no enlazarlas. Pero el resultado es que las categorías aparecen dos veces en la portada (header y Top Categorías), y se perdió el acceso directo a ofertas.
 
-### F4 · La ficha perdió el bloque de garantías
+### F4 · La ficha perdió el bloque de garantías — ✅ CORREGIDO
 
 El prototipo pone, bajo los botones de compra, **tres garantías con icono**. Hoy hay una línea de texto: *"Completas tus datos y finalizas el pedido por WhatsApp."*
 
 El home **sí** tiene la fila de garantías (con las tres que el negocio sostiene). Falta replicarlas en la ficha, que es donde se decide la compra.
 
-### F5 · Orden de los botones de compra invertido
+### F5 · Orden de los botones de compra invertido — ✅ CORREGIDO
 
 Prototipo: *Agregar al carrito* (contorno) y luego *Comprar ahora* (gradiente).
 Hoy: *Comprar ahora* arriba, *Agregar al carrito* debajo.
@@ -121,12 +127,12 @@ El prototipo destaca una palabra del titular en fuente de acento itálica (*"enc
 
 ---
 
-## Qué se propone hacer
+## Qué queda abierto
 
-**Corregir ya** (son pequeños y dos de ellos contradicen reglas escritas): D1, F4, F5.
+**Necesitan decisión de producto:**
+- **F2 — el banner de portada.** Hoy se gana autonomía del operador (sube imágenes desde Vitrina) y se pierde el precio y el CTA sobre el producto destacado.
+- **F3 — la segunda fila del header.** Las categorías aparecen dos veces en la portada, y se perdió el acceso directo a ofertas.
 
-**Decidir con Daniel** antes de tocar: D2 (botón en las cards — hay dos referencias que se contradicen), F2 (banner), F3 (fila del header).
+**Planificados:** F1 (filtros de catálogo, S6) · F6 (Categorías en el nav) · F7 (columna de canal, al construir el POS) · F8 (verificar el acento tipográfico).
 
-**Planificar**: F1 (filtros, S6), F6, F7 (al construir el POS), F8 (verificar).
-
-Lo que se corrija va en un change propio; esta auditoría es el insumo, no la implementación.
+Corregido el 7 ago en el change `correcciones-fidelidad-escritorio`: D1, D2, F4, F5.
