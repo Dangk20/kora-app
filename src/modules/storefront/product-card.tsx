@@ -1,8 +1,8 @@
-// Card de producto del listado — patrón del prototipo (§4.1): media 170px,
-// cuerpo en columna, precio abajo. Sin botón de compra (ver el comentario de
-// `ProductCard`) y sin las promesas comerciales del mock (cuotas,
-// calificaciones, envío gratis): no están validadas con el cliente y KORA no
-// tiene pasarela de pago.
+// Card de producto del listado — patrón del prototipo (§4.1): foto en
+// contenedor CUADRADO, cuerpo en columna, precio abajo. Sin botón de compra
+// (ver el comentario de `ProductCard`) y sin las promesas comerciales del mock
+// (cuotas, calificaciones, envío gratis): no están validadas con el cliente y
+// KORA no tiene pasarela de pago.
 import Image from "next/image";
 import Link from "next/link";
 import { resolvePrice, type Currency } from "@/modules/pricing";
@@ -54,6 +54,14 @@ export function ProductCard({
   const image = product.images[0];
   const multiPrice = new Set(amounts).size > 1;
 
+  // Porcentaje de ahorro, derivado del precio resuelto. No hay campo de
+  // "descuento" en la base a propósito: el ahorro es una consecuencia de que
+  // el precio online sea menor, no un dato que alguien pueda dejar mentiroso.
+  const ahorro =
+    price?.hasOnlineDiscount && price.storeAmount > 0
+      ? Math.round(((price.storeAmount - price.amount) / price.storeAmount) * 100)
+      : null;
+
   const clases =
     "group flex flex-col overflow-hidden rounded-2xl border border-[#efe9e1] bg-white transition-[transform,box-shadow] duration-200 hover:-translate-y-1.5 hover:shadow-[0_18px_38px_rgba(0,0,0,0.1)]";
 
@@ -70,8 +78,13 @@ export function ProductCard({
 
   return (
     <Envoltura>
+      {/* Contenedor CUADRADO de la foto.
+
+          `aspect-square` y no una altura fija: con altura fija el contenedor
+          cambia de proporción según el ancho de la columna, y la misma foto se
+          ve distinta en el home, en el catálogo y en relacionados. */}
       <div
-        className="relative flex h-[170px] items-center justify-center overflow-hidden"
+        className="relative flex aspect-square items-center justify-center overflow-hidden"
         style={{ background: image ? "#f7f4f0" : product.category.color }}
       >
         {image ? (
@@ -79,8 +92,14 @@ export function ProductCard({
             src={image.url}
             alt={image.alt ?? product.name}
             fill
-            sizes="(max-width: 900px) 50vw, 25vw"
-            className="object-cover"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            // `contain` y NO `cover`: las fotos del catálogo son packshots —el
+            // producto entero sobre fondo claro—. `cover` recorta para llenar,
+            // y en un packshot lo que recorta es el producto: una licuadora
+            // alta pierde la jarra, un teclado ancho pierde las teclas de los
+            // extremos. Hoy no se nota porque no hay ni una foto cargada; se
+            // notaría en TODAS las tarjetas el día que llegue el catálogo real.
+            className="object-contain p-4 transition-transform duration-300 group-hover:scale-[1.04]"
             unoptimized
           />
         ) : (
@@ -110,6 +129,29 @@ export function ProductCard({
             </span>
           )}
         </div>
+
+        {/* Porcentaje de ahorro, arriba a la derecha. Sale del precio real
+            resuelto, no de un campo de descuento: si mañana el precio online
+            deja de ser menor, el porcentaje desaparece solo. */}
+        {ahorro !== null && !soldOut && (
+          <span className="absolute top-2.5 right-2.5 rounded-full bg-white px-2 py-1 text-[11px] font-extrabold text-kora-black shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+            −{ahorro}%
+          </span>
+        )}
+
+        {/* Señal de que la tarjeta es pulsable, solo con puntero fino: en
+            táctil no hay hover, y una pastilla que aparece "al pasar el dedo"
+            sería un botón fantasma. No lleva acciones propias —comparar,
+            favoritos, vista rápida— porque son funciones que KORA no tiene, y
+            pintar un icono que no hace nada es peor que no pintarlo. */}
+        {!preview && !soldOut && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-2 rounded-full bg-kora-black/90 py-2 text-center text-[12px] font-bold text-white opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:block"
+          >
+            Ver producto
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col px-3.5 pt-3 pb-4">

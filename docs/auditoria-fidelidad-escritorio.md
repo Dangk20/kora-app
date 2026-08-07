@@ -136,3 +136,47 @@ El prototipo destaca una palabra del titular en fuente de acento itálica (*"enc
 **Planificados:** F1 (filtros de catálogo, S6) · F6 (Categorías en el nav) · F7 (columna de canal, al construir el POS) · F8 (verificar el acento tipográfico).
 
 Corregido el 7 ago en el change `correcciones-fidelidad-escritorio`: D1, D2, F4, F5.
+
+---
+
+## Anexo — segunda pasada (7 ago, tras revisión de Daniel)
+
+La primera pasada **se saltó la cuenta del comprador** (`/cuenta`). Daniel la señaló. Añadidos aquí sus hallazgos y los de la tarjeta de producto.
+
+### 🔴 D3 · La cuenta muestra el número interno del pedido, no el código del pedido — ✅ CORREGIDO
+
+**Dónde:** `src/app/(tienda)/cuenta/page.tsx` y `cuenta/pedidos/[numero]/page.tsx`.
+
+Mostraban `Pedido {p.number}` — el autoincremento de la base: **"Pedido 1"**, **"Pedido 2"**. El código real del pedido es `KO-2026-00223`, y lo produce `formatOrderNumber()`, que ya se usa en el checkout y en el mensaje de WhatsApp.
+
+**Por qué importa más que en el panel:** en KORA el pedido se confirma y se paga **por WhatsApp**. Ese número es cómo el operador lo encuentra. Un comprador escribiendo *"hola, sobre mi pedido 2"* le da al operador un dato que no existe en su panel — el admin muestra `KO-2026-00223`. Rompe el único canal donde la venta se cierra.
+
+Es el mismo defecto que D1 con otra cara: un valor interno de la base filtrándose a la pantalla.
+
+### 🟡 D4 · La cuenta tiene su propio vocabulario de estados — deliberado, pero frágil
+
+`cuenta/ui.tsx` define su propia tabla: `PENDING` → **"Por confirmar"**, mientras el panel dice **"Pendiente"**.
+
+**Está razonado en el código y el razonamiento es bueno:** *"un pedido pendiente NO es un error, es el estado normal de una compra recién hecha. Si la cuenta no lo dice, el comprador cree que su compra falló y la repite."* Vocabulario para el comprador ≠ vocabulario para el operador.
+
+Se deja como está. Pero son **dos tablas de etiquetas**, y si mañana se añade un estado hay que acordarse de las dos. Anotado para que la próxima persona no lo lea como un descuido.
+
+### 🟡 F9 · La cuenta no tenía la estructura del prototipo — ✅ CORREGIDO
+
+El prototipo §7 especifica **barra lateral** (avatar con inicial, nombre/email, pestañas, cerrar sesión) + contenido por pestañas. Había una sola columna con todo apilado: saludo, cashback, pedidos, datos y contraseña.
+
+Reconstruida con la barra lateral y tres pestañas —**Mis pedidos · Kora Cashback · Mis datos**— controladas por URL (`?seccion=`), como el resto de la aplicación. En móvil la barra se convierte en cabecera más pestañas desplazables.
+
+**Favoritos** y **Direcciones**, que el prototipo incluye, siguen fuera: favoritos no está en el alcance, y el comprador tiene una sola dirección que se edita en "Mis datos".
+
+### 🔴 D5 · Las fotos de producto se iban a recortar — ✅ CORREGIDO
+
+**Dónde:** `src/modules/storefront/product-card.tsx`.
+
+El contenedor de la foto era de altura fija (170 px) con `object-cover`. `cover` **recorta** la imagen para llenar el hueco, y en un packshot lo que recorta es el producto: una licuadora alta pierde la jarra, un teclado ancho pierde las teclas de los extremos.
+
+**Hoy es invisible porque no hay ni una foto cargada.** Se habría visto en *todas* las tarjetas el día que llegue el catálogo real del cliente — es decir, el día de la entrega.
+
+Corregido a contenedor **cuadrado** con `object-contain` y margen interior. Verificado con una foto de prueba ancha: entra completa. Se añadió además el **porcentaje de ahorro** arriba a la derecha, derivado del precio resuelto y no de un campo editable, y una señal *"Ver producto"* al pasar el cursor —solo con puntero fino, porque en táctil no hay hover y sería un botón fantasma—.
+
+**Lo que NO se copió de la referencia que pasó Daniel** (SmartJoys): la columna de iconos al pasar el cursor —comparar, vista rápida, lista de deseos—. Son tres funciones que KORA no tiene, y pintar un icono que no hace nada es peor que no pintarlo. Si alguna se quiere de verdad, es alcance nuevo y se cotiza.

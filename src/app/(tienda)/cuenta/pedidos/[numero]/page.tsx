@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatOrderNumber } from "@/modules/orders/message";
 import { notFound } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { requireBuyer } from "@/modules/buyer/guard";
@@ -39,7 +40,7 @@ export default async function PedidoPage({
       <div className="mt-4 mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[28px] leading-tight font-extrabold tracking-tight text-kora-black">
-            Pedido {pedido.number}
+            {formatOrderNumber(pedido.number, pedido.createdAt)}
           </h1>
           <p className="mt-1 text-[13.5px] text-muted-foreground">
             {new Intl.DateTimeFormat("es-CO", { dateStyle: "long" }).format(pedido.createdAt)}
