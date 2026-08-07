@@ -20,6 +20,8 @@
     "staff:email": "tsx scripts/set-staff-email.ts",
     "emails:preview": "tsx scripts/preview-emails.ts",
     "legal:export": "tsx scripts/legal-export.ts",
+    "backup:verify": "tsx scripts/verify-backup.ts",
+    "backup:status": "tsx scripts/backup-status.ts",
     "orders:expire": "tsx scripts/expire-orders.ts",
     "spec": "openspec",
     "outbox:worker": "tsx scripts/outbox-worker.ts",

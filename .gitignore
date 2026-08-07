@@ -58,6 +58,7 @@ next-env.d.ts
 # Correos escritos por el driver de desarrollo: llevan datos de compradores.
 /.emails
 /.legal
+/.backup-keys
 /.emails-test
 
 # Claude Code: ajustes locales de la máquina (los comandos y skills de OpenSpec SÍ se versionan)

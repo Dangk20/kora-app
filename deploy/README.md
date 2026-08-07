@@ -57,7 +57,11 @@ Sobre un Ubuntu 24.04 recién aprovisionado:
 
 > ⚠️ Ubuntu trae `/etc/ssh/sshd_config.d/50-cloud-init.conf` con `PasswordAuthentication yes`. En SSH **gana la primera ocurrencia**, así que un archivo `99-` no sirve de nada: el servidor se ve endurecido y sigue aceptando contraseñas. Usar prefijo `00-`, corregir el de cloud-init y poner `ssh_pwauth: false` en `/etc/cloud/cloud.cfg.d/`.
 
-**2. Docker** desde el repositorio oficial (no el paquete de Ubuntu).
+**2. Docker** desde el repositorio oficial (no el paquete de Ubuntu), y las herramientas del respaldo:
+```bash
+sudo apt-get install -y age rclone
+```
+> Estos dos viven **fuera** del `docker compose`. Reconstruir el servidor sin ellos deja el sistema **sin copias de seguridad y sin decirlo**. Ver [`backup/README.md`](backup/README.md).
 
 **3. Redes:**
 ```bash
@@ -220,4 +224,13 @@ Mientras se ajusta el enrutamiento, apuntar `KORA_ACME_CA` a la autoridad de **p
 
 ## Respaldos
 
-⛔ **No existen todavía.** Se descartaron los snapshots del proveedor por presupuesto, así que el `pg_dump` diario cifrado a Cloudflare R2 con retención de 30 días **es la única capa de respaldo del proyecto**. Es un change aparte (`encrypted-db-backup`) y **bloquea el go-live del 30 oct**: un respaldo que nunca se restauró no es un respaldo.
+**Construidos y verificados en local (7 ago); falta instalarlos en el VPS.** Se descartaron los snapshots del proveedor por presupuesto, así que el `pg_dump` diario cifrado con retención de 30 días **es la única capa de respaldo del proyecto**.
+
+El procedimiento completo —generación y custodia de claves, instalación, `cron`, y la recuperación ante desastre paso a paso— vive en **[`backup/README.md`](backup/README.md)**. Lo esencial:
+
+- Corre en el **anfitrión** con `docker exec`, no en un contenedor: la red `interna` no tiene salida a internet y darle una crearía la ruta de exfiltración que ese aislamiento evita.
+- Se cifra con clave **pública**: el servidor crea respaldos y **no puede leerlos**. La privada no vive aquí. Perderla los hace irrecuperables.
+- `pnpm backup:verify` recorre el ciclo entero (volcar → cifrar → descifrar → restaurar → comparar) y comprueba además que un respaldo **truncado falle**.
+- `pnpm backup:status` avisa cuando el respaldo dejó de ocurrir — el fallo que de otro modo es indistinguible de que todo va bien.
+
+⛔ **Sigue bloqueando el go-live del 30 oct**: falta el destino remoto (misma cuenta de R2 que bloquea el despliegue) y, sobre todo, **ejecutar una restauración real en el VPS**. Un respaldo que nunca se restauró no es un respaldo.
