@@ -31,9 +31,9 @@
 
 ## 5. Carrito y checkout
 
-- [ ] 5.1 Carrito como página completa, con el resumen accesible sin desplazarse hasta el fondo.
-- [ ] 5.2 Checkout de un solo paso, campos de 48 px y resumen colapsable.
-- [ ] 5.3 Confirmación con el enlace de WhatsApp y la vigencia de 2 h.
+- [x] 5.1 Carrito como página completa, con el resumen accesible sin desplazarse hasta el fondo.
+- [x] 5.2 Checkout de un solo paso, campos de 48 px y resumen colapsable.
+- [x] 5.3 Confirmación con el enlace de WhatsApp y la vigencia de 2 h — ya existía (`order-bridge.tsx`) y se verificó que cabe en móvil sin cambios.
 
 ## 6. Cuenta
 

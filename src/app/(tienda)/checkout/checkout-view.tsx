@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
 import { applyCoupon } from "@/modules/coupons/apply-action";
 import { getResolvedCart } from "@/modules/cart/actions";
@@ -22,8 +22,11 @@ import {
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { OrderBridge } from "./order-bridge";
 
+// `min-h-12` = 48 px: el mínimo táctil del diseño (§05). Y `text-base` en
+// móvil no es estética — iOS hace zoom automático sobre cualquier campo con
+// fuente menor de 16 px, y al salir del campo la página se queda ampliada.
 const inputCls =
-  "w-full rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-[15px] py-3 text-sm outline-none focus:border-kora-coral";
+  "w-full min-h-12 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-[15px] py-3 text-base sm:text-sm outline-none focus:border-kora-coral";
 const labelCls = "mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]";
 
 type Country = "CO" | "US";
@@ -134,7 +137,7 @@ export function CheckoutView({
 
   if (buyable.length === 0) {
     return (
-      <div className="mx-auto max-w-[1040px] px-[22px] py-20 text-center">
+      <div className="mx-auto max-w-[1040px] px-4 py-20 text-center sm:px-[22px]">
         <h1 className="text-2xl font-bold text-kora-black">No hay nada que pedir</h1>
         <p className="mt-2 text-[13.5px] text-[#8a8f98]">
           Tu carrito está vacío o los productos ya no están disponibles.
@@ -163,21 +166,21 @@ export function CheckoutView({
     ) : null;
 
   return (
-    <div className="mx-auto max-w-[1040px] px-[22px] pt-6 pb-16">
+    <div className="mx-auto max-w-[1040px] px-4 pt-5 pb-16 sm:px-[22px] sm:pt-6">
       <Link
         href="/carrito"
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-[#8a8f98] hover:text-kora-black"
       >
         <ArrowLeft className="size-4" /> Volver al carrito
       </Link>
-      <h1 className="mb-1 text-[30px] font-bold text-kora-black">Finalizar pedido</h1>
+      <h1 className="mb-1 text-[23px] font-bold text-kora-black sm:text-[30px]">Finalizar pedido</h1>
       <p className="mb-6 text-[13.5px] text-[#8a8f98]">
         Completa tus datos y te llevamos a WhatsApp para confirmar el pedido.
       </p>
 
       <form action={submit} className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <section className="rounded-[20px] bg-white p-7 shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
+          <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-kora-black">Tus datos</h2>
               <label className="flex items-center gap-2 text-[12.5px] text-[#6b6f78]">
@@ -188,7 +191,7 @@ export function CheckoutView({
                     setCountry(e.target.value as Country);
                     setState("");
                   }}
-                  className="rounded-[9px] border-[1.6px] border-[#e2ddd6] px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-black outline-none focus:border-kora-coral"
+                  className="min-h-11 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-black outline-none focus:border-kora-coral"
                 >
                   <option value="CO">Colombia</option>
                   <option value="US">Estados Unidos</option>
@@ -268,7 +271,7 @@ export function CheckoutView({
             </div>
           </section>
 
-          <section className="rounded-[20px] bg-white p-7 shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
+          <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-5 text-lg font-bold text-kora-black">
               {isCO ? "Dirección de entrega" : "Shipping address"}
             </h2>
@@ -351,7 +354,7 @@ export function CheckoutView({
             </div>
           </section>
 
-          <section className="rounded-[20px] bg-white p-7 shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
+          <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-2 text-lg font-bold text-kora-black">
               {isCO ? "¿Cómo prefieres pagar?" : "Preferred payment"}
             </h2>
@@ -375,9 +378,13 @@ export function CheckoutView({
 
             {/* Habeas Data (Ley 1581): aceptación explícita y obligatoria. */}
             <div className="mt-5 space-y-2.5 border-t border-[#f0ece6] pt-5">
-              <label className="flex items-start gap-2.5 text-[12.5px] text-[#4a4f58]">
+              {/* `py-2` no es aire decorativo: la casilla mide 13 px, así que
+                  el área que se toca es la ETIQUETA. Sin altura propia queda en
+                  ~30 px, por debajo del mínimo táctil, y fallar el toque en la
+                  única casilla obligatoria del checkout es perder la venta. */}
+              <label className="flex items-start gap-2.5 py-2 text-[12.5px] text-[#4a4f58]">
                 <input type="checkbox" name="acceptsData" required
-                  className="mt-0.5 accent-kora-coral" />
+                  className="mt-0.5 size-[18px] shrink-0 accent-kora-coral" />
                 <span>
                   Autorizo el tratamiento de mis datos personales para gestionar
                   este pedido, conforme a la{" "}
@@ -395,9 +402,9 @@ export function CheckoutView({
                   .
                 </span>
               </label>
-              <label className="flex items-start gap-2.5 text-[12.5px] text-[#4a4f58]">
+              <label className="flex items-start gap-2.5 py-2 text-[12.5px] text-[#4a4f58]">
                 <input type="checkbox" name="acceptsMarketing"
-                  className="mt-0.5 accent-kora-coral" />
+                  className="mt-0.5 size-[18px] shrink-0 accent-kora-coral" />
                 <span>
                   Quiero recibir novedades y promociones de KORA.
                   <span className="text-[#9aa0ab]"> (opcional)</span>
@@ -430,9 +437,24 @@ export function CheckoutView({
           </section>
         </div>
 
-        {/* Resumen */}
-        <div className="rounded-[18px] bg-white p-6 shadow-[0_4px_18px_rgba(0,0,0,0.04)] lg:sticky lg:top-[140px]">
-          <h2 className="mb-4 text-[17px] font-bold text-kora-black">Tu pedido</h2>
+        {/* Resumen. En móvil se colapsa (diseño §05): entre el formulario y el
+            botón final, la lista de artículos con sus fotos añade una pantalla
+            entera de recorrido a alguien que ya decidió comprar. En escritorio
+            va abierto y pegado a la derecha, como siempre. */}
+        <details
+          open
+          className="group rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px] lg:[&>*:not(summary)]:!block"
+        >
+          <summary className="mb-4 flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black lg:pointer-events-none [&::-webkit-details-marker]:hidden">
+            Tu pedido
+            <span className="flex items-center gap-2 lg:hidden">
+              <span className="text-[15px] font-extrabold">{formatMoney(total, currency)}</span>
+              <ChevronDown
+                className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180"
+                aria-hidden
+              />
+            </span>
+          </summary>
           <div className="max-h-64 space-y-3 overflow-y-auto">
             {buyable.map((l) => (
               <div key={l.variantId} className="flex items-center gap-3">
@@ -609,7 +631,7 @@ export function CheckoutView({
             <ShieldCheck className="size-4 shrink-0 text-kora-coral" />
             Tu pedido queda registrado en KORA antes de abrir WhatsApp.
           </p>
-        </div>
+        </details>
       </form>
     </div>
   );
