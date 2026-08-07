@@ -11,6 +11,7 @@ import { whatsappNumberFor } from "@/modules/orders/settings";
 import { LEGAL_LINKS } from "@/modules/legal/content";
 import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
 import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
+import { MobileBarsProvider } from "@/modules/storefront/mobile/bars-context";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
 import { CartDrawer } from "./cart-drawer";
@@ -44,6 +45,7 @@ export default async function StoreLayout({
 
   return (
     <CartProvider>
+    <MobileBarsProvider>
     <div className="flex min-h-screen flex-col bg-[#F5F3F0]">
       {/* Chrome móvil: header que se oculta al bajar, banda de búsqueda y menú
           lateral. Es una navegación distinta, no la de escritorio encogida
@@ -200,6 +202,7 @@ export default async function StoreLayout({
 
       <CartDrawer />
     </div>
+    </MobileBarsProvider>
     </CartProvider>
   );
 }

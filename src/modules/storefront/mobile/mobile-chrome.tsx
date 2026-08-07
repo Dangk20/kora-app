@@ -22,6 +22,7 @@ import { useCart } from "@/modules/cart/cart-context";
 import type { Currency } from "@/modules/pricing";
 import { setCurrency } from "@/modules/pricing/currency-actions";
 import { NAV_ITEMS } from "./nav-items";
+import { useBuyBarVisible } from "./bars-context";
 
 /** Alto de la barra inferior sin contar el área segura de iOS. */
 const NAV_H = 56;
@@ -32,6 +33,12 @@ const NAV_H = 56;
  * Se oculta al bajar y reaparece al subir. El umbral evita que un temblor de
  * dedo lo haga parpadear: sin él, cualquier micro-desplazamiento alterna el
  * estado y el header vibra mientras se lee.
+ *
+ * Hubo aquí una guarda extra para no cambiar de estado cerca del final de la
+ * página: ocultar el header acortaba el documento, el navegador ajustaba el
+ * scroll y ese ajuste volvía a dispararlo, en bucle. Se quitó al pasar a
+ * `transform`, que no toca la maquetación — la guarda tapaba el síntoma de un
+ * problema que ya no existe.
  */
 function useHideOnScroll(threshold = 8): boolean {
   const [visible, setVisible] = useState(true);
@@ -45,19 +52,6 @@ function useHideOnScroll(threshold = 8): boolean {
       const delta = y - ultimo.current;
 
       if (Math.abs(delta) < threshold) return;
-
-      // Al final de la página no se cambia de estado.
-      //
-      // Ocultar el header acorta el documento; si el scroll estaba al fondo,
-      // el navegador lo AJUSTA hacia arriba, y ese ajuste llega como un evento
-      // con delta negativo que vuelve a mostrarlo — que alarga el documento, y
-      // otra vez. El header oscila en el pie de página, justo donde está el
-      // botón de "Cargar más".
-      const fondo = document.documentElement.scrollHeight - window.innerHeight - y;
-      if (fondo < 120) {
-        ultimo.current = y;
-        return;
-      }
 
       // Cerca del tope siempre visible: si no, al volver arriba de un tirón el
       // header puede quedarse escondido con la página ya en el principio.
@@ -81,6 +75,22 @@ export function MobileHeader({
 }) {
   const visible = useHideOnScroll();
   const { count, ready, openDrawer } = useCart();
+
+  // Cuánto hay que desplazar para esconder la fila negra. Se mide en vez de
+  // fijarse a mano: el alto cambia con el tamaño de fuente del sistema, y un
+  // valor escrito a ojo deja una franja negra asomando en unos teléfonos.
+  const filaRef = useRef<HTMLDivElement>(null);
+  const [filaAlto, setFilaAlto] = useState(0);
+
+  useEffect(() => {
+    const nodo = filaRef.current;
+    if (!nodo) return;
+    const medir = () => setFilaAlto(nodo.offsetHeight);
+    medir();
+    const obs = new ResizeObserver(medir);
+    obs.observe(nodo);
+    return () => obs.disconnect();
+  }, []);
   const router = useRouter();
   const [q, setQ] = useState("");
 
@@ -90,14 +100,23 @@ export function MobileHeader({
   };
 
   return (
-    <header className="sticky top-0 z-40 lg:hidden">
-      {/* Fila negra: se oculta al bajar. La banda de búsqueda de abajo NO,
-          porque buscar es la acción que más se repite en un catálogo. */}
-      <div
-        className={`bg-[#16181D] transition-[max-height,opacity] duration-200 ease-out ${
-          visible ? "max-h-20 opacity-100" : "max-h-0 overflow-hidden opacity-0"
-        }`}
-      >
+    <header
+      className="sticky top-0 z-40 transition-transform duration-200 ease-out lg:hidden"
+      // Se DESPLAZA, no se encoge.
+      //
+      // La primera versión animaba `max-height` y `opacity`. Dos defectos, y
+      // los dos se veían: durante la animación la fila quedaba semitransparente
+      // y el contenido de la página se leía a través del header; y animar la
+      // altura CAMBIA LA MAQUETACIÓN, lo que perturba el scroll, lo que vuelve
+      // a disparar este manejador — el header temblando mientras se lee.
+      //
+      // Con `transform` no se toca el flujo: el navegador solo recompone, y el
+      // hueco que ocupa el header en la página no cambia nunca.
+      style={{ transform: visible ? undefined : `translateY(-${filaAlto}px)` }}
+    >
+      {/* Fila negra: se aparta al bajar. La banda de búsqueda NO, porque
+          buscar es la acción que más se repite en un catálogo. */}
+      <div ref={filaRef} className="bg-[#16181D]">
         <div className="flex items-center gap-[9px] px-3.5 py-[11px]">
           <Link href="/" className="flex flex-1 items-center gap-[7px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -180,6 +199,11 @@ export function MobileHeader({
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { count, ready } = useCart();
+  // Cuando la ficha saca su barra de compra, esta se aparta: el diseño dice
+  // que nunca se superponen, y dos barras fijas en 390 px se comen la pantalla.
+  const cedePaso = useBuyBarVisible();
+
+  if (cedePaso) return null;
 
   return (
     <nav
@@ -237,6 +261,8 @@ export function MobileBottomNav() {
  * el checkout lo último es justamente el botón que cierra la compra.
  */
 export function MobileNavSpacer() {
+  // El hueco se mantiene aunque la barra ceda el paso: la de compra ocupa un
+  // alto parecido, y quitarlo haría saltar la página al aparecer aquélla.
   return (
     <div
       aria-hidden

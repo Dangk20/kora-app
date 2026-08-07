@@ -24,10 +24,10 @@
 
 ## 4. Ficha de producto
 
-- [ ] 4.1 Galería a sangre con bullets.
-- [ ] 4.2 Chips de variante y acordeones para descripción y especificaciones.
-- [ ] 4.3 Barra sticky de compra que **reemplaza** a la de navegación al aparecer (nunca se superponen).
-- [ ] 4.4 Sellos: solo lo que el negocio sostiene. Sin envío gratis, sin cuotas, sin pago contra entrega.
+- [x] 4.1 Galería a sangre con bullets.
+- [x] 4.2 Chips de variante y acordeones para descripción y especificaciones.
+- [x] 4.3 Barra sticky de compra que **reemplaza** a la de navegación al aparecer (nunca se superponen).
+- [x] 4.4 Sellos: solo lo que el negocio sostiene. Sin envío gratis, sin cuotas, sin pago contra entrega.
 
 ## 5. Carrito y checkout
 

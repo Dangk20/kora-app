@@ -5,7 +5,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, MessageCircle, Store, Truck } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import {
   getProductBySlug,
@@ -64,7 +64,7 @@ export default async function ProductPage({
   const categoryLink = product.parentCategory ?? product.category;
 
   return (
-    <div className="mx-auto max-w-[1320px] px-[22px] pt-6 pb-16">
+    <div className="mx-auto max-w-[1320px] px-4 pt-4 pb-12 sm:px-[22px] sm:pt-6 sm:pb-16">
       <nav className="mb-5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-[#8a8f98]">
         <Link href="/" className="hover:text-kora-black">
           Inicio
@@ -93,18 +93,44 @@ export default async function ProductPage({
 
       <ProductDetail product={product} currency={currency} />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-[20px] bg-white p-[30px] shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
-          <h2 className="mb-3 text-xl font-bold text-kora-black">Descripción</h2>
-          <p className="text-[14.5px] leading-[1.7] whitespace-pre-line text-[#4a4f58]">
+      {/* En móvil, acordeones (diseño §04). La descripción y la tabla de
+          especificaciones son un muro de texto entre el precio y los productos
+          relacionados, y en un teléfono empujan los relacionados fuera de
+          alcance.
+
+          `<details>` nativo: sin JavaScript, accesible por teclado y con el
+          estado que ya trae el navegador. En escritorio no hay acordeón —el
+          resumen deja de responder al clic y el contenido se fuerza visible
+          con `[&>*:not(summary)]`—, así que allí siguen siendo las dos
+          tarjetas abiertas de siempre.
+
+          Las tres garantías que había aquí se quitaron: viven bajo los botones
+          de compra desde la auditoría del 7 ago, y repetirlas era decir dos
+          veces lo mismo en la misma pantalla. */}
+      <div className="mt-4 grid gap-3 sm:mt-6 sm:gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <details className="group rounded-[16px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-[30px] sm:[&>*:not(summary)]:!block">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black sm:pointer-events-none sm:mb-3 sm:text-xl [&::-webkit-details-marker]:hidden">
+            Descripción
+            <ChevronDown
+              className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180 sm:hidden"
+              aria-hidden
+            />
+          </summary>
+          <p className="mt-3 text-[14.5px] leading-[1.7] whitespace-pre-line text-[#4a4f58] sm:mt-0">
             {product.description?.trim() ||
               `${product.name}${product.brand ? ` de ${product.brand}` : ""}. Escríbenos por WhatsApp y te contamos todos los detalles.`}
           </p>
-        </section>
+        </details>
 
-        <section className="rounded-[20px] bg-white p-[30px] shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
-          <h2 className="mb-3 text-xl font-bold text-kora-black">Especificaciones</h2>
-          <dl className="text-[13.5px]">
+        <details className="group rounded-[16px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-[30px] sm:[&>*:not(summary)]:!block">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black sm:pointer-events-none sm:mb-3 sm:text-xl [&::-webkit-details-marker]:hidden">
+            Especificaciones
+            <ChevronDown
+              className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180 sm:hidden"
+              aria-hidden
+            />
+          </summary>
+          <dl className="mt-3 text-[13.5px] sm:mt-0">
             {specs(product)
               .map(({ key, value }) => (
                 <div
@@ -116,31 +142,15 @@ export default async function ProductPage({
                 </div>
               ))}
           </dl>
-
-          <div className="mt-5 grid gap-3">
-            {[
-              { icon: MessageCircle, text: "Confirmamos tu pedido por WhatsApp" },
-              { icon: Store, text: "También disponible en nuestra tienda física" },
-              { icon: Truck, text: "Coordinamos el envío contigo" },
-            ].map(({ icon: Icon, text }) => (
-              <div
-                key={text}
-                className="flex items-center gap-2.5 rounded-[13px] bg-[#faf8f5] px-3.5 py-3"
-              >
-                <Icon className="size-5 shrink-0 text-kora-coral" />
-                <span className="text-[12.5px] text-[#4a4f58]">{text}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        </details>
       </div>
 
       {related.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-4 text-2xl font-bold text-kora-black">
+        <section className="mt-8 sm:mt-10">
+          <h2 className="mb-4 text-xl font-bold text-kora-black sm:text-2xl">
             Productos relacionados
           </h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} currency={currency} />
             ))}

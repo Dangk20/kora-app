@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
-import { resolvePrice, type Currency } from "@/modules/pricing";
+import { formatMoney, resolvePrice, type Currency } from "@/modules/pricing";
 import { PriceTag } from "@/modules/storefront/price-tag";
 import type { StoreProduct } from "@/modules/storefront/queries";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { useCart } from "@/modules/cart/cart-context";
 import { ProductGuarantees } from "@/modules/storefront/product-guarantees";
+import { useOwnsBottomBar } from "@/modules/storefront/mobile/bars-context";
 
 /**
  * Bloque principal de la ficha: galería + selección de variante.
@@ -44,6 +45,30 @@ export function ProductDetail({
   const maxQty = Math.max(1, units);
   const clampQty = (n: number) => Math.min(Math.max(1, n), maxQty);
 
+  // La barra de compra aparece cuando los botones reales se van de la
+  // pantalla, y no a partir de una posición de scroll fija: una ficha con
+  // muchas variantes o una descripción larga mueve ese punto, y un umbral
+  // en píxeles acertaría solo en el producto con el que se probó.
+  const botonesRef = useRef<HTMLDivElement>(null);
+  const [barraCompra, setBarraCompra] = useState(false);
+
+  useEffect(() => {
+    const nodo = botonesRef.current;
+    if (!nodo) return;
+
+    const obs = new IntersectionObserver(
+      ([entrada]) => setBarraCompra(!entrada.isIntersecting),
+      // Un margen inferior generoso: la barra no debe aparecer mientras los
+      // botones todavía asoman por abajo, o se ven los dos a la vez.
+      { rootMargin: "0px 0px -80px 0px" },
+    );
+    obs.observe(nodo);
+    return () => obs.disconnect();
+  }, []);
+
+  // Mientras la barra esté fuera, la de navegación se aparta (diseño §05).
+  useOwnsBottomBar(barraCompra);
+
   const chooseVariant = (id: string) => {
     setVariantId(id);
     setQty(1); // el cupo cambia con la variante
@@ -64,11 +89,11 @@ export function ProductDetail({
   };
 
   return (
-    <div className="grid gap-10 rounded-3xl bg-white p-8 shadow-[0_6px_28px_rgba(0,0,0,0.05)] lg:grid-cols-[480px_1fr]">
+    <div className="-mx-4 grid gap-6 bg-white p-4 sm:mx-0 sm:gap-10 sm:rounded-3xl sm:p-8 sm:shadow-[0_6px_28px_rgba(0,0,0,0.05)] lg:grid-cols-[480px_1fr]">
       {/* Galería */}
       <div>
         <div
-          className="relative flex h-[430px] items-center justify-center overflow-hidden rounded-[18px]"
+          className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] sm:aspect-auto sm:h-[430px] sm:rounded-[18px]"
           style={{ background: image ? "#f7f4f0" : product.category.color }}
         >
           {image ? (
@@ -125,7 +150,7 @@ export function ProductDetail({
             {product.brand}
           </p>
         )}
-        <h1 className="text-[28px] leading-[1.18] font-bold text-kora-black">
+        <h1 className="text-[21px] leading-[1.2] font-bold text-kora-black sm:text-[28px] sm:leading-[1.18]">
           {product.name}
         </h1>
         <p className="mt-2 text-[13px] text-[#8a8f98]">
@@ -226,7 +251,7 @@ export function ProductDetail({
         {/* Orden del prototipo (§3): primero agregar al carrito, después
             comprar ahora. "Comprar ahora" lleva al checkout; el pedido se
             envía por WhatsApp al final del formulario (PED_HU001/002). */}
-        <div className="space-y-2.5">
+        <div ref={botonesRef} className="space-y-2.5">
           <button
             type="button"
             onClick={addToCart}
@@ -259,6 +284,47 @@ export function ProductDetail({
         {/* Las mismas tres del home, desde una sola lista: lo que no puede
             divergir es QUÉ se promete (prototipo §3). */}
         <ProductGuarantees />
+      </div>
+
+      {/* Barra de compra: solo en móvil y solo cuando los botones no se ven.
+          Sustituye a la de navegación, no se le suma — dos barras fijas en una
+          pantalla de 390 px dejan la ficha sin sitio. */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-[#f0ece6] bg-white px-4 pt-3 transition-transform duration-200 lg:hidden ${
+          barraCompra ? "translate-y-0" : "pointer-events-none translate-y-full"
+        }`}
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        aria-hidden={!barraCompra}
+      >
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11.5px] text-[#8a8f98]">
+              {soldOut ? "Sin cupo online" : variant?.name ? variant.name : product.name}
+            </p>
+            {price && (
+              <p className="text-[17px] leading-tight font-extrabold text-kora-black">
+                {formatMoney(price.amount, price.currency)}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={addToCart}
+            disabled={soldOut}
+            aria-label="Agregar al carrito"
+            className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.8px] border-kora-black bg-white text-kora-black disabled:opacity-40"
+          >
+            {justAdded ? <Check className="size-5" /> : <ShoppingCart className="size-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={buyNow}
+            disabled={soldOut}
+            className="bg-kora-gradient flex min-h-12 shrink-0 items-center rounded-full px-6 text-[14.5px] font-bold text-white disabled:opacity-45"
+          >
+            {soldOut ? "Agotado" : "Comprar"}
+          </button>
+        </div>
       </div>
     </div>
   );
