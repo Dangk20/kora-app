@@ -9,6 +9,8 @@ import { CartProvider } from "@/modules/cart/cart-context";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import { LEGAL_LINKS } from "@/modules/legal/content";
+import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
+import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
 import { CartDrawer } from "./cart-drawer";
@@ -43,7 +45,16 @@ export default async function StoreLayout({
   return (
     <CartProvider>
     <div className="flex min-h-screen flex-col bg-[#F5F3F0]">
-      <header className="sticky top-0 z-50 bg-[#16181D]">
+      {/* Chrome móvil: header que se oculta al bajar, banda de búsqueda y menú
+          lateral. Es una navegación distinta, no la de escritorio encogida
+          (ver src/modules/storefront/mobile/). */}
+      <MobileShell
+        currency={currency}
+        categories={categories}
+        whatsappHref={WHATSAPP.href}
+      />
+
+      <header className="sticky top-0 z-50 hidden bg-[#16181D] lg:block">
         {/* Fila 1: marca · buscador · moneda · cuenta · carrito */}
         <div className="mx-auto flex max-w-[1320px] items-center gap-5 px-[22px] py-3.5">
           <Link href="/" className="flex shrink-0 items-center gap-3">
@@ -180,6 +191,12 @@ export default async function StoreLayout({
           </ul>
         </div>
       </footer>
+
+      {/* La barra inferior es fija: sin este hueco, lo último de cada página
+          queda debajo de ella — y en el carrito lo último es el botón de
+          comprar. */}
+      <MobileNavSpacer />
+      <MobileBottomNav />
 
       <CartDrawer />
     </div>
