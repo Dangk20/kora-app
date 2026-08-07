@@ -14,6 +14,8 @@
 //
 // Se llama desde `src/instrumentation.ts` al arrancar el servidor.
 
+import { esProduccion } from "@/lib/environment";
+
 export const LEGAL_REQUIRED_VARS = [
   "KORA_LEGAL_RAZON_SOCIAL",
   "KORA_LEGAL_NIT",
@@ -88,11 +90,19 @@ export class LegalConfigError extends Error {
 /**
  * Lanza si en producción faltan datos del comerciante.
  *
- * En desarrollo no hace nada: ahí los marcadores son el comportamiento
- * correcto y exigir el NIT real rompería a cualquiera que clone el repositorio.
+ * En desarrollo y en PRUEBAS no hace nada, y lo segundo es deliberado: el
+ * entorno de pruebas no necesita la razón social real del comerciante, y
+ * exigírsela obligaría a copiar datos de una empresa de verdad a un entorno de
+ * demostración. Ahí los marcadores son además útiles — se ve de un vistazo qué
+ * insumo falta.
+ *
+ * Se usa `esProduccion()` y no `NODE_ENV`: la imagen se compila UNA vez con
+ * `NODE_ENV=production` y corre en los dos entornos, así que `NODE_ENV` no
+ * distingue pruebas de producción. Es el mismo predicado del correo y del
+ * `robots.txt`.
  */
 export function assertLegalConfigured(env: NodeJS.ProcessEnv = process.env): void {
-  if (env.NODE_ENV !== "production") return;
+  if (!esProduccion(env)) return;
 
   const missing = missingLegalVars(env);
   if (missing.length > 0) throw new LegalConfigError(missing);

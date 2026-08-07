@@ -185,6 +185,8 @@ Sin este paso el sistema funciona igual, solo que el VPS sirve cada imagen cada 
 
 `KORA_STORAGE_DRIVER=r2` con sus cinco credenciales, y copiar los archivos al bucket. Las claves guardadas en la base **no cambian de formato**, así que ninguna fila hay que reescribir.
 
+> **Pruebas declara su almacenamiento en su propio `docker-compose.staging.yml`** (`KORA_STORAGE_DRIVER=disk`, `KORA_UPLOADS_DIR=/data/uploads`), no en `.env.staging`: ese archivo **sí** viaja en cada despliegue, así que el entorno queda completo sin entrar por SSH. Es una elección explícita y revisable en un diff, no un valor por defecto escondido en el código. **Producción declara la suya en `.env.production`**, a propósito aparte: es la que importa.
+
 ## Producción no arranca sin los datos del comerciante
 
 `.env.production` **debe** llevar estas cuatro, o el contenedor termina al
@@ -210,7 +212,10 @@ un requerimiento.
 
 En pruebas no hace falta configurarlas: el entorno se declara `KORA_ENV=staging`,
 la guarda no aplica y las páginas muestran marcadores entre corchetes,
-deliberadamente feos para que salten a la vista.
+deliberadamente feos para que salten a la vista. **No es una excepción por
+comodidad**: pedirle a un entorno de demostración la razón social y el NIT de
+una empresa real sería copiar datos de verdad a donde no hacen falta, y ver los
+marcadores es la forma más rápida de saber qué insumo sigue pendiente.
 
 ## Trampas que ya nos costaron tiempo
 

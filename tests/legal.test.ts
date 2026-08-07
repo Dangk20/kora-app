@@ -51,6 +51,14 @@ describe("datos del comerciante — guarda de arranque", () => {
     expect(() => assertLegalConfigured(env)).toThrow(LegalConfigError);
   });
 
+  it("PRUEBAS sin configurar nada arranca: no necesita el NIT real", () => {
+    // La imagen se compila una vez con NODE_ENV=production y corre en los dos
+    // entornos, así que la guarda tiene que mirar KORA_ENV. Si no, el entorno
+    // de pruebas exigiría copiarle datos de una empresa real.
+    const env = { NODE_ENV: "production", KORA_ENV: "staging" } as NodeJS.ProcessEnv;
+    expect(() => assertLegalConfigured(env)).not.toThrow();
+  });
+
   it("desarrollo sin configurar nada arranca igual", () => {
     // Exigir el NIT real rompería a cualquiera que clone el repositorio.
     expect(() => assertLegalConfigured({ NODE_ENV: "development" } as NodeJS.ProcessEnv)).not.toThrow();

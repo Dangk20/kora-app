@@ -32,6 +32,20 @@ services:
     # que la base registra imágenes y el directorio está vacío.
     volumes:
       - uploads:/data/uploads
+    # El almacenamiento de PRUEBAS se declara aquí y no en `.env.staging`
+    # porque este archivo SÍ viaja en cada despliegue: así el entorno queda
+    # completo sin que nadie tenga que entrar por SSH a añadir dos líneas.
+    #
+    # No es un valor por defecto escondido en el código —eso es justo lo que se
+    # eliminó— sino una elección explícita, versionada y revisable en un diff.
+    # Producción declara la suya en `.env.production`, deliberadamente aparte.
+    #
+    # Efecto lateral bienvenido: las imágenes de producto empiezan a cargar en
+    # pruebas. Hasta ahora nunca lo hicieron, porque el entorno apuntaba a R2
+    # con credenciales de relleno.
+    environment:
+      KORA_STORAGE_DRIVER: disk
+      KORA_UPLOADS_DIR: /data/uploads
     env_file:
       - .env.staging
     depends_on:
