@@ -141,6 +141,38 @@ Dos motivos, y el segundo pesa más que el primero:
 `KORA_ENV` sin definir se comporta como producción. Si alguien monta un entorno
 nuevo y lo olvida, la guarda protege en vez de callarse.
 
+**Esa convención la lee una sola función**, `esProduccion()` en
+`src/lib/environment.ts`. La consumen la guarda del correo y el `robots.txt`.
+Si alguna vez se invierte el criterio —que producción se declare y pruebas
+calle— se cambia ahí y en `.env.production`, no en cada módulo que pregunte.
+
+## Producción no arranca sin los datos del comerciante
+
+`.env.production` **debe** llevar estas cuatro, o el contenedor termina al
+arrancar y el despliegue revierte solo:
+
+```
+KORA_LEGAL_RAZON_SOCIAL=
+KORA_LEGAL_NIT=
+KORA_LEGAL_DOMICILIO=
+KORA_LEGAL_EMAIL=
+```
+
+Identifican al responsable del tratamiento en `/legal/datos-personales`, que es
+la política a la que apunta la autorización que el checkout le pide al
+comprador. Publicarlas con marcadores no deja un texto incompleto: deja un
+consentimiento que no dice a quién se le entregan los datos, y que por tanto no
+acredita nada ante la SIC (Ley 1581/2012, art. 9).
+
+Es el mismo criterio que R2 y que el proveedor de correo, y por el mismo motivo:
+**el fallo no da error en ninguna pantalla**. Sin la guarda, la tienda vendería
+durante semanas con una política inválida y nadie lo notaría hasta que llegue
+un requerimiento.
+
+En pruebas no hace falta configurarlas: el entorno se declara `KORA_ENV=staging`,
+la guarda no aplica y las páginas muestran marcadores entre corchetes,
+deliberadamente feos para que salten a la vista.
+
 ## Trampas que ya nos costaron tiempo
 
 Ocho fallos reales encontrados montando esto. Ninguno era visible leyendo la configuración; todos aparecieron al verificar contra el servidor.

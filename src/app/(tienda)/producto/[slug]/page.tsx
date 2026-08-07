@@ -2,6 +2,7 @@
 // descripción y especificaciones abajo, relacionados al final.
 // El botón de compra queda anunciado (carrito = S7, pedido por WhatsApp = S8):
 // hasta entonces la ficha ofrece contacto directo, no un carrito falso.
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, MessageCircle, Store, Truck } from "lucide-react";
@@ -12,7 +13,23 @@ import {
   type StoreProduct,
 } from "@/modules/storefront/queries";
 import { ProductCard } from "@/modules/storefront/product-card";
+import { productMetadata } from "@/modules/storefront/metadata";
 import { ProductDetail } from "./product-detail";
+
+// La vista previa del enlace compartido por WhatsApp es la primera impresión
+// del producto en este negocio: sale el nombre, su descripción y su foto, no
+// una tarjeta genérica de la tienda.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product) return {};
+
+  return productMetadata(product);
+}
 
 /** Filas de la tabla de especificaciones, omitiendo las que no aplican. */
 function specs(product: StoreProduct): { key: string; value: string }[] {

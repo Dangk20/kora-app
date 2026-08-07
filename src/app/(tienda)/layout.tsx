@@ -8,6 +8,7 @@ import { listCategories } from "@/modules/storefront/queries";
 import { CartProvider } from "@/modules/cart/cart-context";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { whatsappNumberFor } from "@/modules/orders/settings";
+import { LEGAL_LINKS } from "@/modules/legal/content";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
 import { CartDrawer } from "./cart-drawer";
@@ -149,7 +150,7 @@ export default async function StoreLayout({
             />
             <span className="text-xs">© 2026 · Todo lo que quieres, en un solo lugar</span>
           </div>
-          <div className="flex items-center gap-6 text-[13px]">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
             <a
               href={WHATSAPP.href}
               target="_blank"
@@ -162,6 +163,21 @@ export default async function StoreLayout({
               Acceso al equipo
             </Link>
           </div>
+        </div>
+
+        {/* Las tres políticas, accesibles desde cualquier página pública.
+            Van en su propia fila para que el envolver en móvil no empuje al
+            logo ni deje enlaces sueltos a media línea. */}
+        <div className="mx-auto mt-7 max-w-[1320px] border-t border-[#22252b] pt-6">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2.5 text-[13px]">
+            {LEGAL_LINKS.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="hover:text-white">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </footer>
 

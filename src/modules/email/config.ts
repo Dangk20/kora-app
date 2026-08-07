@@ -10,6 +10,8 @@
 // Se llama desde `src/instrumentation.ts` al arrancar el servidor.
 // Ver openspec/changes/email-marketing — specs/email-delivery.
 
+import { esProduccion } from "@/lib/environment";
+
 export const EMAIL_REQUIRED_VARS = ["RESEND_API_KEY", "EMAIL_FROM"] as const;
 
 export type EmailVar = (typeof EMAIL_REQUIRED_VARS)[number];
@@ -47,12 +49,12 @@ export class EmailConfigError extends Error {
  * NO QUEREMOS que salga correo real: staging escribiría a direcciones de
  * clientes de verdad mientras alguien prueba un pedido.
  *
- * `KORA_ENV` sin definir se comporta como producción: si alguien despliega un
- * entorno nuevo y olvida ponerlo, la guarda protege en vez de callarse.
+ * El predicado vive en `src/lib/environment.ts` y NO se reimplementa aquí:
+ * el rastreo (`src/app/robots.ts`) hace la misma pregunta, y dos copias de la
+ * misma regla son dos sitios donde cambiar uno y olvidar el otro.
  */
 export function requiereProveedor(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.NODE_ENV !== "production") return false;
-  return env.KORA_ENV?.trim().toLowerCase() !== "staging";
+  return esProduccion(env);
 }
 
 /** Lanza si el entorno exige proveedor y falta configuración. */

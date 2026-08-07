@@ -23,6 +23,8 @@ export type StoreProduct = {
   brand: string | null;
   description: string | null;
   featured: boolean;
+  /** Última modificación real, para el `lastModified` del sitemap. */
+  updatedAt: Date;
   category: { id: string; name: string; slug: string; color: string; icon: string };
   parentCategory: { id: string; name: string; slug: string } | null;
   images: { url: string; alt: string | null }[];
@@ -36,6 +38,7 @@ const PRODUCT_SELECT = {
   brand: true,
   description: true,
   featured: true,
+  updatedAt: true,
   category: {
     select: {
       id: true,
@@ -70,6 +73,7 @@ type RawProduct = {
   brand: string | null;
   description: string | null;
   featured: boolean;
+  updatedAt: Date;
   category: {
     id: string;
     name: string;
@@ -100,6 +104,7 @@ function toStoreProduct(p: RawProduct): StoreProduct {
     brand: p.brand,
     description: p.description,
     featured: p.featured,
+    updatedAt: p.updatedAt,
     category: {
       id: p.category.id,
       name: p.category.name,
@@ -144,11 +149,38 @@ export type CatalogFilters = {
   currency: Currency;
 };
 
+/**
+ * Qué significa "publicado" en la tienda. UNA definición.
+ *
+ * No basta con `active`: un producto sin ninguna variante activa no se puede
+ * comprar, así que no se muestra. Cualquier consulta que declare productos al
+ * exterior —el catálogo, el sitemap— parte de aquí; escribir el `where` a mano
+ * en otro sitio crearía una segunda definición que se desincroniza en silencio,
+ * y el síntoma sería un sitemap lleno de URL que devuelven 404.
+ */
+export const PUBLICADO = {
+  active: true,
+  variants: { some: { active: true } },
+} as const;
+
+/**
+ * Slug y fecha de modificación de cada producto publicado, para el sitemap.
+ *
+ * Existe aparte de `listProducts` a propósito: aquélla resuelve las URL de las
+ * imágenes contra el driver de almacenamiento, y el sitemap no necesita
+ * imágenes. Reutilizarla obligaba a tener R2 configurado para generar un
+ * archivo de texto con slugs — y tumbaba el build.
+ */
+export async function listProductSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
+  return db.product.findMany({
+    where: PUBLICADO,
+    select: { slug: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
 export async function listProducts(filters: CatalogFilters): Promise<StoreProduct[]> {
-  const where: Record<string, unknown> = {
-    active: true,
-    variants: { some: { active: true } },
-  };
+  const where: Record<string, unknown> = { ...PUBLICADO };
 
   if (filters.categorySlug) {
     // Una categoría padre incluye lo de sus subcategorías.

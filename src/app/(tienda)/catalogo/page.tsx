@@ -7,7 +7,15 @@ import { ChevronRight, Flame, SlidersHorizontal } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import { listCategories, listProducts } from "@/modules/storefront/queries";
 import { ProductCard } from "@/modules/storefront/product-card";
+import { storeMetadata } from "@/modules/storefront/metadata";
 import { SortSelect } from "./sort-select";
+
+export const metadata = storeMetadata({
+  title: "Catálogo",
+  description:
+    "Explora todo el catálogo de KORA por categoría, marca y precio. Compra en línea y coordina tu pedido por WhatsApp.",
+  path: "/catalogo",
+});
 
 const SORTS = ["relevancia", "precioAsc", "precioDesc", "nombre"] as const;
 type Sort = (typeof SORTS)[number];

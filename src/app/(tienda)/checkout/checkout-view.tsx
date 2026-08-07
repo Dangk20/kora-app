@@ -380,7 +380,19 @@ export function CheckoutView({
                   className="mt-0.5 accent-kora-coral" />
                 <span>
                   Autorizo el tratamiento de mis datos personales para gestionar
-                  este pedido.
+                  este pedido, conforme a la{" "}
+                  {/* En pestaña nueva a propósito: navegar dentro de la misma
+                      perdería el formulario a medio llenar y el comprador
+                      tendría que empezar de cero por leer lo que autoriza. */}
+                  <a
+                    href="/legal/datos-personales"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-kora-coral underline underline-offset-2 hover:opacity-80"
+                  >
+                    política de tratamiento de datos
+                  </a>
+                  .
                 </span>
               </label>
               <label className="flex items-start gap-2.5 text-[12.5px] text-[#4a4f58]">
@@ -392,6 +404,28 @@ export function CheckoutView({
                 </span>
               </label>
               {fieldError("acceptsData")}
+
+              <p className="pt-1 text-[12px] leading-relaxed text-[#9aa0ab]">
+                Al crear el pedido aceptas nuestros{" "}
+                <a
+                  href="/legal/terminos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-[#4a4f58]"
+                >
+                  términos y condiciones
+                </a>{" "}
+                y la{" "}
+                <a
+                  href="/legal/cambios"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-[#4a4f58]"
+                >
+                  política de cambios y garantía
+                </a>
+                .
+              </p>
             </div>
           </section>
         </div>

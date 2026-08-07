@@ -9,6 +9,14 @@ import {
 } from "@/modules/showcase/queries";
 import { StoreHomeLayout } from "@/modules/storefront/home-layout";
 import { CONTAINER } from "@/modules/storefront/home-sections";
+import { storeMetadata } from "@/modules/storefront/metadata";
+
+export const metadata = storeMetadata({
+  title: "Todo lo que quieres, en un solo lugar",
+  description:
+    "Tienda online KORA. Compra en línea y coordina tu pedido por WhatsApp, con el mismo inventario de nuestra tienda física.",
+  path: "/",
+});
 
 export default async function StoreHome() {
   const currency = await activeCurrency();

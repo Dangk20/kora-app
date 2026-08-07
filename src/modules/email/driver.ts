@@ -31,7 +31,7 @@ export function fromAddress(env = process.env): string {
   return env.EMAIL_FROM?.trim() || "KORA <no-responder@korashopp.com>";
 }
 
-/** Base pública de la tienda, para armar enlaces absolutos dentro del correo. */
-export function storeUrl(env = process.env): string {
-  return (env.NEXT_PUBLIC_STORE_URL?.trim() || "https://korashopp.com").replace(/\/+$/, "");
-}
+// La base pública de la tienda se movió a `src/lib/site.ts` cuando dejó de ser
+// solo cosa del correo: el `robots.txt`, el sitemap y la metadata para
+// compartir necesitan la misma. Se reexporta para no tocar a sus consumidores.
+export { storeUrl } from "@/lib/site";

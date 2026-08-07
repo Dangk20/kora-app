@@ -19,6 +19,7 @@
     "whatsapp:set": "tsx scripts/set-whatsapp.ts",
     "staff:email": "tsx scripts/set-staff-email.ts",
     "emails:preview": "tsx scripts/preview-emails.ts",
+    "legal:export": "tsx scripts/legal-export.ts",
     "orders:expire": "tsx scripts/expire-orders.ts",
     "spec": "openspec",
     "outbox:worker": "tsx scripts/outbox-worker.ts",

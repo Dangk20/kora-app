@@ -30,4 +30,11 @@ export async function register(): Promise<void> {
   // cliente.
   const { assertEmailConfiguredOrExit } = await import("./modules/email/config");
   assertEmailConfiguredOrExit();
+
+  // Y para los datos del comerciante: las páginas legales identifican a quién
+  // se le entregan los datos personales. Sin ellos, el checkout pide una
+  // autorización que no dice a favor de quién — un consentimiento que no
+  // acredita nada. Es un fallo que no da error en ninguna pantalla.
+  const { assertLegalConfiguredOrExit } = await import("./modules/legal/config");
+  assertLegalConfiguredOrExit();
 }
