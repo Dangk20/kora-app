@@ -17,10 +17,10 @@
 
 ## 3. Catálogo
 
-- [ ] 3.1 Chips de categoría pegajosos bajo el chrome.
-- [ ] 3.2 Bottom-sheets para Filtros y Ordenar.
-- [ ] 3.3 Rejilla de 2 columnas y **"Cargar más"** — nunca paginación numérica.
-- [ ] 3.4 Estado vacío: *"No encontramos productos con esos filtros."*
+- [x] 3.1 Chips de categoría pegajosos bajo el chrome.
+- [x] 3.2 Bottom-sheets para Filtros y Ordenar.
+- [x] 3.3 Rejilla de 2 columnas y **"Cargar más"** — nunca paginación numérica.
+- [x] 3.4 Estado vacío: *"No encontramos productos con esos filtros."*
 
 ## 4. Ficha de producto
 

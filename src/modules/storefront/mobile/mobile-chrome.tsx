@@ -46,6 +46,19 @@ function useHideOnScroll(threshold = 8): boolean {
 
       if (Math.abs(delta) < threshold) return;
 
+      // Al final de la página no se cambia de estado.
+      //
+      // Ocultar el header acorta el documento; si el scroll estaba al fondo,
+      // el navegador lo AJUSTA hacia arriba, y ese ajuste llega como un evento
+      // con delta negativo que vuelve a mostrarlo — que alarga el documento, y
+      // otra vez. El header oscila en el pie de página, justo donde está el
+      // botón de "Cargar más".
+      const fondo = document.documentElement.scrollHeight - window.innerHeight - y;
+      if (fondo < 120) {
+        ultimo.current = y;
+        return;
+      }
+
       // Cerca del tope siempre visible: si no, al volver arriba de un tirón el
       // header puede quedarse escondido con la página ya en el principio.
       setVisible(y < 80 || delta < 0);
@@ -187,12 +200,15 @@ export function MobileBottomNav() {
             aria-current={activo ? "page" : undefined}
             className="relative flex min-h-[44px] flex-1 flex-col items-center justify-center gap-[3px]"
           >
+            {/* El activo va relleno EN NARANJA, como el diseño. El relleno y
+                el trazo se dan explícitos en vez de `currentColor`: así el
+                icono no puede heredar un color de un padre y salir negro, que
+                es como se vio la primera vez. */}
             <Icono
               className="size-[22px]"
-              // El activo va relleno, como en el diseño.
-              fill={activo ? "currentColor" : "none"}
+              fill={activo ? "#ff5a1f" : "none"}
+              stroke={activo ? "#ff5a1f" : "#8a8f98"}
               strokeWidth={activo ? 1.5 : 1.8}
-              color={activo ? "#ff5a1f" : "#8a8f98"}
             />
             <span
               className={`text-[10.5px] ${

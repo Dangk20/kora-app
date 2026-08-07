@@ -9,6 +9,18 @@ import { listCategories, listProducts } from "@/modules/storefront/queries";
 import { ProductCard } from "@/modules/storefront/product-card";
 import { storeMetadata } from "@/modules/storefront/metadata";
 import { SortSelect } from "./sort-select";
+import { MobileFilters } from "./mobile-filters";
+
+/**
+ * Cuántos productos se pintan de golpe.
+ *
+ * Sin tope, el catálogo real (~1.000 productos) manda todas las tarjetas en la
+ * primera respuesta: cientos de imágenes y un HTML enorme, en un teléfono con
+ * datos móviles. El diseño pide **"Cargar más", nunca paginación numérica**
+ * (§03), y aquí es un enlace: funciona sin JavaScript y la URL sigue siendo
+ * compartible.
+ */
+const POR_PAGINA = 12;
 
 export const metadata = storeMetadata({
   title: "Catálogo",
@@ -23,9 +35,9 @@ type Sort = (typeof SORTS)[number];
 export default async function CatalogoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; q?: string; orden?: string }>;
+  searchParams: Promise<{ categoria?: string; q?: string; orden?: string; ver?: string }>;
 }) {
-  const { categoria, q, orden } = await searchParams;
+  const { categoria, q, orden, ver } = await searchParams;
   const sort: Sort = SORTS.includes(orden as Sort) ? (orden as Sort) : "relevancia";
   const currency = await activeCurrency();
 
@@ -39,12 +51,32 @@ export default async function CatalogoPage({
   );
   const activeChild = active?.children.find((ch) => ch.slug === categoria);
 
+  // Cuántos se ven. Se acota a un múltiplo razonable para que nadie fuerce
+  // `?ver=999999` y tumbe la página.
+  const pedidos = Number(ver);
+  const visibles = Math.min(
+    Number.isFinite(pedidos) && pedidos > 0 ? Math.ceil(pedidos / POR_PAGINA) * POR_PAGINA : POR_PAGINA,
+    products.length,
+  );
+  const mostrados = products.slice(0, visibles);
+  const quedan = products.length - mostrados.length;
+
+  /** Enlace de "Cargar más" conservando categoría, búsqueda y orden. */
+  const masUrl = () => {
+    const next = new URLSearchParams();
+    if (categoria) next.set("categoria", categoria);
+    if (q) next.set("q", q);
+    if (orden) next.set("orden", orden);
+    next.set("ver", String(visibles + POR_PAGINA));
+    return `/catalogo?${next}`;
+  };
+
   const title = q
     ? `Resultados para "${q}"`
     : (activeChild?.name ?? active?.name ?? "Todos los productos");
 
   return (
-    <div className="mx-auto max-w-[1320px] px-[22px] pt-6 pb-16">
+    <div className="mx-auto max-w-[1320px] px-4 pt-4 pb-12 sm:px-[22px] sm:pt-6 sm:pb-16">
       <nav className="mb-4 flex items-center gap-1.5 text-[12.5px] text-[#8a8f98]">
         <Link href="/" className="hover:text-kora-black">
           Inicio
@@ -74,17 +106,30 @@ export default async function CatalogoPage({
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[30px] leading-tight font-bold text-kora-black">{title}</h1>
+          <h1 className="text-[22px] leading-tight font-bold text-kora-black sm:text-[30px]">
+            {title}
+          </h1>
           <p className="mt-0.5 text-[13px] text-[#8a8f98]">
             {products.length}{" "}
             {products.length === 1 ? "producto" : "productos"}
           </p>
         </div>
-        <SortSelect current={sort} />
+        {/* En móvil el orden vive en su hoja inferior, no en un <select> que
+            abre el menú nativo del sistema encima de todo. */}
+        <div className="hidden lg:block">
+          <SortSelect current={sort} />
+        </div>
       </div>
 
+      <MobileFilters
+        categorias={categories}
+        categoriaActiva={categoria}
+        orden={sort}
+        total={products.length}
+      />
+
       <div className="grid items-start gap-6 lg:grid-cols-[262px_1fr]">
-        <aside className="rounded-[18px] bg-white p-[22px] shadow-[0_4px_18px_rgba(0,0,0,0.04)] lg:sticky lg:top-[140px]">
+        <aside className="hidden rounded-[18px] bg-white p-[22px] shadow-[0_4px_18px_rgba(0,0,0,0.04)] lg:sticky lg:top-[140px] lg:block">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="size-[18px] text-kora-coral" />
@@ -149,19 +194,33 @@ export default async function CatalogoPage({
         </aside>
 
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} currency={currency} />
-            ))}
+          <div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+              {mostrados.map((p) => (
+                <ProductCard key={p.id} product={p} currency={currency} />
+              ))}
+            </div>
+
+            {quedan > 0 && (
+              <div className="mt-8 text-center">
+                <Link
+                  href={masUrl()}
+                  scroll={false}
+                  className="inline-flex min-h-12 items-center rounded-full border-[1.8px] border-kora-black bg-white px-7 text-[14px] font-bold text-kora-black hover:bg-kora-black hover:text-white"
+                >
+                  Cargar más ({quedan})
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="rounded-[18px] bg-white p-16 text-center">
+          <div className="rounded-[18px] bg-white px-6 py-12 text-center sm:p-16">
             <Flame className="mx-auto size-14 text-[#e2ddd6]" />
             <p className="mt-4 text-lg font-semibold text-kora-black">
-              No encontramos productos
+              No encontramos productos con esos filtros
             </p>
             <p className="mt-1 text-[13.5px] text-[#8a8f98]">
-              Prueba con otra categoría o término de búsqueda.
+              Prueba quitando alguno.
             </p>
             <Link
               href="/catalogo"

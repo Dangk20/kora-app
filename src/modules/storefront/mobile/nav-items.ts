@@ -5,7 +5,7 @@
 // sin renderizar nada, y la regla de la ficha de producto (§4 del design) se
 // merece una prueba propia.
 
-import { Grid3x3, Home, ShoppingCart, User } from "lucide-react";
+import { Home, LayoutGrid, ShoppingCart, User } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -22,7 +22,11 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/catalogo",
     label: "Catálogo",
-    icon: Grid3x3,
+    // `LayoutGrid` (cuatro cuadrados) y NO `Grid3x3` (una cuadrícula de
+    // líneas): el diseño marca el acceso activo rellenando el icono, y
+    // rellenar una cuadrícula de líneas produce un bloque macizo en vez de un
+    // icono. Cuatro cuadrados se rellenan siendo lo que son.
+    icon: LayoutGrid,
     // La ficha de producto pertenece al catálogo. Dejar los cuatro accesos
     // apagados mientras se mira un producto —que es donde el comprador pasa
     // más tiempo antes de comprar— comunica "estás fuera de la tienda" justo
