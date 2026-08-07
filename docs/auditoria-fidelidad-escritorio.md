@@ -177,6 +177,10 @@ El contenedor de la foto era de altura fija (170 px) con `object-cover`. `cover`
 
 **Hoy es invisible porque no hay ni una foto cargada.** Se habría visto en *todas* las tarjetas el día que llegue el catálogo real del cliente — es decir, el día de la entrega.
 
-Corregido a contenedor **cuadrado** con `object-contain` y margen interior. Verificado con una foto de prueba ancha: entra completa. Se añadió además el **porcentaje de ahorro** arriba a la derecha, derivado del precio resuelto y no de un campo editable, y una señal *"Ver producto"* al pasar el cursor —solo con puntero fino, porque en táctil no hay hover y sería un botón fantasma—.
+**No era solo la tarjeta: estaba en DIEZ sitios.** Al buscarlo aparecieron el mismo recorte en las miniaturas de la galería de la ficha, la fila compacta del home, el panel de ofertas, el carrito, el panel lateral del carrito, el checkout, el listado de productos del panel, el selector de productos de Vitrina, su modal de secciones y el previsualizador de subida.
+
+Corregido en los diez a contenedor con `object-contain` y margen interior; la tarjeta pasa además a contenedor **cuadrado**. Verificado con una foto de prueba ancha: entra completa. **Fijado por `tests/product-photo.test.ts`**, que recorre todos los `.tsx` de `src/` y falla si alguno vuelve a recortar una foto de producto — con una lista explícita de los cuatro archivos de **banner**, donde `cover` sí es lo correcto porque son artes diseñadas para llenar su hueco.
+
+Corrección a lo que escribí antes: la **imagen principal** de la ficha ya usaba `contain` y estaba bien. Eran sus miniaturas. Se añadió además el **porcentaje de ahorro** arriba a la derecha, derivado del precio resuelto y no de un campo editable, y una señal *"Ver producto"* al pasar el cursor —solo con puntero fino, porque en táctil no hay hover y sería un botón fantasma—.
 
 **Lo que NO se copió de la referencia que pasó Daniel** (SmartJoys): la columna de iconos al pasar el cursor —comparar, vista rápida, lista de deseos—. Son tres funciones que KORA no tiene, y pintar un icono que no hace nada es peor que no pintarlo. Si alguna se quiere de verdad, es alcance nuevo y se cotiza.

@@ -103,7 +103,7 @@ export function CartDrawer() {
                       alt={line.productName}
                       fill
                       sizes="64px"
-                      className="object-cover"
+                      className="object-contain p-1"
                       unoptimized
                     />
                   ) : (

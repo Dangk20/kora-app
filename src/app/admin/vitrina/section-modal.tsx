@@ -273,7 +273,7 @@ export function SectionModal({
                                 alt=""
                                 fill
                                 sizes="44px"
-                                className="object-cover"
+                                className="object-contain p-0.5"
                                 unoptimized
                               />
                             ) : (

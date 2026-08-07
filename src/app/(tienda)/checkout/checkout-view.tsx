@@ -442,7 +442,7 @@ export function CheckoutView({
                 >
                   {l.imageUrl ? (
                     <Image src={l.imageUrl} alt="" fill sizes="48px"
-                      className="object-cover" unoptimized />
+                      className="object-contain p-1" unoptimized />
                   ) : (
                     <CategoryTile color="transparent" icon={l.categoryIcon} size={48} radius={0} />
                   )}

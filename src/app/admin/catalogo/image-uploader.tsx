@@ -74,7 +74,7 @@ export function ImageUploader({
               alt={img.alt ?? ""}
               fill
               sizes="80px"
-              className="object-cover"
+              className="object-contain p-1.5"
               unoptimized
             />
             {i === 0 && (

@@ -109,7 +109,7 @@ export function ProductDetail({
                   alt=""
                   fill
                   sizes="110px"
-                  className="object-cover"
+                  className="object-contain p-1.5"
                   unoptimized
                 />
               </button>

@@ -96,7 +96,7 @@ export function CompactProductRow({
                   alt={p.name}
                   fill
                   sizes="58px"
-                  className="object-cover"
+                  className="object-contain p-1"
                   unoptimized
                 />
               ) : (
@@ -174,7 +174,7 @@ export function DealsPanel({
                       alt={p.name}
                       fill
                       sizes="220px"
-                      className="object-cover"
+                      className="object-contain p-2"
                       unoptimized
                     />
                   ) : (

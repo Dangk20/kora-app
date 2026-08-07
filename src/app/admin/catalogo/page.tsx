@@ -196,7 +196,7 @@ export default async function CatalogPage({
                       alt={image.alt ?? p.name}
                       fill
                       sizes="42px"
-                      className="object-cover"
+                      className="object-contain p-1"
                       unoptimized
                     />
                   </div>

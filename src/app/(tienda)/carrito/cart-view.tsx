@@ -87,7 +87,7 @@ export function CartView() {
                     alt={line.productName}
                     fill
                     sizes="84px"
-                    className="object-cover"
+                    className="object-contain p-1.5"
                     unoptimized
                   />
                 ) : (
