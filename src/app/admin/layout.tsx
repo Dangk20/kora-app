@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogOut, Store } from "lucide-react";
 import { auth, signOut } from "@/auth";
+import { marketingEnabled } from "@/modules/campaigns/lock";
 import { NavLinks } from "./nav-links";
 import { Topbar } from "./topbar";
 
@@ -35,7 +36,7 @@ export default async function AdminLayout({
           />
           <span className="text-[10px] tracking-[1px] text-white/40">ADMIN</span>
         </div>
-        <NavLinks permissions={permissions} />
+        <NavLinks permissions={permissions} marketingLocked={!marketingEnabled()} />
         <div className="flex flex-col gap-2 border-t border-white/10 pt-4">
           <Link
             href="/"

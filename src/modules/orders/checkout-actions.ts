@@ -15,6 +15,7 @@ import { resolveCart } from "@/modules/cart/resolve";
 import type { CartLine } from "@/modules/cart/cart-context";
 import {
   buildWhatsappMessage,
+  addressLines,
   compactAddress,
   formatOrderNumber,
   whatsappUrl,
@@ -325,7 +326,16 @@ export async function createOrder(
         cashbackApplied,
         contactName: data.name,
         contactPhone: phone,
-        address,
+        // El mensaje la quiere en dos líneas; el pedido la guarda en una.
+        address: addressLines({
+          country: data.country,
+          address: data.address,
+          address2: data.address2,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+          zip: data.zip,
+        }),
         paymentPreference: data.paymentPreference,
       });
 

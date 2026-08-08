@@ -2,7 +2,7 @@
 // prototipo aprobado (zona Tienda). El color y la tipografía vienen del manual.
 import Image from "next/image";
 import Link from "next/link";
-import { MessageCircle, Search, User } from "lucide-react";
+import { MessageCircle, User } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import { listCategories } from "@/modules/storefront/queries";
 import { CartProvider } from "@/modules/cart/cart-context";
@@ -12,6 +12,7 @@ import { LEGAL_LINKS } from "@/modules/legal/content";
 import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
 import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
 import { MobileBarsProvider } from "@/modules/storefront/mobile/bars-context";
+import { SearchBox } from "./search-box";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
 import { CartDrawer } from "./cart-drawer";
@@ -70,24 +71,7 @@ export default async function StoreLayout({
             />
           </Link>
 
-          <form action="/catalogo" className="flex max-w-[560px] flex-1 items-center">
-            <div className="flex w-full items-center rounded-full border border-[#2a2e36] bg-[#0E0F12] py-[5px] pr-[6px] pl-5">
-              <input
-                type="search"
-                name="q"
-                placeholder="Buscar productos, marcas y más…"
-                aria-label="Buscar en la tienda"
-                className="flex-1 bg-transparent text-[14.5px] text-[#F5F5F7] outline-none placeholder:text-[#6b7078]"
-              />
-              <button
-                type="submit"
-                aria-label="Buscar"
-                className="bg-kora-gradient flex size-[42px] shrink-0 items-center justify-center rounded-full text-white hover:opacity-90"
-              >
-                <Search className="size-5" />
-              </button>
-            </div>
-          </form>
+          <SearchBox />
 
           <CurrencySwitch current={currency} />
 

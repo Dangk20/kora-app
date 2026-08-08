@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Lock,
   LayoutDashboard,
   Layers,
   LayoutTemplate,
@@ -27,6 +28,11 @@ type NavItem = {
   permission: string;
   icon: LucideIcon;
   soon?: string;
+  /**
+   * Módulo construido pero cerrado: se entra y se ve por qué, no se navega
+   * dentro. Distinto de `soon`, que es algo que todavía no existe.
+   */
+  lockable?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -40,18 +46,34 @@ const NAV: NavItem[] = [
   { href: "/admin/ventas", label: "Ventas", permission: "sales:view", icon: Receipt },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
   { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
-  { href: "/admin/campanas", label: "Email marketing", permission: "marketing:view", icon: Mail },
+  {
+    href: "/admin/campanas",
+    label: "Email marketing",
+    permission: "marketing:view",
+    icon: Mail,
+    lockable: true,
+  },
   { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
   { href: "/admin/usuarios", label: "Usuarios", permission: "users:view", icon: Users },
 ];
 
-export function NavLinks({ permissions }: { permissions: string[] }) {
+export function NavLinks({
+  permissions,
+  // Viene del servidor: la variable de entorno no existe en el navegador, y
+  // publicarla como `NEXT_PUBLIC_` solo para pintar un candado sería exponer
+  // configuración para una decoración.
+  marketingLocked = false,
+}: {
+  permissions: string[];
+  marketingLocked?: boolean;
+}) {
   const pathname = usePathname();
   const items = NAV.filter((item) => permissions.includes(item.permission));
 
   return (
     <nav className="flex flex-1 flex-col gap-1">
-      {items.map(({ href, label, icon: Icon, soon }) => {
+      {items.map(({ href, label, icon: Icon, soon, lockable }) => {
+        const locked = Boolean(lockable && marketingLocked);
         const active = soon
           ? false
           : href === "/admin"
@@ -72,6 +94,13 @@ export function NavLinks({ permissions }: { permissions: string[] }) {
           >
             <Icon className="size-[19px]" strokeWidth={1.8} />
             {label}
+            {locked && (
+              <Lock
+                className="ml-auto size-[15px] text-white/45"
+                strokeWidth={2}
+                aria-label="cerrado"
+              />
+            )}
             {soon && (
               <Badge
                 variant="outline"

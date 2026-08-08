@@ -19,17 +19,18 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: enImagenDocker },
   typescript: { ignoreBuildErrors: enImagenDocker },
 
-  // `sharp` carga su binario según la plataforma con un require DINÁMICO, y el
-  // rastreo de archivos de Next —que es estático— no lo ve: la salida
-  // standalone se llevaba `sharp` pero no `@img/sharp-linux-x64`, así que en el
-  // contenedor arrancaba bien y moría al procesar la primera imagen con
-  // "Could not load the sharp module using the linux-x64 runtime".
+  // ⚠️ `sharp` NO se resuelve por el rastreo de archivos de Next. Se instala
+  // aparte, dentro de la imagen (etapa `sharpdeps` del Dockerfile).
   //
-  // Pasó en pruebas el 7 ago y en local no se veía: ahí el binario de macOS sí
-  // estaba, porque es el que instala quien desarrolla.
-  outputFileTracingIncludes: {
-    "/**": ["./node_modules/@img/**", "./node_modules/sharp/**"],
-  },
+  // Se intentó con `outputFileTracingIncludes` y no basta: el rastreo es
+  // estático y `sharp` carga sus piezas con requires DINÁMICOS. Añadiendo
+  // `node_modules/@img/**` llegó el binario de la plataforma… y siguió
+  // faltando `@img/colour`, que vive anidado dentro de `.pnpm/` y no en el
+  // nivel superior. Cada glob nuevo destapaba la siguiente pieza que falta, y
+  // cada intento costaba un despliegue entero porque **en local nunca se ve**:
+  // ahí `sharp` está completo con el binario de macOS.
+  //
+  // Persiguiendo globs no se termina; instalándolo de verdad, sí.
 
   experimental: {
     // Las imágenes se suben por Server Action, y Next las corta en 1 MB por

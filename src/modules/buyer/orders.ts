@@ -18,15 +18,52 @@ export type BuyerOrderRow = {
   status: OrderStatus;
   currency: Currency;
   total: number;
-  /** Cashback que generó (ya acreditado) o que generará al confirmarse. */
+  /** Cashback del pedido: lo acreditado, o la estimación si aún no ocurrió. */
   cashback: number;
-  cashbackPendiente: boolean;
+  /**
+   * `acreditado` = está en el libro. `estimado` = todavía no, se enseña en
+   * futuro. `ninguno` = no va a generar (cancelado o vencido) y no se enseña.
+   */
+  cashbackEstado: "acreditado" | "estimado" | "ninguno";
   items: number;
 };
 
 /** Un pedido pendiente sigue vivo mientras no venza su vigencia de 2 h. */
 export function estaVigente(o: { status: OrderStatus; expiresAt: Date | null }, now = new Date()) {
   return o.status === "PENDING" && (o.expiresAt === null || o.expiresAt > now);
+}
+
+/**
+ * Un pedido cancelado no genera cashback, ni ahora ni nunca.
+ *
+ * No hay estado "vencido": un pendiente que pasó su vigencia se detecta por
+ * `expiresAt`, y lo resuelve la comprobación de abajo.
+ */
+const SIN_CASHBACK: OrderStatus[] = ["CANCELLED"];
+
+/**
+ * Qué decirle al comprador sobre el cashback de un pedido.
+ *
+ * **"Generó" se dice SOLO si está en el libro.** Antes, un pedido confirmado
+ * sin movimiento caía en "Generó" con el 3 % calculado: la pantalla prometía
+ * un dinero que el libro no tenía, el comprador iba a su saldo y encontraba
+ * cero. Le pasó a un pedido entregado, y el fallo no daba ningún error — que
+ * es exactamente lo que lo hace peligroso.
+ *
+ * El cálculo se sigue enseñando, pero **en futuro y como estimación**, que es
+ * lo único que se puede prometer antes de que el evento se procese.
+ */
+export function estadoCashback(
+  o: { status: OrderStatus; expiresAt: Date | null },
+  acreditado: boolean,
+  now = new Date(),
+): "acreditado" | "estimado" | "ninguno" {
+  if (acreditado) return "acreditado";
+  if (SIN_CASHBACK.includes(o.status)) return "ninguno";
+  // Un pendiente ya vencido tampoco va a generar nada, aunque el trabajo que
+  // lo marca como vencido no haya pasado todavía.
+  if (o.status === "PENDING" && !estaVigente(o, now)) return "ninguno";
+  return "estimado";
 }
 
 export async function buyerOrders(customerId: string, now = new Date()): Promise<BuyerOrderRow[]> {
@@ -52,7 +89,7 @@ export async function buyerOrders(customerId: string, now = new Date()): Promise
       // Si ya se acreditó, se muestra lo que REALMENTE entró al libro, no un
       // cálculo repetido: si algún día divergieran, lo que vale es el libro.
       cashback: acreditado ? aNumero(acreditado.delta) : computeAccrual({ total, currency: o.currency }),
-      cashbackPendiente: !acreditado && estaVigente(o, now),
+      cashbackEstado: estadoCashback(o, Boolean(acreditado), now),
       items: o._count.items,
     };
   });
@@ -99,6 +136,7 @@ export async function buyerOrder(customerId: string, number: number) {
     shipCity: o.shipCity,
     cashback: acreditado ? aNumero(acreditado.delta) : computeAccrual({ total, currency: o.currency }),
     cashbackAcreditado: Boolean(acreditado),
+    cashbackEstado: estadoCashback(o, Boolean(acreditado)),
     cashbackVence: acreditado?.expiresAt ?? null,
     items: o.items.map((i) => ({
       id: i.id,

@@ -17,6 +17,7 @@ import { SEGMENTO_VACIO, countAudience, type Segment } from "./audience";
 import { renderCampaignFor, validateContent, type CampaignContent } from "./content";
 import { startCampaign } from "./send";
 import { isCancellable, isDeletable, isEditable } from "./status";
+import { assertMarketingUnlocked } from "./lock";
 
 const RUTA = "/admin/campanas";
 
@@ -61,6 +62,7 @@ function leerSegmento(f: FormData): Segment {
 
 export async function saveCampaign(_prev: ActionResult | null, f: FormData): Promise<ActionResult> {
   const session = await requirePermission("marketing:create");
+  assertMarketingUnlocked();
 
   const id = String(f.get("id") ?? "").trim() || null;
   const contenido = leerContenido(f);
@@ -102,6 +104,7 @@ export async function saveCampaign(_prev: ActionResult | null, f: FormData): Pro
 /** Conteo en vivo mientras el operador ajusta los filtros. */
 export async function estimateAudience(segment: Segment): Promise<number> {
   await requirePermission("marketing:view");
+  assertMarketingUnlocked();
   return countAudience(segment);
 }
 
@@ -114,6 +117,7 @@ export async function estimateAudience(segment: Segment): Promise<number> {
  */
 export async function sendTestEmail(campaignId: string, to: string): Promise<ActionResult> {
   await requirePermission("marketing:create");
+  assertMarketingUnlocked();
 
   const c = await db.campaign.findUnique({ where: { id: campaignId } });
   if (!c) return { ok: false, error: "La campaña no existe." };
@@ -150,6 +154,7 @@ export async function sendTestEmail(campaignId: string, to: string): Promise<Act
 
 export async function scheduleCampaign(id: string, when: Date): Promise<ActionResult> {
   await requirePermission("marketing:send");
+  assertMarketingUnlocked();
 
   const c = await db.campaign.findUnique({ where: { id }, select: { status: true } });
   if (!c) return { ok: false, error: "La campaña no existe." };
@@ -169,6 +174,7 @@ export async function scheduleCampaign(id: string, when: Date): Promise<ActionRe
 /** Dispara el envío. Idempotente: la garantía está en `startCampaign`. */
 export async function sendNow(id: string): Promise<ActionResult> {
   await requirePermission("marketing:send");
+  assertMarketingUnlocked();
   const r = await startCampaign(id);
   revalidar(id);
   return r.ok
@@ -178,6 +184,7 @@ export async function sendNow(id: string): Promise<ActionResult> {
 
 export async function cancelCampaign(id: string): Promise<ActionResult> {
   await requirePermission("marketing:send");
+  assertMarketingUnlocked();
 
   const c = await db.campaign.findUnique({ where: { id }, select: { status: true } });
   if (!c) return { ok: false, error: "La campaña no existe." };
@@ -195,6 +202,7 @@ export async function cancelCampaign(id: string): Promise<ActionResult> {
 /** Duplicar crea un BORRADOR nuevo. La original no se toca: es histórico. */
 export async function duplicateCampaign(id: string): Promise<ActionResult> {
   const session = await requirePermission("marketing:create");
+  assertMarketingUnlocked();
 
   const c = await db.campaign.findUnique({ where: { id } });
   if (!c) return { ok: false, error: "La campaña no existe." };
@@ -221,6 +229,7 @@ export async function duplicateCampaign(id: string): Promise<ActionResult> {
 
 export async function deleteCampaign(id: string): Promise<ActionResult> {
   await requirePermission("marketing:create");
+  assertMarketingUnlocked();
 
   const c = await db.campaign.findUnique({ where: { id }, select: { status: true } });
   if (!c) return { ok: false, error: "La campaña no existe." };

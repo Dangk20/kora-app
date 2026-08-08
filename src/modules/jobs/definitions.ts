@@ -13,6 +13,7 @@
 import { pruneExpiredSessions } from "@/modules/buyer/session";
 import { dispatchOnce } from "@/modules/campaigns/dispatch";
 import { startDueCampaigns } from "@/modules/campaigns/send";
+import { marketingEnabled } from "@/modules/campaigns/lock";
 import { expireCashback } from "@/modules/cashback/ledger";
 import { describeVerification, verifyCashbackLedger } from "@/modules/cashback/verify";
 import { findLedgerMismatches } from "@/modules/inventory/engine";
@@ -124,6 +125,10 @@ export const JOBS: readonly JobDefinition[] = [
     everyMs: MINUTO,
     timeoutMs: 5 * MINUTO,
     async run() {
+      // El candado también aquí: si el módulo se cierra con una campaña ya
+      // programada, cerrarlo solo en el panel la dejaría saliendo igual desde
+      // el worker — que es donde de verdad se envía.
+      if (!marketingEnabled()) return { summary: "email marketing cerrado" };
       const r = await dispatchOnce();
       if (!r.campaignId) return { summary: "sin campañas en curso" };
       if (r.finished) return { summary: `campaña "${r.campaignName}" terminada` };
@@ -144,6 +149,7 @@ export const JOBS: readonly JobDefinition[] = [
     everyMs: MINUTO,
     timeoutMs: 5 * MINUTO,
     async run() {
+      if (!marketingEnabled()) return { summary: "email marketing cerrado" };
       const r = await startDueCampaigns();
       return {
         summary: r.started === 0 ? "sin campañas por disparar" : `${r.started} iniciada(s): ${r.names.join(", ")}`,

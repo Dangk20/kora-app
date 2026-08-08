@@ -6,6 +6,7 @@
 //   4. Nada revela si un correo tiene cuenta.
 //   5. Quien compró como invitado recupera su historial al registrarse.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { authConfig } from "@/auth.config";
 import { MENSAJE_ACCESO, changePassword, registerBuyer, verifyBuyer } from "@/modules/buyer/account";
@@ -50,7 +51,10 @@ async function comprador(over: { email?: string; password?: string | null } = {}
   });
 }
 
-async function pedido(customerId: string, over: { total?: number; status?: "PENDING" | "CONFIRMED" } = {}) {
+async function pedido(
+  customerId: string,
+  over: { total?: number; status?: OrderStatus; expiresAt?: Date } = {},
+) {
   const total = over.total ?? 100_000;
   return db.order.create({
     data: {
@@ -61,7 +65,8 @@ async function pedido(customerId: string, over: { total?: number; status?: "PEND
       subtotal: total,
       total,
       note: PREFIJO,
-      expiresAt: new Date(Date.now() + 2 * 3600_000),
+      // Por omisión vigente; una prueba puede pedir uno ya vencido.
+      expiresAt: over.expiresAt ?? new Date(Date.now() + 2 * 3600_000),
     },
   });
 }
@@ -326,7 +331,7 @@ describe("la cuenta solo muestra lo del comprador", () => {
 
     const filas = await buyerOrders(c.id);
     expect(filas[0].cashback).toBe(2_400);
-    expect(filas[0].cashbackPendiente).toBe(false);
+    expect(filas[0].cashbackEstado).toBe("acreditado");
   });
 
   it("un pedido sin confirmar muestra su cashback como pendiente", async () => {
@@ -334,7 +339,7 @@ describe("la cuenta solo muestra lo del comprador", () => {
     await pedido(c.id, { total: 100_000, status: "PENDING" });
 
     const filas = await buyerOrders(c.id);
-    expect(filas[0]).toMatchObject({ cashback: 3_000, cashbackPendiente: true });
+    expect(filas[0]).toMatchObject({ cashback: 3_000, cashbackEstado: "estimado" });
   });
 
   it("un pedido pendiente que expiró deja de ofrecerse para retomar", async () => {
@@ -464,5 +469,52 @@ describe("límite de intentos", () => {
     for (let i = 0; i < 8; i++) registrarFallo("9.9.9.9");
     expect(comprobarLimite("9.9.9.9").permitido).toBe(false);
     expect(comprobarLimite("10.10.10.10").permitido).toBe(true);
+  });
+});
+
+describe("qué se le promete al comprador sobre su cashback", () => {
+  // El fallo que motivó esto: un pedido ENTREGADO sin movimiento en el libro
+  // decía "Generó $8.250 de cashback" —el 3 % calculado— y el saldo del
+  // comprador estaba en cero. La pantalla prometía un dinero que no existía y
+  // no daba ningún error: el comprador iba a buscarlo y no lo encontraba.
+  it("un pedido confirmado SIN movimiento en el libro no dice 'Generó'", async () => {
+    const c = await comprador();
+    await pedido(c.id, { total: 275_000, status: "DELIVERED" });
+
+    const filas = await buyerOrders(c.id);
+    // Se puede estimar, nunca afirmar: lo acreditado lo dice el libro.
+    expect(filas[0].cashbackEstado).toBe("estimado");
+    expect(filas[0].cashbackEstado).not.toBe("acreditado");
+  });
+
+  it("solo el libro convierte la promesa en un hecho", async () => {
+    const c = await comprador();
+    const p = await pedido(c.id, { total: 114_000, status: "CONFIRMED" });
+
+    expect((await buyerOrders(c.id))[0].cashbackEstado).toBe("estimado");
+
+    await db.$transaction((tx) =>
+      creditCashback(tx, { customerId: c.id, amount: 3_420, currency: "COP", orderId: p.id }),
+    );
+
+    const despues = (await buyerOrders(c.id))[0];
+    expect(despues.cashbackEstado).toBe("acreditado");
+    expect(despues.cashback).toBe(3_420);
+  });
+
+  it("un pedido cancelado no promete nada", async () => {
+    const c = await comprador();
+    await pedido(c.id, { total: 100_000, status: "CANCELLED" });
+    expect((await buyerOrders(c.id))[0].cashbackEstado).toBe("ninguno");
+  });
+
+  it("un pendiente que ya venció tampoco promete nada", async () => {
+    const c = await comprador();
+    await pedido(c.id, {
+      total: 100_000,
+      status: "PENDING",
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+    expect((await buyerOrders(c.id))[0].cashbackEstado).toBe("ninguno");
   });
 });

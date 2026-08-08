@@ -67,3 +67,6 @@ next-env.d.ts
 # Credencial del entorno de pruebas: el archivo real vive solo en el servidor
 # (plantilla versionada: deploy/auth.caddy.example)
 deploy/auth.caddy
+
+# Capturas y volcados de las verificaciones con navegador
+.playwright-mcp/

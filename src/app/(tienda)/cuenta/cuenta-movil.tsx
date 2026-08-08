@@ -136,9 +136,11 @@ export function CuentaMovil({
                     <span className="text-[15px] font-extrabold text-kora-black">
                       {money(p.total, p.currency)}
                     </span>
-                    {p.cashback > 0 && (
+                    {/* Misma regla que en escritorio: "Generó" solo si está
+                        en el libro; lo demás va en futuro y como estimación. */}
+                    {p.cashbackEstado !== "ninguno" && p.cashback > 0 && (
                       <span className="text-[12px] text-[#8a8f98]">
-                        {p.cashbackPendiente ? "Generará" : "Generó"}{" "}
+                        {p.cashbackEstado === "acreditado" ? "Generó " : "Generará ~"}
                         {money(p.cashback, p.currency)}
                       </span>
                     )}

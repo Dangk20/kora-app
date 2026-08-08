@@ -1,4 +1,6 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
@@ -31,6 +33,19 @@ export default async function LoginPage({
     <main className="flex min-h-screen bg-white">
       {/* Columna del formulario */}
       <section className="flex flex-1 flex-col px-8 py-6 lg:px-16">
+        {/* Salida a la tienda. Sin ella, quien entra aquí por error —o el
+            operador que termina su turno— se queda encerrado: el login no
+            forma parte de ningún chrome, así que no hereda ni el header de la
+            tienda ni el del panel, y la única vía era editar la barra de
+            direcciones. */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 self-start text-[13px] text-muted-foreground transition-colors hover:text-kora-black"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          Volver a la tienda
+        </Link>
+
         <div className="flex flex-1 items-center">
           <div className="mx-auto w-full max-w-sm lg:mx-0">
             <h1 className="text-4xl font-extrabold tracking-tight">

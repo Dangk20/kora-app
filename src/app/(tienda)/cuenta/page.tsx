@@ -116,10 +116,14 @@ export default async function CuentaPage({
                           <div className="text-[15px] font-bold text-kora-black">
                             {money(p.total, p.currency)}
                           </div>
-                          {p.cashback > 0 && (
+                          {/* "Generó" SOLO si está en el libro. La estimación
+                              va en futuro: prometer en pasado un dinero que el
+                              saldo no tiene manda al comprador a buscarlo. */}
+                          {p.cashbackEstado !== "ninguno" && p.cashback > 0 && (
                             <div className="text-[12px] text-muted-foreground">
-                              {p.cashbackPendiente ? "Generará" : "Generó"}{" "}
-                              {money(p.cashback, p.currency)} de cashback
+                              {p.cashbackEstado === "acreditado"
+                                ? `Generó ${money(p.cashback, p.currency)} de cashback`
+                                : `Generará ~${money(p.cashback, p.currency)} de cashback`}
                             </div>
                           )}
                         </div>

@@ -164,6 +164,69 @@ export const PUBLICADO = {
 } as const;
 
 /**
+ * Qué cuenta como coincidencia de búsqueda. UNA definición.
+ *
+ * La comparten la página de resultados y el desplegable del header. Si cada
+ * uno tuviera la suya, el desplegable podría encontrar un producto por su SKU
+ * y el catálogo no: el visitante haría clic en "ver todos los resultados" y
+ * aterrizaría en una página vacía — el peor final para una búsqueda que sí
+ * funcionó, y sin ningún error que lo delate.
+ *
+ * **Por qué es SQL y no un `where` de Prisma.** Prisma sabe comparar sin
+ * distinguir mayúsculas, pero no sin distinguir **tildes**, y eso no es un
+ * matiz: el catálogo lo carga el cliente a mano y en la misma sesión aparecen
+ * "Audífonos", "audifonos" y "AUDIFONOS". Quien busca sin tilde no encuentra el
+ * producto con tilde y no ve ningún error — ve una tienda que no tiene lo que
+ * sí tiene. `unaccent` resuelve las dos direcciones de una vez.
+ *
+ * **Qué se busca.** El nombre, la marca, la descripción, la categoría y el SKU
+ * y nombre de cada variante, todo en un solo texto por producto. Cada palabra
+ * de la consulta tiene que aparecer en ese texto (Y, no O): "audifonos kora"
+ * pide los dos, así que añadir palabras afina en vez de ensuciar.
+ *
+ * **Qué NO decide.** Si el producto está publicado. Devuelve identificadores y
+ * quien llama les aplica `PUBLICADO`: la definición de "publicado" sigue
+ * viviendo en un solo sitio, aquí arriba.
+ *
+ * **Techo conocido.** Recorre la tabla entera en cada consulta. Con unos miles
+ * de productos es cuestión de milisegundos; si el catálogo creciera un orden de
+ * magnitud, esto pasa a ser una columna materializada con índice GIN. No se
+ * hace hoy porque sería optimizar un problema que no existe.
+ */
+export async function searchMatchingIds(raw: string): Promise<string[]> {
+  const palabras = raw.trim().split(/\s+/).filter(Boolean);
+  if (palabras.length === 0) return [];
+
+  const filas = await db.$queryRaw<{ id: string }[]>`
+    WITH doc AS (
+      SELECT
+        p.id,
+        unaccent(lower(
+          coalesce(p.name, '') || ' ' ||
+          coalesce(p.brand, '') || ' ' ||
+          coalesce(p.description, '') || ' ' ||
+          coalesce(c.name, '') || ' ' ||
+          coalesce(string_agg(coalesce(v.sku, '') || ' ' || coalesce(v.name, ''), ' '), '')
+        )) AS texto
+      FROM products p
+      LEFT JOIN categories c ON c.id = p."categoryId"
+      LEFT JOIN variants v ON v."productId" = p.id
+      GROUP BY p.id, c.name
+    )
+    SELECT id FROM doc
+    WHERE NOT EXISTS (
+      SELECT 1 FROM unnest(${palabras}::text[]) AS palabra
+      -- \`strpos\` y no \`LIKE\`: con LIKE habría que escapar los % y _ que
+      -- escriba el visitante, y un % sin escapar convierte la búsqueda en
+      -- "tráemelo todo".
+      WHERE strpos(doc.texto, unaccent(lower(palabra))) = 0
+    )
+  `;
+
+  return filas.map((f) => f.id);
+}
+
+/**
  * Slug y fecha de modificación de cada producto publicado, para el sitemap.
  *
  * Existe aparte de `listProducts` a propósito: aquélla resuelve las URL de las
@@ -191,14 +254,10 @@ export async function listProducts(filters: CatalogFilters): Promise<StoreProduc
       ],
     };
   }
-  if (filters.search) {
-    const q = filters.search.trim();
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { brand: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
-      { variants: { some: { sku: { contains: q, mode: "insensitive" } } } },
-    ];
+  if (filters.search?.trim()) {
+    // El filtro de texto se resuelve aparte y entra como lista de ids: así el
+    // desplegable del header y esta página no pueden encontrar cosas distintas.
+    where.id = { in: await searchMatchingIds(filters.search) };
   }
 
   const rows = (await db.product.findMany({

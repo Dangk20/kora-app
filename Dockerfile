@@ -109,6 +109,40 @@ USER node
 CMD ["node_modules/.bin/tsx", "scripts/outbox-worker.ts"]
 
 # ─────────────────────────────────────────────────────────────
+# sharpdeps — `sharp` instalado de verdad, no rastreado
+# ─────────────────────────────────────────────────────────────
+# **Por qué existe esta etapa.** El rastreo de archivos de Next es ESTÁTICO y
+# `sharp` carga sus piezas con requires dinámicos según la plataforma. La salida
+# standalone se llevaba `sharp` a medias: primero faltó el binario
+# `@img/sharp-linux-x64`, y al forzarlo por glob siguió faltando `@img/colour`.
+# Cada pieza que falta cuesta un despliegue entero, porque **en local nunca se
+# ve**: en macOS `sharp` está completo con su propio binario.
+#
+# Se instala con **npm y no con pnpm** a propósito: npm deja un árbol plano de
+# directorios REALES, y pnpm deja enlaces simbólicos hacia `.pnpm/`, que al
+# copiarse a otra imagen apuntan a rutas que no existen. Aquí hacen falta
+# archivos, no enlaces.
+#
+# La versión se fija a mano y debe coincidir con la de `package.json`. Lo
+# comprueba `tests/imagen-docker.test.ts`, porque una discrepancia silenciosa
+# devolvería justo el fallo que esta etapa existe para cerrar.
+FROM base AS sharpdeps
+ARG SHARP_VERSION=0.35.3
+WORKDIR /sharp
+# Todo lo suyo queda ANIDADO en `sharp/node_modules/`. Dos razones:
+#   1. Node resuelve desde el directorio del módulo hacia arriba, así que el
+#      paquete viaja entero en UNA copia y no puede faltarle una pieza.
+#   2. No pisa nada del nivel superior. Copiar `semver` o `detect-libc` sobre
+#      el node_modules podado de Next sería cambiar la versión que usa otro.
+# Copiando solo `sharp` y `@img` faltaba `detect-libc` y la imagen moría al
+# cargar el módulo: sus dependencias normales también hacen falta.
+RUN npm init -y > /dev/null \
+ && npm install --omit=dev sharp@${SHARP_VERSION} \
+ && mkdir -p node_modules/sharp/node_modules \
+ && cd node_modules \
+ && for d in *; do [ "$d" = "sharp" ] || mv "$d" sharp/node_modules/; done
+
+# ─────────────────────────────────────────────────────────────
 # runner — la imagen que se publica
 # ─────────────────────────────────────────────────────────────
 FROM base AS runner
@@ -120,6 +154,17 @@ ENV NODE_ENV=production \
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+
+# `sharp` completo, por encima de lo que haya dejado el rastreo. Sin esto la
+# aplicación arranca, responde 200 en toda la tienda, y revienta en la primera
+# pantalla que toca una imagen — que es la que usa el operador para cargar el
+# catálogo.
+COPY --from=sharpdeps --chown=node:node /sharp/node_modules/sharp ./node_modules/sharp
+
+# Falla el BUILD si `sharp` no se puede cargar, en vez de fallar en producción
+# cuando el operador sube una foto. Es la comprobación que faltaba: las dos
+# vueltas anteriores se dieron por buenas mirando el build de macOS.
+RUN node -e "const s=require('sharp'); s({create:{width:8,height:8,channels:3,background:'#000'}}).webp().toBuffer().then(()=>console.log('sharp OK'),e=>{console.error(e);process.exit(1)})"
 
 # Sin privilegios: si alguien logra ejecución dentro del contenedor, no es root.
 USER node

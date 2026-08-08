@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Flame, Loader2, ShieldCheck } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
 import { applyCoupon } from "@/modules/coupons/apply-action";
 import { getResolvedCart } from "@/modules/cart/actions";
@@ -566,6 +566,11 @@ export function CheckoutView({
                   onChange={(e) => setUsarCashback(e.target.checked)}
                   className="size-4 accent-kora-orange"
                 />
+                {/* La llama es la marca del cashback en toda la tienda (el
+                    badge de precio online usa la misma). Sin ella, la casilla
+                    se lee como una opción más y pasa desapercibida — que es
+                    justo lo que le pasa al saldo que el comprador ya se ganó. */}
+                <Flame className="size-4 shrink-0 text-kora-orange" aria-hidden />
                 <span className="text-[12.5px] text-kora-black">
                   Usar mi Kora Cashback
                   <span className="ml-1.5 font-bold">
@@ -578,6 +583,26 @@ export function CheckoutView({
                   No puedes usar un cupón y tu Kora Cashback en la misma compra.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Sin sesión NO se puede usar el saldo —la identidad sería el correo
+              que alguien escribió, y eso deja gastar el saldo ajeno—, pero
+              callarlo hace que el comprador no sepa que existe. Este es el
+              único sitio donde se entera justo cuando le sirve. */}
+          {!buyer && (
+            <div className="mb-3 flex items-start gap-2.5 rounded-[10px] border-[1.6px] border-[#ffd9c7] bg-[#FFF4EF] px-3 py-2.5">
+              <Flame className="mt-px size-4 shrink-0 text-kora-orange" aria-hidden />
+              <p className="text-[12.5px] leading-relaxed text-kora-black">
+                ¿Tienes Kora Cashback?{" "}
+                <Link
+                  href="/cuenta/entrar?volver=/checkout"
+                  className="font-bold text-kora-orange underline underline-offset-2"
+                >
+                  Inicia sesión
+                </Link>{" "}
+                para descontarlo de esta compra.
+              </p>
             </div>
           )}
 

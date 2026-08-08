@@ -3,9 +3,11 @@
 // despacha mal. Por eso se prueba carácter a carácter.
 import { describe, expect, it } from "vitest";
 import {
+  addressLines,
   buildWhatsappMessage,
   compactAddress,
   formatOrderNumber,
+  variantDetails,
   whatsappUrl,
 } from "@/modules/orders/message";
 
@@ -33,7 +35,7 @@ const base = {
   total: 200000,
   contactName: "Laura Gómez",
   contactPhone: "+573001234567",
-  address: "Carrera 7 # 82 - 15, Barrio Chapinero, Bogotá, Bogotá D.C.",
+  address: ["Carrera 7 # 82 - 15", "Barrio Chapinero, Bogotá, Bogotá D.C."],
   paymentPreference: "Nequi",
 };
 
@@ -56,34 +58,68 @@ describe("mensaje de WhatsApp", () => {
     const message = buildWhatsappMessage(base);
     expect(message).toBe(
       [
-        "Hola KORA 👋, quiero confirmar mi pedido *KO-2026-00042*:",
+        "🛒 NUEVO PEDIDO | KORA",
         "",
-        "• 2 x Camiseta Essential (Talla M) — $79.000 = $158.000",
-        "• 1 x Vela aromática — $42.000 = $42.000",
+        "#KO-2026-00042",
         "",
-        "Total: $200.000 COP",
-        "Entrega: Carrera 7 # 82 - 15, Barrio Chapinero, Bogotá, Bogotá D.C.",
-        "Pago: Nequi",
-        "Nombre: Laura Gómez · Tel: +573001234567",
+        "👤 Laura Gómez",
+        "📞 +573001234567",
+        "",
+        "📦 Productos",
+        "",
+        "2 × Camiseta Essential",
+        "• Talla M",
+        "$158.000",
+        "",
+        "1 × Vela aromática",
+        "$42.000",
+        "",
+        "💰 Total: $200.000 COP",
+        "💳 Pago: Nequi",
+        "",
+        "📍 Entrega",
+        "Carrera 7 # 82 - 15",
+        "Barrio Chapinero, Bogotá, Bogotá D.C.",
+        "",
+        "🟠 Estado: Nuevo pedido",
       ].join("\n"),
     );
   });
 
   it("omite la variante cuando es 'Única' (no aporta nada al operador)", () => {
     const message = buildWhatsappMessage(base);
-    expect(message).toContain("• 1 x Vela aromática — ");
-    expect(message).not.toContain("(Única)");
+    expect(message).toContain("1 × Vela aromática\n$42.000");
+    expect(message).not.toContain("Única");
   });
 
-  it("incluye el cupón solo si se aplicó", () => {
+  it("cada detalle de la variante va en su propia viñeta", () => {
+    // El operador separa mercancía leyendo esto en un teléfono: talla y color
+    // en la misma línea se leen mal y se despacha mal.
+    const message = buildWhatsappMessage({
+      ...base,
+      items: [{ ...baseItems[0], variantName: "Talla: M · Color: Negro" }],
+    });
+    expect(message).toContain(["2 × Camiseta Essential", "• Talla: M", "• Color: Negro"].join("\n"));
+  });
+
+  it("incluye el cupón solo si se aplicó, y antes del total", () => {
     expect(buildWhatsappMessage(base)).not.toContain("Cupón");
     const conCupon = buildWhatsappMessage({
       ...base,
       discount: { code: "BIENVENIDA", amount: 20000 },
       total: 180000,
     });
-    expect(conCupon).toContain("Cupón BIENVENIDA: −$20.000");
-    expect(conCupon).toContain("Total: $180.000 COP");
+    expect(conCupon).toContain("🎟️ Cupón BIENVENIDA: −$20.000");
+    expect(conCupon).toContain("💰 Total: $180.000 COP");
+    expect(conCupon.indexOf("Cupón")).toBeLessThan(conCupon.indexOf("Total:"));
+  });
+
+  it("el cashback va en línea propia, distinta del cupón", () => {
+    // Son dos rebajas de origen distinto: el operador tiene que poder
+    // explicarle al comprador de dónde sale cada una.
+    const message = buildWhatsappMessage({ ...base, cashbackApplied: 15000, total: 185000 });
+    expect(message).toContain("🔥 Kora Cashback: −$15.000");
+    expect(message).not.toContain("Cupón");
   });
 
   it("respeta el formato de cada moneda", () => {
@@ -93,8 +129,55 @@ describe("mensaje de WhatsApp", () => {
       items: [{ ...baseItems[0], unitPrice: 24.5, lineTotal: 49 }],
       total: 49,
     });
-    expect(usd).toContain("— $24.50 = $49.00");
-    expect(usd).toContain("Total: $49.00 USD");
+    expect(usd).toContain("$49.00");
+    expect(usd).toContain("💰 Total: $49.00 USD");
+  });
+});
+
+describe("detalles de la variante", () => {
+  it("parte por los separadores que se usan al cargar el catálogo", () => {
+    expect(variantDetails("Talla M · Negro")).toEqual(["Talla M", "Negro"]);
+    expect(variantDetails("Talla: M / Color: Negro")).toEqual(["Talla: M", "Color: Negro"]);
+    expect(variantDetails("Talla M")).toEqual(["Talla M"]);
+  });
+
+  it("'Única' y el vacío no producen viñeta", () => {
+    expect(variantDetails("Única")).toEqual([]);
+    expect(variantDetails("unica")).toEqual([]);
+    expect(variantDetails("   ")).toEqual([]);
+  });
+});
+
+describe("dirección en líneas", () => {
+  it("Colombia: la calle arriba, el lugar abajo", () => {
+    expect(
+      addressLines({
+        country: "CO",
+        address: "Carrera 7 # 82 - 15",
+        address2: "Apto 402",
+        neighborhood: "Chapinero",
+        city: "Bogotá",
+        state: "Bogotá D.C.",
+      }),
+    ).toEqual(["Carrera 7 # 82 - 15, Apto 402", "Barrio Chapinero, Bogotá, Bogotá D.C."]);
+  });
+
+  it("Estados Unidos: ciudad, estado y ZIP en la segunda línea; sin barrio", () => {
+    expect(
+      addressLines({
+        country: "US",
+        address: "123 Main St",
+        city: "Miami",
+        state: "FL",
+        zip: "33101",
+      }),
+    ).toEqual(["123 Main St", "Miami, FL 33101"]);
+  });
+
+  it("sin barrio no deja una coma suelta", () => {
+    expect(
+      addressLines({ country: "CO", address: "Calle 1 # 2-3", city: "Cali", state: "Valle" }),
+    ).toEqual(["Calle 1 # 2-3", "Cali, Valle"]);
   });
 });
 
