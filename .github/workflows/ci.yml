@@ -2,13 +2,18 @@
 #
 # Ver openspec/changes/vps-two-stack-deploy — specs/continuous-deployment.
 #
-# En cada integración: SOLO verificación. Es la compuerta y da respuesta rápida.
-# El despliegue es NOCTURNO o BAJO PETICIÓN — desplegar en cada commit es ruido
-# y gasta tiempo de CI en cada iteración; lo que importa es tener commits por
-# bloques de trabajo, no un servidor que cambia veinte veces al día.
+# **PRUEBAS se despliega solo, en cada integración a `main`** (7 ago 2026).
+# Antes había que entrar a la interfaz de GitHub y pedirlo a mano: con varios
+# arreglos seguidos eso son minutos de espera por cada uno, y en un día con
+# presentación costó tiempo real. El argumento de "desplegar en cada commit es
+# ruido" era cierto cuando nadie miraba pruebas; ahora el cliente sí lo mira, y
+# lo caro pasó a ser lo contrario — que un arreglo se quede en el repositorio.
+#
+# **PRODUCCIÓN sigue siendo a mano y con aprobación humana.** Eso no cambia, y
+# no debe cambiar: `environment: production` es lo que lo garantiza.
 #
 # Cadena al desplegar: verificación → imágenes → configuración → pruebas.
-# Producción, además, exige aprobación humana.
+# La verificación sigue siendo la COMPUERTA: si falla, no se construye nada.
 name: CI
 
 on:
@@ -29,6 +34,17 @@ on:
         description: "Desplegar a PRODUCCIÓN (exige aprobación del entorno)"
         type: boolean
         default: false
+
+# Dos integraciones seguidas no pueden desplegar a la vez: el guion de
+# despliegue recrea contenedores, y dos a la vez sobre el mismo servidor dejan
+# un estado que nadie eligió.
+#
+# En `main` las ejecuciones se ENCOLAN (no se cancelan): cancelar a mitad de un
+# despliegue es peor que esperar. En pull requests sí se cancela la anterior,
+# porque ahí solo se verifica y lo que importa es la respuesta rápida.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   REGISTRY: ghcr.io
@@ -82,10 +98,22 @@ jobs:
   # una imagen construida en un equipo Apple Silicon no arrancaría allí.
   imagen:
     needs: ci
-    # Solo cuando se va a desplegar: en una integración normal, construir y
-    # publicar tres imágenes que nadie va a usar es tiempo y espacio tirados.
+    # Se despliega a pruebas cuando:
+    #   · llega trabajo a `main` (lo normal desde el 7 ago),
+    #   · el nocturno, que además ensaya a diario el camino de recuperación,
+    #   · o alguien lo pide a mano.
+    #
+    # `github.ref` NO sobra pese al filtro de `on.push`: sin él, un `push` de
+    # etiqueta desplegaría. Y las pull requests nunca despliegan — verificar el
+    # trabajo de otro no puede tocar un servidor que el cliente está mirando.
+    #
+    # Escape: si el mensaje del commit lleva `[sin desplegar]`, se verifica y no
+    # se despliega. Para subir notas o documentación sin gastar el ciclo.
     if: >-
       github.event_name == 'schedule' ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       !contains(github.event.head_commit.message, '[sin desplegar]')) ||
       (github.event_name == 'workflow_dispatch' &&
        (inputs.desplegar_pruebas || inputs.desplegar_produccion))
     runs-on: ubuntu-latest
@@ -158,8 +186,13 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   desplegar-pruebas:
     needs: imagen
+    # Las mismas condiciones que construyeron la imagen, menos la de producción:
+    # pedir SOLO producción no debe arrastrar un despliegue a pruebas.
     if: >-
       github.event_name == 'schedule' ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       !contains(github.event.head_commit.message, '[sin desplegar]')) ||
       (github.event_name == 'workflow_dispatch' && inputs.desplegar_pruebas)
     runs-on: ubuntu-latest
     environment:

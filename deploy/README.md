@@ -88,15 +88,22 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm mi
 
 ## Despliegue
 
-Desde GitHub Actions. **En cada integración solo corre la verificación** — no se despliega ni se construyen imágenes. El entorno de pruebas se despliega **cada noche a las 02:00 (Colombia)** y **bajo petición** desde `Actions → CI → Run workflow`. **Producción** solo bajo petición y con aprobación humana.
-
-Desplegar en cada commit convierte el entorno de pruebas en un blanco móvil: cambia bajo los pies de quien lo está probando.
+Desde GitHub Actions. **Pruebas se despliega solo en cada integración a `main`** (desde el 7 ago 2026). **Producción** sigue siendo bajo petición y con aprobación humana — eso no cambia.
 
 ```
-cada push:     verificación
-cada noche:    verificación → imágenes → configuración → pruebas
+push a main:   verificación → imágenes → configuración → pruebas   (automático)
+cada noche:    lo mismo, a las 02:00 (Colombia)
 bajo petición: lo mismo, y opcionalmente producción (con aprobación)
+pull request:  solo verificación — nunca toca el servidor
 ```
+
+**Por qué cambió.** Antes esto decía que desplegar en cada commit convertía pruebas en un blanco móvil. Era verdad **mientras nadie miraba pruebas**: el coste era molestar a quien probaba. Ahora el cliente lo mira, y el coste se invirtió — lo caro pasó a ser que un arreglo verificado se quede en el repositorio esperando a que alguien entre a pedirlo a mano. En un día con presentación eso costó tiempo real.
+
+**Escape:** un commit cuyo mensaje contenga `[sin desplegar]` se verifica pero no despliega. Para notas y documentación.
+
+**El nocturno se conserva** aunque ahora sea casi redundante: es el ensayo diario de que el camino de despliegue sigue funcionando, incluso en semanas sin integraciones. Un camino de recuperación que nunca se recorre no se sabe si funciona.
+
+**Dos integraciones seguidas no despliegan a la vez.** El flujo declara `concurrency` por rama: en `main` las ejecuciones se **encolan** —cancelar a mitad de un despliegue deja un estado que nadie eligió—; en pull requests sí se cancela la anterior, porque ahí solo se verifica.
 
 **El despliegue lleva imágenes Y configuración.** Los archivos de este directorio se copian al servidor en cada despliegue, así que una corrección del compose o del `Caddyfile` llega sola. Los `.env.*` y `auth.caddy` reales **no se tocan**: viven únicamente en el servidor.
 

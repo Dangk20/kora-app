@@ -32,6 +32,8 @@ Ciclo por cada pieza de trabajo (comandos de Claude Code):
 
 Next.js 15 (App Router) + TypeScript · Tailwind 4 + shadcn/ui · PostgreSQL 16 + Prisma 7 (adapter pg, config en `prisma.config.ts`) · Redis (futuro: caché/colas) · Auth.js v5 (JWT 12h) · Vitest · CI en GitHub Actions (`Dangk20/kora-app`).
 
+**Desde el 7 ago 2026, cada integración a `main` despliega sola a PRUEBAS** (`test.korashopp.com`). Producción sigue siendo bajo petición y con aprobación humana. Un commit con `[sin desplegar]` en el mensaje se verifica pero no despliega — para notas y documentación. Detalle en `deploy/README.md`.
+
 ## Comandos
 
 ```bash
