@@ -166,6 +166,18 @@ COPY --from=sharpdeps --chown=node:node /sharp/node_modules/sharp ./node_modules
 # vueltas anteriores se dieron por buenas mirando el build de macOS.
 RUN node -e "const s=require('sharp'); s({create:{width:8,height:8,channels:3,background:'#000'}}).webp().toBuffer().then(()=>console.log('sharp OK'),e=>{console.error(e);process.exit(1)})"
 
+# El punto de montaje de las imágenes, creado y con dueño `node`.
+#
+# No es decorativo: Docker inicializa un volumen con nombre copiando el
+# directorio de la imagen CON SU DUEÑO. Si aquí no existe, el volumen nace de
+# root, la aplicación corre como `node` y no puede crear ni un subdirectorio —
+# el panel abre, la tienda responde 200, y revienta al subir la primera foto.
+# Pasó en pruebas el 7 ago (EACCES sobre /data/uploads/productos).
+#
+# Solo arregla volúmenes NUEVOS; uno ya creado como root hay que corregirlo a
+# mano (el mensaje de `StorageNotWritableError` lleva el comando).
+RUN mkdir -p /data/uploads && chown -R node:node /data
+
 # Sin privilegios: si alguien logra ejecución dentro del contenedor, no es root.
 USER node
 

@@ -18,7 +18,7 @@
 //
 // Ver openspec/changes/imagenes-en-vps-con-cdn — design.md decisión 2.
 
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { configuredDriver, uploadsDir } from "./config";
 
@@ -39,6 +39,25 @@ export class StoragePersistenceError extends Error {
   }
 }
 
+export class StorageNotWritableError extends Error {
+  constructor(
+    readonly directorio: string,
+    readonly causa: string,
+  ) {
+    super(
+      `El directorio de imágenes '${directorio}' NO se puede escribir: ${causa}\n\n` +
+        "  Causa casi segura: el volumen de Docker pertenece a root y la aplicación corre\n" +
+        "  como 'node' (uid 1000). Docker crea los volúmenes con nombre como root salvo que\n" +
+        "  el directorio exista en la imagen con otro dueño.\n\n" +
+        "  Arreglo en un entorno ya montado:\n" +
+        "    docker run --rm -v <pila>_uploads:/u alpine chown -R 1000:1000 /u\n\n" +
+        "  Arrancar así serviría el panel entero y solo fallaría al subir la primera foto,\n" +
+        "  con un error genérico en la cara del operador.",
+    );
+    this.name = "StorageNotWritableError";
+  }
+}
+
 /** ¿Hay al menos un archivo dentro del directorio, a cualquier profundidad? */
 async function tieneAlgunArchivo(dir: string): Promise<boolean> {
   let entradas;
@@ -55,6 +74,45 @@ async function tieneAlgunArchivo(dir: string): Promise<boolean> {
     if (e.isDirectory() && (await tieneAlgunArchivo(join(dir, e.name)))) return true;
   }
   return false;
+}
+
+/**
+ * Comprueba que se pueda ESCRIBIR donde van las imágenes.
+ *
+ * **Por qué hace falta además de la comprobación de persistencia.** Aquélla
+ * mira si lo que la base registra sigue en el disco; no mira si el disco
+ * admite escrituras. El 7 ago en pruebas el volumen quedó como root mientras
+ * la aplicación corre como `node`: la tienda entera respondía 200, el panel
+ * abría, y solo reventaba al crear el directorio de la primera foto —
+ * `EACCES` con una pantalla genérica delante del operador.
+ *
+ * Es la misma lección que `sharp`: lo que va a fallar, que falle al arrancar y
+ * no en la mano de quien está trabajando.
+ *
+ * Crea el directorio si no existe: en un entorno nuevo eso es legítimo, y es
+ * justo la operación que fallaba.
+ */
+export async function assertStorageWritable(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  if (env.NODE_ENV !== "production") return;
+  if (configuredDriver(env) !== "disk") return;
+
+  const dir = uploadsDir(env);
+  // Un nombre fijo y no aleatorio: si un arranque muere entre escribir y
+  // borrar, el siguiente lo pisa en vez de dejar basura acumulada.
+  const testigo = join(dir, ".kora-escritura");
+
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(testigo, "");
+  } catch (e) {
+    throw new StorageNotWritableError(dir, e instanceof Error ? e.message : String(e));
+  }
+
+  // El borrado va aparte: si falla, escribir sí funciona y eso es lo que
+  // importa — no hay motivo para no arrancar.
+  await unlink(testigo).catch(() => {});
 }
 
 /**
@@ -97,6 +155,10 @@ export async function assertStoragePersistsOrExit(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   try {
+    // El orden importa: si no se puede escribir, decirlo así. Un directorio no
+    // escribible también se ve "vacío", y denunciarlo como pérdida de imágenes
+    // mandaría a quien lo lea a buscar en el respaldo un problema de permisos.
+    await assertStorageWritable(env);
     await assertStoragePersists(contarImagenes, env);
   } catch (error) {
     console.error(

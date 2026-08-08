@@ -5,6 +5,7 @@
 // fotos en un sitio que el siguiente despliegue borra, y la tienda sigue
 // respondiendo 200 con el catálogo entero sin imágenes.
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmod, mkdir, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,6 +18,7 @@ import {
 import {
   StoragePersistenceError,
   assertStoragePersists,
+  assertStorageWritable,
 } from "@/modules/storage/persistence";
 import { resolveUploadPath } from "@/modules/storage/local-driver";
 
@@ -231,5 +233,62 @@ describe("las claves no pueden salirse del directorio", () => {
 
   it("rechaza una clave con byte nulo", () => {
     expect(resolveUploadPath("productos/foto.jpg\0.txt", "/data/uploads")).toBeNull();
+  });
+});
+
+describe("el directorio de imágenes tiene que ser ESCRIBIBLE", () => {
+  // El 7 ago el volumen de pruebas quedó como root y la aplicación corre como
+  // `node`: la tienda respondía 200, el panel abría, y solo reventaba al crear
+  // el directorio de la primera foto — EACCES en la cara del operador. La
+  // comprobación de persistencia no lo veía: mira si falta lo registrado, no
+  // si el disco admite escrituras.
+  const base = { NODE_ENV: "production", KORA_STORAGE_DRIVER: "disk" } as const;
+
+  it("no molesta fuera de producción ni con otro driver", async () => {
+    await expect(
+      assertStorageWritable({ NODE_ENV: "development", KORA_UPLOADS_DIR: "/no/existe" } as never),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertStorageWritable({
+        NODE_ENV: "production",
+        KORA_STORAGE_DRIVER: "r2",
+        KORA_UPLOADS_DIR: "/no/existe",
+      } as never),
+    ).resolves.toBeUndefined();
+  });
+
+  it("crea el directorio si no existe: en un entorno nuevo es legítimo", async () => {
+    const dir = join(tmpdir(), `kora-esc-${process.pid}-${Date.now()}`, "anidado");
+    await expect(
+      assertStorageWritable({ ...base, KORA_UPLOADS_DIR: dir } as never),
+    ).resolves.toBeUndefined();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("NO deja basura: el testigo de escritura se borra", async () => {
+    const dir = join(tmpdir(), `kora-esc-limpio-${process.pid}-${Date.now()}`);
+    await assertStorageWritable({ ...base, KORA_UPLOADS_DIR: dir } as never);
+    await expect(readdir(dir)).resolves.toEqual([]);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("se niega —con el arreglo en el mensaje— si no puede escribir", async () => {
+    const dir = join(tmpdir(), `kora-esc-ro-${process.pid}-${Date.now()}`);
+    await mkdir(dir, { recursive: true });
+    await chmod(dir, 0o500); // lectura y recorrido, sin escritura
+
+    try {
+      await assertStorageWritable({ ...base, KORA_UPLOADS_DIR: dir } as never);
+      // Root ignora los permisos del sistema de archivos: si la prueba corre
+      // como root, no hay nada que comprobar y decirlo es mejor que fingir.
+      if (process.getuid?.() !== 0) throw new Error("debió negarse y no lo hizo");
+    } catch (e) {
+      if (process.getuid?.() === 0) return;
+      expect((e as Error).name).toBe("StorageNotWritableError");
+      expect((e as Error).message).toMatch(/chown -R 1000:1000/);
+    } finally {
+      await chmod(dir, 0o700);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
