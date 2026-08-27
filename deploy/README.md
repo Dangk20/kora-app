@@ -59,9 +59,13 @@ Sobre un Ubuntu 24.04 recién aprovisionado:
 
 **2. Docker** desde el repositorio oficial (no el paquete de Ubuntu), y las herramientas del respaldo:
 ```bash
-sudo apt-get install -y age rclone
+sudo apt-get install -y age
+# rclone tampoco desde apt (Ubuntu 24.04 trae la v1.60, de 2022): versión
+# oficial con checksum comprobado. Los comandos exactos en backup/README.md §2.
 ```
 > Estos dos viven **fuera** del `docker compose`. Reconstruir el servidor sin ellos deja el sistema **sin copias de seguridad y sin decirlo**. Ver [`backup/README.md`](backup/README.md).
+>
+> ⚠️ Y comprobar que `backup/` **llegó**: hasta el 27 ago 2026 la lista blanca del flujo de despliegue no lo copiaba, y el sistema de respaldo llevaba tres semanas existiendo solo en el repositorio.
 
 **3. Redes:**
 ```bash
