@@ -226,8 +226,12 @@ jobs:
           #
           # Se envían SOLO los archivos versionados: los .env.* y auth.caddy
           # reales viven únicamente en el servidor y no se tocan.
+          # ⚠️ `backup` faltó en esta lista hasta el 27 ago 2026: los guiones de
+          # respaldo existían en el repositorio y NUNCA llegaban a la máquina.
+          # Semanas sin una sola copia, sin un solo error. Una lista blanca
+          # falla en silencio — lo que no está, no se echa de menos.
           tar czf - -C deploy \
-            Caddyfile desplegar.sh README.md holding \
+            Caddyfile desplegar.sh README.md holding backup \
             docker-compose.edge.yml docker-compose.staging.yml docker-compose.prod.yml \
             .env.edge.example .env.staging.example .env.production.example auth.caddy.example \
             | $SSH "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
@@ -304,8 +308,12 @@ jobs:
           #
           # Se envían SOLO los archivos versionados: los .env.* y auth.caddy
           # reales viven únicamente en el servidor y no se tocan.
+          # ⚠️ `backup` faltó en esta lista hasta el 27 ago 2026: los guiones de
+          # respaldo existían en el repositorio y NUNCA llegaban a la máquina.
+          # Semanas sin una sola copia, sin un solo error. Una lista blanca
+          # falla en silencio — lo que no está, no se echa de menos.
           tar czf - -C deploy \
-            Caddyfile desplegar.sh README.md holding \
+            Caddyfile desplegar.sh README.md holding backup \
             docker-compose.edge.yml docker-compose.staging.yml docker-compose.prod.yml \
             .env.edge.example .env.staging.example .env.production.example auth.caddy.example \
             | $SSH "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
