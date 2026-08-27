@@ -41,6 +41,11 @@ pnpm db:up          # Postgres (puerto 5433) + Redis (6380) — puertos no está
 pnpm db:migrate     # migraciones (nunca cambios de esquema a mano)
 pnpm db:seed        # roles, permisos, admin dev, catálogo demo
 pnpm rbac:sync      # aplica la matriz de permisos a la base (lo corre el despliegue)
+pnpm admin:create <correo> "<Nombre>"  # administrador REAL, sin catálogo de demo.
+                    # La contraseña se lee de la entrada estándar, nunca por argumento
+                    # (los argumentos quedan en el historial y en `ps`):
+                    #   read -rs C && printf '%s' "$C" | pnpm admin:create ana@kora.co "Ana"
+                    # Repetirlo cambia la contraseña y reactiva: es la vía de recuperación.
 pnpm dev            # desarrollo · pnpm start = build de producción
 pnpm test           # Vitest (integración contra el Postgres local — debe estar arriba)
                     # ⚠️ CIERRA `pnpm dev` antes: comparten base. Con el servidor

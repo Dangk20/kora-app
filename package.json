@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "rbac:sync": "tsx prisma/sync-rbac.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
     "db:studio": "prisma studio",
     "ledger:verify": "tsx scripts/verify-ledger.ts",
     "cashback:verify": "tsx scripts/verify-cashback.ts",

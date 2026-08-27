@@ -96,20 +96,57 @@ fi
 echo "▸ recreando la aplicación y el worker"
 "${DC[@]}" up -d --no-deps --force-recreate app worker || restaurar
 
-# ── 4. Comprobar que arrancó de verdad ───────────────────────
+# ── 4. Comprobar que arrancó de verdad, Y QUE SIGUE ARRANCADO ─
 # No basta con que el contenedor exista: la guarda de arranque puede tumbarlo
 # (por ejemplo, sin almacenamiento de imágenes configurado).
+#
+# ⚠️ Y tampoco basta con verlo `running` una vez. Un contenedor que reinicia en
+# bucle pasa por `running` unos instantes en CADA vuelta, así que mirarlo en el
+# momento equivocado declara bueno un despliegue roto —y deja producción caída
+# con el despliegue en verde, que es peor que fallar—.
+#
+# No es hipotético: el 27 ago 2026, al levantar producción por primera vez sin
+# las variables del correo, la aplicación anunciaba "✓ Ready in 101ms" y moría
+# inmediatamente después, 10 veces en un minuto. Con la comprobación anterior
+# —romper el bucle en el primer `running`— una de cada nueve pasadas habría
+# dicho "desplegado" sobre una aplicación que no servía una sola petición.
+#
+# Por eso se exige que esté `running` varias veces SEGUIDAS y que el contador
+# de reinicios no se mueva entre medias. Un bucle de reinicio falla las dos.
+ESTABLES_NECESARIOS=4   # 4 × 3 s ≈ 12 s en pie sin reiniciar
 NOMBRE="kora-${ENTORNO/production/prod}-app"
-for i in $(seq 1 20); do
+estables=0
+reinicios_previos=""
+
+for i in $(seq 1 30); do
   ESTADO=$(docker inspect -f '{{.State.Status}}' "$NOMBRE" 2>/dev/null || echo "ausente")
+  REINICIOS=$(docker inspect -f '{{.RestartCount}}' "$NOMBRE" 2>/dev/null || echo "?")
+
   case "$ESTADO" in
-    running) echo "▸ en ejecución"; break ;;
-    exited|restarting|dead)
+    running)
+      if [ -n "$reinicios_previos" ] && [ "$REINICIOS" != "$reinicios_previos" ]; then
+        echo "✖ la aplicación reinicia en bucle ($REINICIOS reinicios). Últimas líneas:"
+        docker logs --tail 30 "$NOMBRE" 2>&1 || true
+        restaurar
+      fi
+      estables=$((estables + 1))
+      if [ "$estables" -ge "$ESTABLES_NECESARIOS" ]; then
+        echo "▸ en ejecución y estable (${REINICIOS} reinicios)"
+        break
+      fi
+      ;;
+    exited|dead)
       echo "✖ la aplicación no arrancó (estado: $ESTADO). Últimas líneas:"
-      docker logs --tail 20 "$NOMBRE" 2>&1 || true
+      docker logs --tail 30 "$NOMBRE" 2>&1 || true
+      restaurar ;;
+    restarting)
+      echo "✖ la aplicación reinicia en bucle (estado: $ESTADO). Últimas líneas:"
+      docker logs --tail 30 "$NOMBRE" 2>&1 || true
       restaurar ;;
   esac
-  [ "$i" = "20" ] && { echo "✖ no llegó a estado 'running'"; restaurar; }
+
+  reinicios_previos="$REINICIOS"
+  [ "$i" = "30" ] && { echo "✖ no llegó a estar estable"; restaurar; }
   sleep 3
 done
 

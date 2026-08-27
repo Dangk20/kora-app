@@ -21,22 +21,21 @@ export async function register(): Promise<void> {
   // imposible construir la imagen sin credenciales de producción dentro.
   if (process.env.NEXT_PHASE === "phase-production-build") return;
 
-  const { assertStorageConfiguredOrExit } = await import("./modules/storage/config");
-  assertStorageConfiguredOrExit();
-
-  // Mismo criterio para el correo: sin proveedor, en producción el módulo de
-  // campañas está roto y el contenedor no debería reportarse sano. El fallo
-  // aparecería si no cuando alguien lanza la primera campaña — delante del
-  // cliente.
-  const { assertEmailConfiguredOrExit } = await import("./modules/email/config");
-  assertEmailConfiguredOrExit();
-
-  // Y para los datos del comerciante: las páginas legales identifican a quién
-  // se le entregan los datos personales. Sin ellos, el checkout pide una
-  // autorización que no dice a favor de quién — un consentimiento que no
-  // acredita nada. Es un fallo que no da error en ninguna pantalla.
-  const { assertLegalConfiguredOrExit } = await import("./modules/legal/config");
-  assertLegalConfiguredOrExit();
+  // Las tres guardas de configuración, comprobadas JUNTAS y con un solo
+  // informe. Antes se llamaban en fila y cada una terminaba el proceso por su
+  // cuenta, así que el contenedor delataba solo la primera: quien lo leyera
+  // conseguía ese insumo, volvía a desplegar y descubría el siguiente. Con
+  // variables que hay que pedirle al cliente, eso convierte un correo en
+  // cuatro. Ver src/lib/startup-guards.ts.
+  //
+  // Qué cubren: que las imágenes de producto tengan dónde vivir; que el correo
+  // tenga proveedor —sin él, en producción, el fallo aparecería cuando alguien
+  // lanza la primera campaña, delante del cliente—; y que los datos del
+  // comerciante existan, porque las páginas legales identifican a quién se le
+  // entregan los datos personales y sin ellos el checkout pide una autorización
+  // que no dice a favor de quién. Ninguno de los tres da error en pantalla.
+  const { assertConfiguracionDeArranqueOrExit } = await import("./lib/startup-guards");
+  assertConfiguracionDeArranqueOrExit();
 
   // Y la más silenciosa de todas: que las imágenes que la base cree que
   // existen, existan. Sin volumen montado viven en el contenedor y el último
