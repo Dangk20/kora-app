@@ -156,6 +156,13 @@ export default async function StoreLayout({
             >
               Escríbenos por WhatsApp
             </a>
+            {/* El seguimiento va aquí, junto a WhatsApp, y no entre las
+                políticas: quien lo busca está buscando su pedido, no un
+                documento legal. Es la única vía para quien compró como
+                invitado, que es la mayoría mientras el correo esté bloqueado. */}
+            <Link href="/pedido" className="hover:text-white">
+              Seguimiento de tu pedido
+            </Link>
             <Link href="/login" className="hover:text-white">
               Acceso al equipo
             </Link>

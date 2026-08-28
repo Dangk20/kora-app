@@ -6,6 +6,7 @@
 // del comprador. Buscar por número y comprobar después el dueño funciona
 // igual… hasta que alguien olvide la comprobación.
 
+import { Prisma } from "@/generated/prisma/client";
 import type { Currency, OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { computeAccrual } from "@/modules/cashback/accrual";
@@ -28,7 +29,7 @@ export type BuyerOrderRow = {
   items: number;
 };
 
-/** Un pedido pendiente sigue vivo mientras no venza su vigencia de 2 h. */
+/** Un pedido pendiente sigue vivo mientras no venza su vigencia (ORDER_TTL_HOURS). */
 export function estaVigente(o: { status: OrderStatus; expiresAt: Date | null }, now = new Date()) {
   return o.status === "PENDING" && (o.expiresAt === null || o.expiresAt > now);
 }
@@ -107,12 +108,46 @@ export type BuyerOrderDetail = NonNullable<Awaited<ReturnType<typeof buyerOrder>
 export async function buyerOrder(customerId: string, number: number) {
   const o = await db.order.findFirst({
     where: { customerId, number },
-    include: {
-      items: true,
-      cashbackMovements: { where: { type: "EARN" }, select: { delta: true, expiresAt: true } },
-    },
+    include: DETALLE_INCLUDE,
   });
-  if (!o) return null;
+  return o ? detalleDelPedido(o) : null;
+}
+
+/**
+ * El mismo detalle, buscado por identificador y SIN acotar a un cliente.
+ *
+ * La usa el seguimiento público (`modules/orders/tracking.ts`), donde el
+ * derecho a ver el pedido ya se demostró de otra forma: con el número más el
+ * contacto del propio pedido, y después con un token firmado.
+ *
+ * Va aquí, y no reimplementada allí, porque lo que no puede divergir es QUÉ se
+ * le enseña al comprador sobre su pedido. Dos mapeos separados se separan más
+ * con cada cambio, y el que se olvide será el que un invitado ve.
+ */
+export async function orderDetailById(orderId: string) {
+  const o = await db.order.findUnique({
+    where: { id: orderId },
+    include: DETALLE_INCLUDE,
+  });
+  return o ? detalleDelPedido(o) : null;
+}
+
+/**
+ * Lo que las dos consultas traen. Una sola definición del `include`: si las
+ * dos lo escribieran por su cuenta, una podría dejar de traer los movimientos
+ * de cashback y la pantalla enseñaría una estimación donde hay un dato real.
+ */
+const DETALLE_INCLUDE = {
+  items: true,
+  cashbackMovements: {
+    where: { type: "EARN" as const },
+    select: { delta: true, expiresAt: true },
+  },
+} satisfies Prisma.OrderInclude;
+
+type PedidoConDetalle = Prisma.OrderGetPayload<{ include: typeof DETALLE_INCLUDE }>;
+
+function detalleDelPedido(o: PedidoConDetalle) {
 
   const total = aNumero(o.total);
   const acreditado = o.cashbackMovements[0];
