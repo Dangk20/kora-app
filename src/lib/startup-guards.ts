@@ -16,13 +16,13 @@
 // insumos que hay que pedirle al cliente. Pedirlos de uno en uno, con un
 // despliegue entre medias, convierte un correo en cuatro.
 //
-// Además de la configuración, se comprueba que el destino de los correos en
-// disco se pueda ESCRIBIR. Aparece aquí y no entre las guardas de la aplicación
-// porque el volumen `kora-staging_correos` nació de root y el worker corre como
-// `node`: entre el 7 y el 28 de agosto de 2026, CADA correo de pruebas falló
-// con EACCES y ninguno se escribió, con el entorno con aspecto perfectamente
-// sano. Comprobar que un directorio existe no basta — uno de root también
-// existe. Hay que escribir en él.
+// Lo que va aquí es lo que vale para CUALQUIER proceso: configuración, no
+// recursos. Que el destino de los correos en disco se pueda escribir NO está
+// aquí, y esa distinción se pagó: al ponerlo, el despliegue a pruebas se cayó.
+// La aplicación no tiene montado `/emails` —ni tiene por qué: no envía, que es
+// una regla del proyecto con prueba propia— pero sí recibe `EMAIL_DEV_DIR` por
+// el `env_file` compartido, así que exigirle escribir ahí la mataba. Esa
+// comprobación vive en `modules/email/writable.ts` y la llama solo el worker.
 //
 // Las comprobaciones que dependen de la BASE no van aquí: se ejecutan después,
 // y solo si la configuración ya está completa. Preguntarle a la base antes de
@@ -95,18 +95,6 @@ export async function assertConfiguracionDeArranqueOrExit(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   const fallos = fallosDeArranque(env);
-
-  // Escribir de verdad en el destino de los correos, no solo mirar variables.
-  try {
-    const { assertEmailDirWritable } = await import("@/modules/email/writable");
-    await assertEmailDirWritable(env);
-  } catch (error) {
-    fallos.push({
-      asunto: "Carpeta de correos",
-      mensaje: error instanceof Error ? error.message : String(error),
-    });
-  }
-
   if (fallos.length === 0) return;
 
   const encabezado =
@@ -120,4 +108,33 @@ export async function assertConfiguracionDeArranqueOrExit(
 
   console.error(`${encabezado}\n${cuerpo}\n`);
   process.exit(1);
+}
+
+/**
+ * Comprobación EXCLUSIVA del worker: que el destino de los correos en disco se
+ * pueda escribir de verdad.
+ *
+ * No está entre las guardas compartidas a propósito. La aplicación **no envía
+ * correo** —todo cuelga de la bandeja de salida, y hay una prueba que impide
+ * que el checkout importe el módulo de envío—, así que no tiene montado el
+ * volumen de correos. Exigirle escribir ahí la tumbaría por un recurso que no
+ * usa: pasó el 28 ago 2026 y tiró abajo el despliegue a pruebas.
+ *
+ * La regla que queda: **la guarda vive donde ocurre la escritura**, no en el
+ * conjunto común.
+ */
+export async function assertDestinoDeCorreosOrExit(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  try {
+    const { assertEmailDirWritable } = await import("@/modules/email/writable");
+    await assertEmailDirWritable(env);
+  } catch (error) {
+    console.error(
+      `\n✖ El worker de KORA no puede arrancar.\n  ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    process.exit(1);
+  }
 }

@@ -14,7 +14,10 @@
 
 import "dotenv/config";
 import { db } from "../src/lib/db";
-import { assertConfiguracionDeArranqueOrExit } from "../src/lib/startup-guards";
+import {
+  assertConfiguracionDeArranqueOrExit,
+  assertDestinoDeCorreosOrExit,
+} from "../src/lib/startup-guards";
 import { runOnce, DEFAULT_BATCH_SIZE } from "../src/modules/events/consumer";
 import { registerAllHandlers, registeredTypes } from "../src/modules/events/handlers";
 import { JOBS } from "../src/modules/jobs/definitions";
@@ -99,6 +102,13 @@ async function main() {
   // Un worker sano sobre un entorno incompleto es peor que uno caído: nada
   // avisa, los eventos se consumen y sus manejadores fallan uno a uno.
   await assertConfiguracionDeArranqueOrExit();
+
+  // Y, solo aquí, que el destino de los correos se pueda ESCRIBIR. El worker es
+  // el único que escribe: entre el 7 y el 28 de agosto de 2026 el volumen
+  // pertenecía a root, cada correo falló con EACCES y ninguno se escribió, con
+  // el entorno de aspecto sano. Comprobar que el directorio existe no habría
+  // servido — uno de root también existe.
+  await assertDestinoDeCorreosOrExit();
 
   registerAllHandlers();
   console.log(

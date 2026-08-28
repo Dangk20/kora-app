@@ -134,6 +134,22 @@ describe("las guardas cubren LOS DOS procesos", () => {
       ).toContain("assertConfiguracionDeArranqueOrExit");
     }
   });
+
+  it("🔒 pero SOLO el worker exige poder escribir los correos", () => {
+    // La aplicación no envía —todo cuelga de la bandeja de salida— así que no
+    // tiene montado el volumen de correos. Exigírselo la tumba por un recurso
+    // que no usa: pasó el 28 ago 2026 y tiró abajo el despliegue a pruebas,
+    // porque `EMAIL_DEV_DIR` sí le llega por el `env_file` compartido.
+    //
+    // La regla: la guarda vive donde ocurre la escritura.
+    const fuente = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+
+    expect(fuente("scripts/outbox-worker.ts")).toContain("assertDestinoDeCorreosOrExit");
+    expect(
+      fuente("src/instrumentation.ts"),
+      "la aplicación NO debe exigir un directorio de correos escribible",
+    ).not.toContain("assertDestinoDeCorreosOrExit");
+  });
 });
 
 describe("la carpeta de correos tiene que ser ESCRIBIBLE", () => {
