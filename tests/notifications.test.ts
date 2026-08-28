@@ -28,7 +28,12 @@ import { canSendMarketing, canSendTransactional } from "@/modules/notifications/
 import { orderEmailContext } from "@/modules/notifications/order-data";
 import { renderOrderEmail } from "@/modules/notifications/render";
 import { sendOrderEmail } from "@/modules/notifications/send";
-import { setStaffEmail, STAFF_EMAIL_KEY, staffEmail } from "@/modules/notifications/settings";
+import {
+  orderNoticeRecipients,
+  setStaffEmail,
+  STAFF_EMAIL_KEY,
+  staffEmail,
+} from "@/modules/notifications/settings";
 
 const PREFIJO = "zzt-notif";
 
@@ -113,6 +118,7 @@ async function limpiar() {
     await db.customer.deleteMany({ where: { id: { in: ids } } });
   }
   await db.setting.deleteMany({ where: { key: STAFF_EMAIL_KEY } });
+  await db.user.deleteMany({ where: { name: { startsWith: PREFIJO } } });
 }
 
 beforeEach(async () => {
@@ -402,7 +408,7 @@ describe("EL CORREO NUNCA ROMPE LA VENTA", () => {
     expect(Number(despues.total)).toBe(100_000);
   });
 
-  it("de punta a punta: el worker manda los dos correos del pedido nuevo", async () => {
+  it("de punta a punta: el worker avisa al comprador y a TODO el equipo", async () => {
     const enviados = driverFalso();
     await setStaffEmail("pedidos@korashopp.com");
     const c = await cliente();
@@ -421,9 +427,24 @@ describe("EL CORREO NUNCA ROMPE LA VENTA", () => {
     await orderCreatedBuyerEmail.handle(evento);
     await orderCreatedStaffEmail.handle(evento);
 
-    expect(enviados).toHaveLength(2);
-    expect(enviados.map((e) => e.to)).toContain("pedidos@korashopp.com");
-    // Ninguno de los dos lleva cabecera de baja: no son comerciales.
+    // La cuenta se DERIVA de la regla, no es un número fijo: desde el 28 ago
+    // 2026 el aviso va al correo del negocio y a cada administrador activo, así
+    // que cuántos son depende de los usuarios que existan. Atarlo a un "2"
+    // convertía esta prueba en algo que se rompe cada vez que alguien crea un
+    // administrador, sin que nada esté mal.
+    const equipo = await orderNoticeRecipients();
+    expect(equipo).toContain("pedidos@korashopp.com");
+
+    // Se separan por el ASUNTO y no por la dirección: el correo del comprador
+    // sale del PEDIDO, no de su ficha, y los dos pueden no coincidir.
+    const alEquipo = enviados.filter((e) => e.subject.startsWith("Pedido nuevo"));
+    expect(alEquipo.map((e) => e.to).sort()).toEqual([...equipo].sort());
+
+    // Y exactamente uno al comprador.
+    const alComprador = enviados.filter((e) => e.subject.startsWith("Recibimos tu pedido"));
+    expect(alComprador).toHaveLength(1);
+
+    // Ninguno lleva cabecera de baja: no son comerciales.
     expect(enviados.every((e) => !e.unsubscribeUrl)).toBe(true);
 
     resetRegistry();
@@ -434,19 +455,40 @@ describe("EL CORREO NUNCA ROMPE LA VENTA", () => {
     const c = await cliente();
     const p = await pedido(c.id);
 
-    await expect(
-      orderCreatedStaffEmail.handle({
-        id: "evt-sin-destino",
-        type: "order.created",
-        payload: { orderId: p.id },
-        attempts: 1,
-        createdAt: new Date(),
-      }),
-    ).resolves.toBeUndefined();
+    // "Nadie a quien avisar" ya no es solo que falte el ajuste: desde el 28 ago
+    // 2026 también cuentan los administradores activos. Para provocar el
+    // escenario de verdad hay que dejar la lista entera vacía.
+    const admins = await db.user.findMany({
+      where: { active: true, role: { name: "admin" } },
+      select: { id: true },
+    });
+    await db.user.updateMany({
+      where: { id: { in: admins.map((u) => u.id) } },
+      data: { active: false },
+    });
 
-    expect(enviados).toHaveLength(0);
-    const nota = await db.orderStatusHistory.findFirst({ where: { orderId: p.id } });
-    expect(nota?.note).toContain("sin dirección del negocio");
+    try {
+      await expect(
+        orderCreatedStaffEmail.handle({
+          id: "evt-sin-destino",
+          type: "order.created",
+          payload: { orderId: p.id },
+          attempts: 1,
+          createdAt: new Date(),
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(enviados).toHaveLength(0);
+      const nota = await db.orderStatusHistory.findFirst({ where: { orderId: p.id } });
+      expect(nota?.note).toContain("no hay ningún destinatario configurado");
+    } finally {
+      // Se restauran pase lo que pase: dejarlos desactivados haría fallar a
+      // otras pruebas por un motivo que no tiene nada que ver con ellas.
+      await db.user.updateMany({
+        where: { id: { in: admins.map((u) => u.id) } },
+        data: { active: true },
+      });
+    }
   });
 });
 
@@ -540,5 +582,68 @@ describe("la dirección del negocio", () => {
   it("se puede poner y se normaliza", async () => {
     await setStaffEmail("  Pedidos@KoraShopp.com ");
     expect(await staffEmail()).toBe("pedidos@korashopp.com");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe("QUIÉN se entera de un pedido nuevo", () => {
+  // Regla del negocio (28 ago 2026): la dirección configurada del negocio MÁS
+  // todos los administradores activos.
+
+  async function usuario(rol: string, email: string, active = true) {
+    const role = await db.role.findUniqueOrThrow({ where: { name: rol } });
+    return db.user.create({
+      data: {
+        email,
+        name: `${PREFIJO} ${rol}`,
+        passwordHash: "x",
+        roleId: role.id,
+        active,
+      },
+    });
+  }
+
+  it("sin nada configurado y sin admins, no hay a quién avisar", async () => {
+    await db.user.updateMany({ where: { role: { name: "admin" } }, data: { active: false } });
+    expect(await orderNoticeRecipients()).toEqual([]);
+    await db.user.updateMany({ where: { role: { name: "admin" } }, data: { active: true } });
+  });
+
+  it("incluye la dirección del negocio Y a los administradores activos", async () => {
+    await setStaffEmail("negocio@ejemplo.com");
+    await usuario("admin", `${PREFIJO}-jefa@ejemplo.com`);
+
+    const r = await orderNoticeRecipients();
+    expect(r).toContain("negocio@ejemplo.com");
+    expect(r).toContain(`${PREFIJO}-jefa@ejemplo.com`.toLowerCase());
+  });
+
+  it("🔒 NO incluye a cajeros ni a otros roles", async () => {
+    // Un cajero atiende pedidos pero no tiene por qué recibir en su correo
+    // personal el aviso de cada venta del negocio.
+    await setStaffEmail("negocio@ejemplo.com");
+    await usuario("cajero", `${PREFIJO}-caja@ejemplo.com`);
+
+    expect(await orderNoticeRecipients()).not.toContain(`${PREFIJO}-caja@ejemplo.com`);
+  });
+
+  it("🔒 un administrador DESACTIVADO deja de recibir", async () => {
+    // Es lo que se espera de desactivar a alguien: deja de llegarle el negocio.
+    await setStaffEmail("negocio@ejemplo.com");
+    await usuario("admin", `${PREFIJO}-exjefe@ejemplo.com`, false);
+
+    expect(await orderNoticeRecipients()).not.toContain(`${PREFIJO}-exjefe@ejemplo.com`);
+  });
+
+  it("🔒 no repite a quien está en las dos listas", async () => {
+    // Lo normal es que el correo configurado del negocio sea también el de
+    // algún administrador. Sin deduplicar, esa persona recibiría dos veces el
+    // mismo aviso — justo lo que el sistema de reservas existe para impedir.
+    const mismo = `${PREFIJO}-doble@ejemplo.com`;
+    await setStaffEmail(mismo);
+    await usuario("admin", mismo);
+
+    const r = await orderNoticeRecipients();
+    expect(r.filter((x) => x === mismo)).toHaveLength(1);
   });
 });

@@ -864,9 +864,20 @@ model OrderEmail {
   error      String? // último fallo, si lo hubo
   createdAt  DateTime @default(now())
 
-  // LA garantía: un correo por pedido y tipo. No una comprobación previa —
-  // dos trabajadores pueden mirar a la vez y ver ambos que no está.
-  @@unique([orderId, type])
+  // LA garantía: un correo por pedido, tipo y DESTINATARIO. No una comprobación
+  // previa — dos trabajadores pueden mirar a la vez y ver ambos que no está.
+  //
+  // El destinatario entra en la clave desde el 28 ago 2026, cuando el aviso de
+  // pedido nuevo pasó a ir a varias personas (el correo del negocio más los
+  // administradores activos). Con la clave sin él, el segundo destinatario
+  // chocaba contra la reserva del primero y NO recibía nada: el índice que
+  // existe para que nadie reciba dos veces habría impedido que la mayoría
+  // recibiera una.
+  //
+  // Reservar por destinatario mantiene la garantía donde importa —nadie recibe
+  // el mismo correo dos veces— y aísla los fallos: una dirección que rebota no
+  // deja sin aviso a los demás.
+  @@unique([orderId, type, to])
   @@index([sentAt])
   @@map("order_emails")
 }

@@ -5,6 +5,7 @@
 // el texto sin fabricar un pedido, y quien lea este archivo ve de un vistazo
 // todo lo que KORA le dice a un comprador.
 
+import { ORDER_TTL_HOURS } from "@/modules/orders/status";
 import type { OrderEmailType } from "@/generated/prisma/enums";
 import { renderCampaign, type TemplateOrder } from "@/modules/email/template";
 import { storeUrl } from "@/modules/email/driver";
@@ -63,12 +64,19 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
         preheader: "Continúa por WhatsApp para confirmar tu pago.",
         title: "Ya tenemos tu pedido",
         // El pago ocurre FUERA de la plataforma: sin este enlace, quien cerró
-        // la pestaña no tiene forma de volver, y el pedido expira en 2 horas.
+        // la pestaña no tiene forma de volver, y el pedido expira.
+        //
+        // ⚠️ El plazo se DERIVA de ORDER_TTL_HOURS, nunca se escribe a mano.
+        // Estuvo escrito ("2 horas") y el 27 ago 2026 la vigencia pasó a 24 h:
+        // durante unas horas estos correos le prometieron al comprador un plazo
+        // que el sistema ya no cumplía. Es la misma trampa que la página de
+        // términos, en un sitio donde además el texto ya salió por correo y no
+        // se puede corregir después.
         body:
           "Gracias por comprar en KORA. Tu pedido quedó reservado y el pago se acuerda por " +
           "WhatsApp: escríbenos con el botón de abajo y lo confirmamos contigo.\n\n" +
-          "Si no lo confirmas dentro de las próximas 2 horas, el pedido se cancela solo y " +
-          "los productos vuelven a quedar disponibles.",
+          `Si no lo confirmas dentro de las próximas ${ORDER_TTL_HOURS} horas, el pedido se ` +
+          "cancela solo y los productos vuelven a quedar disponibles.",
         cta: data.whatsappUrl
           ? { label: "Continuar por WhatsApp", url: data.whatsappUrl }
           : null,
@@ -160,9 +168,9 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
         preheader: expirado ? "Puedes volver a armarlo cuando quieras." : "Cualquier duda, escríbenos.",
         title: expirado ? "Tu pedido expiró" : "Tu pedido fue cancelado",
         body: expirado
-          ? "Tu pedido se canceló porque pasaron las 2 horas sin confirmar el pago, y los " +
-            "productos volvieron a quedar disponibles. Si todavía lo quieres, puedes armarlo " +
-            "de nuevo en la tienda."
+          ? `Tu pedido se canceló porque pasaron las ${ORDER_TTL_HOURS} horas sin confirmar ` +
+            "el pago, y los productos volvieron a quedar disponibles. Si todavía lo quieres, " +
+            "puedes armarlo de nuevo en la tienda."
           : "Tu pedido fue cancelado. Si crees que fue un error o quieres retomarlo, " +
             "escríbenos por WhatsApp.",
         cta: { label: "Volver a la tienda", url: storeUrl() },
@@ -172,14 +180,14 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
 
     case "STAFF_NEW_ORDER":
       return base(data, {
-        // El operador tiene 2 horas antes de que el pedido expire: el asunto
-        // dice lo que necesita para decidir si atiende ahora.
+        // El operador tiene la vigencia entera antes de que el pedido expire:
+        // el asunto dice lo que necesita para decidir si atiende ahora.
         subject: `Pedido nuevo ${data.orderNumber} · ${formatMoney(data.order.total, c)} ${c}`,
         preheader: "Confírmalo en el panel antes de que expire.",
         title: "Entró un pedido",
         body:
           `${data.buyerName ?? "Un comprador"} acaba de hacer un pedido. Está pendiente de ` +
-          "confirmación y expira en 2 horas si nadie lo atiende.",
+          `confirmación y expira en ${ORDER_TTL_HOURS} horas si nadie lo atiende.`,
         cta: { label: "Abrir el pedido", url: `${storeUrl()}/admin/pedidos/${data.orderId}` },
       });
   }

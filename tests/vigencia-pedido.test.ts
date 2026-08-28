@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ORDER_TTL_HOURS, ORDER_TTL_MS } from "@/modules/orders/status";
+import { renderOrderEmail } from "@/modules/notifications/render";
 
 describe("vigencia del pedido — una sola definición", () => {
   it("los milisegundos se DERIVAN de las horas, no se escriben aparte", () => {
@@ -48,5 +49,48 @@ describe("vigencia del pedido — una sola definición", () => {
     // justo la forma que tenía la copia: `= <n> * 60 * 60 * 1000`.
     const copiaAMano = /ORDER_TTL_\w*\s*=\s*\d+\s*\*\s*60\s*\*\s*60\s*\*\s*1000/;
     expect(src, "no debe redefinir la vigencia").not.toMatch(copiaAMano);
+  });
+});
+
+describe("el plazo que se PROMETE por correo es el que se aplica", () => {
+  // Los correos le dicen al comprador cuánto tiempo tiene. Ese número estuvo
+  // escrito a mano ("2 horas") y el 27 ago 2026 la vigencia pasó a 24 h: los
+  // correos siguieron prometiendo dos horas durante el resto del día.
+  //
+  // Es peor que el mismo fallo en la página de términos: una página se corrige
+  // y ya está, pero un correo ya salió de la casa. No se puede editar lo que
+  // alguien tiene en su bandeja.
+  const datos = {
+    orderId: "x",
+    orderNumber: "KO-2026-00001",
+    buyerName: "Prueba",
+    whatsappUrl: "https://api.whatsapp.com/send?phone=1",
+    order: {
+      number: "KO-2026-00001",
+      currency: "COP" as const,
+      lines: [{ qty: 1, name: "Producto", variant: "Única", total: 10_000 }],
+      subtotal: 10_000,
+      discountTotal: 0,
+      cashbackApplied: 0,
+      total: 10_000,
+    },
+  };
+
+  it("el correo de pedido recibido dice el plazo real", () => {
+    const { text } = renderOrderEmail("BUYER_CREATED", datos);
+    expect(text).toContain(`${ORDER_TTL_HOURS} horas`);
+    expect(text, "no puede quedar un plazo escrito a mano").not.toMatch(
+      new RegExp(`(?<!${ORDER_TTL_HOURS} )\\b2 horas`),
+    );
+  });
+
+  it("el aviso al operador dice el plazo real", () => {
+    const { text } = renderOrderEmail("STAFF_NEW_ORDER", datos);
+    expect(text).toContain(`${ORDER_TTL_HOURS} horas`);
+  });
+
+  it("el correo de expirado dice el plazo real", () => {
+    const { text } = renderOrderEmail("BUYER_CANCELLED", { ...datos, cancelReason: "EXPIRED" as const });
+    expect(text).toContain(`${ORDER_TTL_HOURS} horas`);
   });
 });

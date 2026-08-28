@@ -9,9 +9,13 @@
 // lo que hace que un comprador dude de si compró dos veces y que un operador
 // deje de mirar los avisos.
 //
-// La garantía la da el índice único (pedido, tipo), no la comprobación previa:
-// dos trabajadores pueden mirar a la vez y ver ambos que no está. Leer no es
-// reservar.
+// La garantía la da el índice único (pedido, tipo, DESTINATARIO), no la
+// comprobación previa: dos trabajadores pueden mirar a la vez y ver ambos que
+// no está. Leer no es reservar.
+//
+// El destinatario entra en la clave desde el 28 ago 2026, cuando el aviso de
+// pedido nuevo pasó a ir a varias personas. Sin él, el segundo destinatario
+// chocaba contra la reserva del primero y se quedaba sin correo.
 
 import type { OrderEmailType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
@@ -62,16 +66,21 @@ async function tomar(
     where: {
       orderId,
       type,
+      // El destinatario acota la fila: cada uno tiene la suya, con sus propios
+      // intentos y su propio error. Un correo que rebota no bloquea a nadie más.
+      to,
       // Ya enviado: no se toca. Es lo que impide el duplicado.
       sentAt: null,
       OR: [{ claimedAt: null }, { claimedAt: { lt: limite } }],
     },
-    data: { claimedAt: new Date(), attempts: { increment: 1 }, to },
+    // `to` ya NO se actualiza: forma parte de la clave, así que cambiarlo aquí
+    // convertiría la fila en la de otra persona.
+    data: { claimedAt: new Date(), attempts: { increment: 1 } },
   });
   if (tomados.count === 0) return null;
 
   const fila = await db.orderEmail.findUnique({
-    where: { orderId_type: { orderId, type } },
+    where: { orderId_type_to: { orderId, type, to } },
     select: { id: true },
   });
   return fila;

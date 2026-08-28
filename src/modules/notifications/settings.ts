@@ -30,3 +30,35 @@ export async function setStaffEmail(email: string): Promise<void> {
     update: { value: limpio },
   });
 }
+
+/**
+ * TODAS las direcciones que deben enterarse de un pedido nuevo.
+ *
+ * Regla del negocio (28 ago 2026): el correo configurado del negocio **más
+ * todos los usuarios con rol de administrador que estén activos**. Un
+ * administrador nuevo empieza a recibir avisos sin que nadie toque nada, y uno
+ * desactivado deja de recibirlos — que es lo que se espera de desactivarlo.
+ *
+ * Solo administradores: un cajero atiende pedidos pero no tiene por qué recibir
+ * en su correo personal el aviso de cada venta del negocio.
+ *
+ * Se devuelven en minúsculas y SIN REPETIDOS. La deduplicación importa de
+ * verdad: lo normal es que el correo configurado del negocio sea también el de
+ * algún administrador, y sin esto esa persona recibiría el mismo aviso dos
+ * veces — exactamente lo que el sistema de reservas existe para impedir.
+ */
+export async function orderNoticeRecipients(): Promise<string[]> {
+  const [fijo, admins] = await Promise.all([
+    staffEmail(),
+    db.user.findMany({
+      where: { active: true, role: { name: "admin" } },
+      select: { email: true },
+    }),
+  ]);
+
+  const todos = [fijo, ...admins.map((u) => u.email)]
+    .filter((e): e is string => Boolean(e?.trim()))
+    .map((e) => e.trim().toLowerCase());
+
+  return [...new Set(todos)];
+}

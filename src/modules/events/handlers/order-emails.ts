@@ -15,7 +15,7 @@ import { db } from "@/lib/db";
 import { orderEmailContext } from "@/modules/notifications/order-data";
 import { renderOrderEmail } from "@/modules/notifications/render";
 import { sendOrderEmail } from "@/modules/notifications/send";
-import { staffEmail } from "@/modules/notifications/settings";
+import { orderNoticeRecipients } from "@/modules/notifications/settings";
 import type { DomainEventRecord, EventHandler } from "../types";
 
 function orderIdDe(event: DomainEventRecord): string {
@@ -121,33 +121,56 @@ export const orderCreatedStaffEmail: EventHandler = {
   name: "order-created-staff-email",
   async handle(event) {
     const orderId = orderIdDe(event);
-    const destino = await staffEmail();
+    const destinos = await orderNoticeRecipients();
 
-    if (!destino) {
-      // Sin dirección no se falla —el pedido no tiene la culpa— pero SÍ queda
-      // escrito: un negocio que no recibe avisos tiene que poder enterarse.
-      await anotar(orderId, "correo (STAFF_NEW_ORDER): no enviado — sin dirección del negocio configurada");
+    if (destinos.length === 0) {
+      // Sin nadie a quien avisar no se falla —el pedido no tiene la culpa— pero
+      // SÍ queda escrito: un negocio que no recibe avisos tiene que poder
+      // enterarse de que no los recibe.
+      await anotar(orderId, "correo (STAFF_NEW_ORDER): no enviado — no hay ningún destinatario configurado");
       return;
     }
 
     const ctx = await orderEmailContext(orderId);
     if (!ctx) throw new Error(`El pedido ${orderId} no existe (evento ${event.id})`);
+    const email = renderOrderEmail("STAFF_NEW_ORDER", ctx);
 
-    const r = await sendOrderEmail({
-      orderId,
-      type: "STAFF_NEW_ORDER",
-      to: destino,
-      email: renderOrderEmail("STAFF_NEW_ORDER", ctx),
-      // La dirección del negocio no pasa por la lista de supresión de los
-      // compradores: es interna y no se le puede dar de baja.
-      skipGuard: true,
-    });
+    // Se recorren TODOS antes de decidir si el manejador falla. Cortar en el
+    // primer error dejaría sin aviso a los que vienen después por culpa de una
+    // dirección ajena, y el reintento volvería a empezar por el mismo sitio.
+    // Cada destinatario tiene su propia reserva, así que quien ya recibió no
+    // recibe de nuevo al reintentar.
+    const fallos: string[] = [];
 
-    if (r.sent || r.reason === "YA_ENVIADO") return;
-    if (r.reason === "NO_ENVIABLE") {
-      await anotar(orderId, `correo (STAFF_NEW_ORDER): no enviado — ${r.detail}`);
-      return;
+    for (const to of destinos) {
+      const r = await sendOrderEmail({
+        orderId,
+        type: "STAFF_NEW_ORDER",
+        to,
+        email,
+        // Las direcciones del negocio no pasan por la lista de supresión de los
+        // compradores: son internas y no se les puede dar de baja.
+        skipGuard: true,
+      });
+
+      if (r.sent || r.reason === "YA_ENVIADO") continue;
+
+      if (r.reason === "NO_ENVIABLE") {
+        // Una dirección inservible es un dato del negocio, no un fallo del
+        // sistema: se anota y no se reintenta, porque reintentar no la arregla.
+        await anotar(orderId, `correo (STAFF_NEW_ORDER → ${to}): no enviado — ${r.detail}`);
+        continue;
+      }
+
+      fallos.push(`${to}: ${r.detail}`);
     }
-    throw new Error(`No se pudo avisar del pedido ${orderId}: ${r.detail}`);
+
+    // Basta con que UNO haya fallado por el proveedor para reintentar el
+    // evento: los que ya salieron están reservados y no se repetirán.
+    if (fallos.length > 0) {
+      throw new Error(
+        `No se pudo avisar del pedido ${orderId} a ${fallos.length} de ${destinos.length} destinatarios — ${fallos.join(" · ")}`,
+      );
+    }
   },
 };
