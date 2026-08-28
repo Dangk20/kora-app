@@ -25,6 +25,9 @@ const baseSchema = z.object({
   percentValue: z.coerce.number().optional(),
   amountCop: z.coerce.number().optional(),
   amountUsd: z.coerce.number().optional(),
+  // Compra mínima, uno por moneda: COP y USD no se convierten.
+  minSubtotalCop: z.coerce.number().optional(),
+  minSubtotalUsd: z.coerce.number().optional(),
   freeVariantId: z.string().optional().or(z.literal("").transform(() => undefined)),
   validFrom: z.string().optional().or(z.literal("").transform(() => undefined)),
   validTo: z.string().optional().or(z.literal("").transform(() => undefined)),
@@ -108,6 +111,12 @@ function datosComunes(d: z.infer<typeof baseSchema>) {
     percentValue: d.type === "PERCENT" ? (d.percentValue ?? 0) : null,
     amountCop: d.type === "FIXED" && (d.amountCop ?? 0) > 0 ? d.amountCop! : null,
     amountUsd: d.type === "FIXED" && (d.amountUsd ?? 0) > 0 ? d.amountUsd! : null,
+    // El mínimo aplica a CUALQUIER tipo de cupón, no solo al de monto fijo:
+    // "20% desde $100.000" es tan razonable como "$20.000 desde $100.000".
+    // Vacío o cero = sin mínimo; se guarda null para que la validación no
+    // tenga que distinguir "cero" de "sin definir".
+    minSubtotalCop: (d.minSubtotalCop ?? 0) > 0 ? d.minSubtotalCop! : null,
+    minSubtotalUsd: (d.minSubtotalUsd ?? 0) > 0 ? d.minSubtotalUsd! : null,
     freeVariantId: d.type === "FREE_PRODUCT" ? (d.freeVariantId ?? null) : null,
     validFrom: opcionalFecha(d.validFrom),
     validTo: opcionalFecha(d.validTo),

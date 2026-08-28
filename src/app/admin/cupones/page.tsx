@@ -202,6 +202,8 @@ export default async function CuponesPage({
                   percentValue: editando.percentValue === null ? "" : String(editando.percentValue),
                   amountCop: editando.amountCop === null ? "" : String(editando.amountCop),
                   amountUsd: editando.amountUsd === null ? "" : String(editando.amountUsd),
+                  minSubtotalCop: editando.minSubtotalCop === null ? "" : String(editando.minSubtotalCop),
+                  minSubtotalUsd: editando.minSubtotalUsd === null ? "" : String(editando.minSubtotalUsd),
                   freeVariantId: editando.freeVariantId ?? "",
                   validFrom: editando.validFrom?.toISOString().slice(0, 10) ?? "",
                   validTo: editando.validTo?.toISOString().slice(0, 10) ?? "",

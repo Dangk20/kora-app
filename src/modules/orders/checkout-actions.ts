@@ -20,6 +20,10 @@ import {
   formatOrderNumber,
   whatsappUrl,
 } from "./message";
+// La vigencia se IMPORTA y no se copia: hasta el 27 ago 2026 aquí vivía una
+// segunda definición escrita a mano, y era la única que mandaba de verdad.
+// Ver el comentario de ORDER_TTL_HOURS en `status.ts`.
+import { ORDER_TTL_MS } from "./status";
 import { whatsappNumberFor } from "./settings";
 import { toE164 } from "@/modules/customers/phone";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
@@ -43,8 +47,6 @@ class CouponRaceError extends Error {
   }
 }
 
-/** Validez del pedido pendiente (PED_HU003). */
-const ORDER_TTL_MS = 2 * 60 * 60 * 1000;
 
 const baseSchema = z.object({
   checkoutToken: z.string().min(10).max(100),

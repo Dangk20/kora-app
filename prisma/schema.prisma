@@ -426,7 +426,20 @@ model Coupon {
   freeVariantId String?
   freeVariant   Variant? @relation("CouponFreeVariant", fields: [freeVariantId], references: [id])
 
-  minSubtotal      Decimal?  @db.Decimal(12, 2)
+  // Compra mínima para que el cupón aplique (petición del cliente, 7 ago 2026).
+  //
+  // DOS importes y no uno, por la misma razón que amountCop/amountUsd y que los
+  // precios del catálogo: COP y USD NO se convierten. Un único mínimo obligaría
+  // a inventar una tasa de cambio, y en este sistema no existe ninguna.
+  //
+  // Antes aquí vivía un solo `minSubtotal` que NADIE leía ni escribía —ni el
+  // canje, ni el panel, ni una prueba—: una columna que aparentaba tener el
+  // requisito hecho e inducía a construirlo mal.
+  //
+  // Se evalúa contra el SUBTOTAL, nunca contra el total tras descuentos: si no,
+  // un cupón podría invalidarse a sí mismo al aplicarse.
+  minSubtotalCop   Decimal?  @db.Decimal(12, 2)
+  minSubtotalUsd   Decimal?  @db.Decimal(12, 2)
   maxUses          Int? // null = ilimitado
   usedCount        Int       @default(0)
   perCustomerLimit Int?      @default(1)

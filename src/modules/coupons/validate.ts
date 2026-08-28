@@ -1,4 +1,4 @@
-// Las siete validaciones del canje, EN SU ORDEN.
+// Las OCHO validaciones del canje, EN SU ORDEN.
 // Ver openspec/changes/modulo-cupones — specs/coupon-redemption.
 //
 // El orden importa porque el mensaje es lo único que el comprador ve.
@@ -25,6 +25,8 @@ export type CouponSnapshot = CouponForDiscount & {
   active: boolean;
   firstPurchaseOnly: boolean;
   freeVariantId: string | null;
+  minSubtotalCop: number | null;
+  minSubtotalUsd: number | null;
 };
 
 export type ValidationOk = {
@@ -39,8 +41,24 @@ export type ValidationResult = ValidationOk | ValidationFail;
 /** Contacto del formulario, para las reglas que dependen del cliente. */
 export type BuyerContact = { phone?: string | null; email?: string | null };
 
-function fail(reason: RejectionReason, currency?: string): ValidationFail {
-  return { ok: false, reason, message: rejectionMessage(reason, currency) };
+function fail(
+  reason: RejectionReason,
+  currency?: string,
+  minimum?: number,
+): ValidationFail {
+  return { ok: false, reason, message: rejectionMessage(reason, currency, minimum) };
+}
+
+/**
+ * Compra mínima que exige el cupón en la moneda del carrito, o null si no exige.
+ *
+ * Gemela de `fixedAmountFor`: NUNCA se convierte de una moneda a la otra. Un
+ * cupón con mínimo solo en COP no impone nada a una compra en USD — imponer el
+ * importe en pesos sobre dólares sería exigir ~4.000 veces más.
+ */
+function minSubtotalFor(coupon: CouponSnapshot, currency: string): number | null {
+  const valor = currency === "USD" ? coupon.minSubtotalUsd : coupon.minSubtotalCop;
+  return valor && valor > 0 ? valor : null;
 }
 
 export async function loadCoupon(code: string, client: Db = db): Promise<CouponSnapshot | null> {
@@ -68,6 +86,8 @@ export async function loadCoupon(code: string, client: Db = db): Promise<CouponS
     active: c.active,
     firstPurchaseOnly: c.firstPurchaseOnly,
     freeVariantId: c.freeVariantId,
+    minSubtotalCop: c.minSubtotalCop === null ? null : Number(c.minSubtotalCop),
+    minSubtotalUsd: c.minSubtotalUsd === null ? null : Number(c.minSubtotalUsd),
   };
 }
 
@@ -108,11 +128,28 @@ export async function validateCoupon(
     return fail("CURRENCY", cart.currency);
   }
 
-  // 5. Sin ítems elegibles según el alcance (o todos excluidos por estar en
+  // 5. Compra mínima no alcanzada (petición del cliente, 7 ago 2026).
+  //
+  //    Va DESPUÉS de la moneda porque el mínimo es por divisa —COP y USD no se
+  //    convierten— y antes del alcance porque es lo más fácil de arreglar para
+  //    el comprador: "te faltan $X" es accionable; "no aplica a tus productos"
+  //    ya no.
+  //
+  //    ⚠️ Se compara contra el SUBTOTAL, no contra el total tras descuentos. Si
+  //    se midiera después de aplicar el propio cupón, uno de $20.000 sobre un
+  //    mínimo de $100.000 se invalidaría a sí mismo al aplicarse: válido antes,
+  //    inválido después, y el comprador vería el descuento aparecer y
+  //    desaparecer sin entender por qué.
+  const minimo = minSubtotalFor(coupon, cart.currency);
+  if (minimo !== null && cart.subtotal < minimo) {
+    return fail("BELOW_MINIMUM", cart.currency, minimo);
+  }
+
+  // 6. Sin ítems elegibles según el alcance (o todos excluidos por estar en
   //    oferta con el interruptor apagado).
   if (eligibleLines(coupon, cart).length === 0) return fail("NO_ELIGIBLE_ITEMS");
 
-  // 6 y 7 dependen de reconocer al cliente por el contacto del formulario.
+  // 7 y 8 dependen de reconocer al cliente por el contacto del formulario.
   const phone = buyer.phone?.trim() || null;
   const email = buyer.email?.trim().toLowerCase() || null;
   const customer =
@@ -124,7 +161,7 @@ export async function validateCoupon(
       : null;
 
   if (customer) {
-    // 6. Solo primera compra.
+    // 7. Solo primera compra.
     if (coupon.firstPurchaseOnly) {
       const previos = await client.order.count({
         where: {
@@ -135,7 +172,7 @@ export async function validateCoupon(
       if (previos > 0) return fail("FIRST_PURCHASE_ONLY");
     }
 
-    // 7. Máximo por cliente.
+    // 8. Máximo por cliente.
     if (coupon.perCustomerLimit !== null) {
       const usados = await client.couponRedemption.count({
         where: { couponId: coupon.id, customerId: customer.id },

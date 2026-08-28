@@ -270,6 +270,69 @@ describe("validación: orden y motivos", () => {
   });
 });
 
+describe("compra mínima — un importe POR MONEDA", () => {
+  // Petición del cliente del 7 ago 2026. Antes existía una columna
+  // `minSubtotal` que nadie leía: aparentaba tenerlo hecho.
+
+  it("por debajo del mínimo, el cupón se rechaza", async () => {
+    const c = await cupon({ minSubtotalCop: 100_000 });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 71_200 })]), {});
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("BELOW_MINIMUM");
+  });
+
+  it("justo en el mínimo, aplica: el límite es inclusivo", async () => {
+    // Rechazar exactamente $100.000 en un cupón "desde $100.000" es la clase
+    // de detalle que el comprador vive como un error de la tienda.
+    const c = await cupon({ minSubtotalCop: 100_000 });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 100_000 })]), {});
+    expect(r.ok).toBe(true);
+  });
+
+  it("el mensaje dice el importe, no solo que no llega", async () => {
+    const c = await cupon({ minSubtotalCop: 100_000 });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 50_000 })]), {});
+    expect(r.ok).toBe(false);
+    // Sin la cifra, el comprador tiene que adivinar cuánto le falta — que es
+    // justo la compra que el cupón existe para provocar.
+    if (!r.ok) expect(r.message).toContain("100.000");
+  });
+
+  it("un mínimo en COP NO se impone a una compra en USD", async () => {
+    // La regla que sostiene todo el sistema: COP y USD no se convierten.
+    // Aplicar 100.000 (pesos) sobre dólares exigiría ~4.000 veces más.
+    const c = await cupon({ minSubtotalCop: 100_000, minSubtotalUsd: null });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 25 })], "USD"), {});
+    expect(r.ok).toBe(true);
+  });
+
+  it("cada moneda usa SU propio mínimo", async () => {
+    const c = await cupon({ minSubtotalCop: 100_000, minSubtotalUsd: 30 });
+    const enDolares = await validateCoupon(c.code, carrito([linea({ lineTotal: 25 })], "USD"), {});
+    expect(enDolares.ok).toBe(false);
+    if (!enDolares.ok) expect(enDolares.reason).toBe("BELOW_MINIMUM");
+
+    const suficiente = await validateCoupon(c.code, carrito([linea({ lineTotal: 30 })], "USD"), {});
+    expect(suficiente.ok).toBe(true);
+  });
+
+  it("se mide contra el SUBTOTAL: un cupón no puede invalidarse a sí mismo", async () => {
+    // 50% sobre $100.000 deja $50.000. Si el mínimo se midiera después del
+    // descuento, este cupón sería válido al aplicarse e inválido justo
+    // después, y el comprador vería el descuento aparecer y desaparecer.
+    const c = await cupon({ percentValue: 50, minSubtotalCop: 100_000 });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 100_000 })]), {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.discount).toBe(50_000);
+  });
+
+  it("sin mínimo definido no impone nada", async () => {
+    const c = await cupon({ minSubtotalCop: null, minSubtotalUsd: null });
+    const r = await validateCoupon(c.code, carrito([linea({ lineTotal: 1_000 })]), {});
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("mensajes exactos de la historia de usuario", () => {
   it("son los siete literales", () => {
     expect(rejectionMessage("NOT_FOUND")).toBe("Cupón no válido.");

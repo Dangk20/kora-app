@@ -27,6 +27,8 @@ type Coupon = {
   validFrom: string;
   validTo: string;
   maxUses: string;
+  minSubtotalCop: string;
+  minSubtotalUsd: string;
   perCustomerLimit: string;
   active: boolean;
   firstPurchaseOnly: boolean;
@@ -248,9 +250,25 @@ export function CouponForm({
                 <label className={label} htmlFor="perCustomerLimit">Máximo por cliente</label>
                 <input id="perCustomerLimit" name="perCustomerLimit" type="number" min={1} defaultValue={coupon?.perCustomerLimit ?? "1"} className={input} />
               </div>
+              {/* Compra mínima: DOS campos, uno por moneda. No hay conversión
+                  en KORA, así que un solo importe obligaría a inventar una
+                  tasa de cambio. Dejar uno vacío = ese cupón no impone mínimo
+                  a las compras en esa moneda. */}
+              <div>
+                <label className={label} htmlFor="minSubtotalCop">Compra mínima en COP</label>
+                <input id="minSubtotalCop" name="minSubtotalCop" type="number" min={0} placeholder="Sin mínimo" defaultValue={coupon?.minSubtotalCop} className={input} />
+              </div>
+              <div>
+                <label className={label} htmlFor="minSubtotalUsd">Compra mínima en USD</label>
+                <input id="minSubtotalUsd" name="minSubtotalUsd" type="number" min={0} step="0.01" placeholder="Sin mínimo" defaultValue={coupon?.minSubtotalUsd} className={input} />
+              </div>
             </div>
             <p className="text-[11.5px] text-muted-foreground">
               Vacío = sin límite. Usos actuales: {coupon?.usedCount ?? 0}.
+            </p>
+            <p className="text-[11.5px] text-muted-foreground">
+              La compra mínima se mide sobre el <strong>subtotal</strong>, antes de
+              aplicar el descuento. Cada moneda lleva el suyo: no se convierten.
             </p>
           </div>
 

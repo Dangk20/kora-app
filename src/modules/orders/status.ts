@@ -44,8 +44,31 @@ export const CANCEL_REASONS = [
   "Otro",
 ] as const;
 
-/** Validez del pedido pendiente antes de expirar (PED_HU003 §2). */
-export const ORDER_TTL_HOURS = 2;
+/**
+ * Validez del pedido pendiente antes de expirar (PED_HU003 §2).
+ *
+ * **24 h desde el 27 ago 2026**, a petición del cliente en la reunión del 7 de
+ * agosto. Antes eran 2 h.
+ *
+ * ⚠️ El efecto de segundo orden, que no se ve y hay que tener presente: el
+ * stock **no** se reserva —decisión cerrada en julio—, así que alargar la
+ * vigencia no bloquea inventario a nadie. Pero **el Kora Cashback SÍ se
+ * descuenta al CREAR el pedido**, así que con 24 h el saldo de un comprador
+ * queda comprometido un día entero por un pedido que quizá nunca se confirme.
+ * Es aceptable —el saldo vuelve a sus lotes originales al expirar— pero es un
+ * cambio real de comportamiento para el comprador, no solo un número.
+ *
+ * ⚠️ **Esta es la ÚNICA definición.** Hasta hoy había dos: esta, que solo
+ * redactaba el texto de `/legal/terminos`, y una copia en
+ * `checkout-actions.ts` que era la que de verdad escribía `expiresAt`. Cambiar
+ * una sin la otra publicaba unas condiciones que prometían un plazo distinto
+ * del que el sistema aplicaba, con la suite entera en verde: la prueba que
+ * vigila el texto legal lo comparaba contra la constante equivocada.
+ */
+export const ORDER_TTL_HOURS = 24;
+
+/** La misma vigencia en milisegundos. Derivada, nunca escrita a mano. */
+export const ORDER_TTL_MS = ORDER_TTL_HOURS * 60 * 60 * 1000;
 /** Un pendiente a menos de esto se marca como "por expirar" en el listado. */
 export const EXPIRING_SOON_MINUTES = 30;
 
