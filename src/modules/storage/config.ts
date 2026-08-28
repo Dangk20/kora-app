@@ -102,7 +102,7 @@ export function assertStorageConfigured(env: NodeJS.ProcessEnv = process.env): v
   if (driver === null) {
     throw new StorageConfigError(
       "Almacenamiento de imágenes sin elegir. Define KORA_STORAGE_DRIVER=disk (las imágenes " +
-        "viven en el disco del servidor, detrás del CDN) o KORA_STORAGE_DRIVER=r2 (almacenamiento " +
+        "viven en el disco del servidor, servidas por /media) o KORA_STORAGE_DRIVER=r2 (almacenamiento " +
         "remoto). No hay valor por defecto en producción a propósito: elegir en silencio por ti " +
         "sería elegir mal sin avisar.",
       ["KORA_STORAGE_DRIVER"],

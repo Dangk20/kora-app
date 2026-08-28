@@ -14,6 +14,7 @@
 
 import "dotenv/config";
 import { db } from "../src/lib/db";
+import { assertConfiguracionDeArranqueOrExit } from "../src/lib/startup-guards";
 import { runOnce, DEFAULT_BATCH_SIZE } from "../src/modules/events/consumer";
 import { registerAllHandlers, registeredTypes } from "../src/modules/events/handlers";
 import { JOBS } from "../src/modules/jobs/definitions";
@@ -86,6 +87,19 @@ async function ciclarTrabajos() {
 }
 
 async function main() {
+  // Las MISMAS guardas de configuración que la aplicación.
+  //
+  // Faltaban aquí, y se vio al levantar producción por primera vez el 27 ago
+  // 2026: la aplicación se negó a arrancar por falta de proveedor de correo y
+  // **el worker se quedó arriba tan tranquilo**. Es la peor mitad para
+  // olvidarlo, porque el worker es justamente QUIEN ENVÍA: sin proveedor no
+  // habría fallado al desplegar —cuando se puede revertir— sino al despachar
+  // el primer comprobante de un pedido real.
+  //
+  // Un worker sano sobre un entorno incompleto es peor que uno caído: nada
+  // avisa, los eventos se consumen y sus manejadores fallan uno a uno.
+  assertConfiguracionDeArranqueOrExit();
+
   registerAllHandlers();
   console.log(
     `▸ worker activo · sondeo cada ${INTERVALO_MS} ms · lotes de ${LOTE}\n` +

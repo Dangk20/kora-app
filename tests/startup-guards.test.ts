@@ -10,6 +10,8 @@
 // Pasó de verdad al levantar producción por primera vez: el registro decía
 // "Faltan estas variables: RESEND_API_KEY" y callaba las cuatro de datos del
 // comerciante que también faltaban.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fallosDeArranque } from "@/lib/startup-guards";
 
@@ -107,5 +109,26 @@ describe("guardas de arranque — informe completo", () => {
     expect(fallosDeArranque(sinAlmacenamiento).map((f) => f.asunto)).toEqual([
       "Imágenes de producto",
     ]);
+  });
+});
+
+describe("las guardas cubren LOS DOS procesos", () => {
+  it("la aplicación y el worker comprueban lo mismo al arrancar", () => {
+    // Garantía estructural. El 27 ago 2026, al levantar producción sin
+    // proveedor de correo, la aplicación se negó a arrancar y **el worker se
+    // quedó arriba tan tranquilo** — y el worker es justamente quien envía.
+    // Sin proveedor no habría fallado al desplegar, cuando todavía se puede
+    // revertir, sino al despachar el comprobante de un pedido real.
+    //
+    // Un worker sano sobre un entorno incompleto es peor que uno caído: nada
+    // avisa, y sus manejadores fallan uno a uno en silencio.
+    const fuente = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+
+    for (const archivo of ["src/instrumentation.ts", "scripts/outbox-worker.ts"]) {
+      expect(
+        fuente(archivo),
+        `${archivo} debe comprobar la configuración al arrancar`,
+      ).toContain("assertConfiguracionDeArranqueOrExit");
+    }
   });
 });

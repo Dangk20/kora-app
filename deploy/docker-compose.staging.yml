@@ -117,6 +117,19 @@ services:
     restart: unless-stopped
     env_file:
       - .env.staging
+    # Las mismas variables de almacenamiento que `app`. El worker no sirve
+    # imágenes, pero desde el 28 ago 2026 comprueba al arrancar las MISMAS
+    # guardas de configuración que la aplicación, y "entorno completo" tiene que
+    # significar lo mismo para los dos procesos. Partir esa definición en dos
+    # es exactamente cómo el worker acabó subiendo sano en una producción sin
+    # correo configurado.
+    #
+    # No necesita el volumen: la guarda comprueba que las variables estén
+    # elegidas, no que el directorio exista — eso lo hace la aplicación, que sí
+    # escribe ahí.
+    environment:
+      KORA_STORAGE_DRIVER: disk
+      KORA_UPLOADS_DIR: /data/uploads
     depends_on:
       postgres:
         condition: service_healthy
