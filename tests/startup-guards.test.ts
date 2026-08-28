@@ -150,7 +150,7 @@ describe("la carpeta de correos tiene que ser ESCRIBIBLE", () => {
     const dir = await mkdtemp(join(tmpdir(), "kora-correos-"));
     try {
       await expect(
-        assertEmailDirWritable({ EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
+        assertEmailDirWritable({ NODE_ENV: "development", EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
       ).resolves.toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -163,7 +163,7 @@ describe("la carpeta de correos tiene que ser ESCRIBIBLE", () => {
     try {
       await chmod(padre, 0o500); // r-x: no se puede crear nada dentro
       await expect(
-        assertEmailDirWritable({ EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
+        assertEmailDirWritable({ NODE_ENV: "development", EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
       ).rejects.toThrow(EmailDirNotWritableError);
     } finally {
       await chmod(padre, 0o700).catch(() => {});
