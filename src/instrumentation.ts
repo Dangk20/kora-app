@@ -35,7 +35,7 @@ export async function register(): Promise<void> {
   // entregan los datos personales y sin ellos el checkout pide una autorización
   // que no dice a favor de quién. Ninguno de los tres da error en pantalla.
   const { assertConfiguracionDeArranqueOrExit } = await import("./lib/startup-guards");
-  assertConfiguracionDeArranqueOrExit();
+  await assertConfiguracionDeArranqueOrExit();
 
   // Y la más silenciosa de todas: que las imágenes que la base cree que
   // existen, existan. Sin volumen montado viven en el contenedor y el último

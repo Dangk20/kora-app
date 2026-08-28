@@ -16,6 +16,14 @@
 // insumos que hay que pedirle al cliente. Pedirlos de uno en uno, con un
 // despliegue entre medias, convierte un correo en cuatro.
 //
+// Además de la configuración, se comprueba que el destino de los correos en
+// disco se pueda ESCRIBIR. Aparece aquí y no entre las guardas de la aplicación
+// porque el volumen `kora-staging_correos` nació de root y el worker corre como
+// `node`: entre el 7 y el 28 de agosto de 2026, CADA correo de pruebas falló
+// con EACCES y ninguno se escribió, con el entorno con aspecto perfectamente
+// sano. Comprobar que un directorio existe no basta — uno de root también
+// existe. Hay que escribir en él.
+//
 // Las comprobaciones que dependen de la BASE no van aquí: se ejecutan después,
 // y solo si la configuración ya está completa. Preguntarle a la base antes de
 // saber si el entorno es coherente añade un modo de fallo (base caída) a un
@@ -83,10 +91,22 @@ export function fallosDeArranque(env: NodeJS.ProcessEnv = process.env): FalloDeA
  * puede quedar atrapado por el servidor y dejar el proceso vivo —que es
  * exactamente el defecto que estas guardas corrigen—.
  */
-export function assertConfiguracionDeArranqueOrExit(
+export async function assertConfiguracionDeArranqueOrExit(
   env: NodeJS.ProcessEnv = process.env,
-): void {
+): Promise<void> {
   const fallos = fallosDeArranque(env);
+
+  // Escribir de verdad en el destino de los correos, no solo mirar variables.
+  try {
+    const { assertEmailDirWritable } = await import("@/modules/email/writable");
+    await assertEmailDirWritable(env);
+  } catch (error) {
+    fallos.push({
+      asunto: "Carpeta de correos",
+      mensaje: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   if (fallos.length === 0) return;
 
   const encabezado =

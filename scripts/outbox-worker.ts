@@ -98,7 +98,7 @@ async function main() {
   //
   // Un worker sano sobre un entorno incompleto es peor que uno caído: nada
   // avisa, los eventos se consumen y sus manejadores fallan uno a uno.
-  assertConfiguracionDeArranqueOrExit();
+  await assertConfiguracionDeArranqueOrExit();
 
   registerAllHandlers();
   console.log(

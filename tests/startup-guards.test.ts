@@ -10,10 +10,13 @@
 // Pasó de verdad al levantar producción por primera vez: el registro decía
 // "Faltan estas variables: RESEND_API_KEY" y callaba las cuatro de datos del
 // comerciante que también faltaban.
+import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fallosDeArranque } from "@/lib/startup-guards";
+import { EmailDirNotWritableError, assertEmailDirWritable } from "@/modules/email/writable";
 
 /** Un entorno de producción al que NO le falta nada. */
 function produccionCompleta(): NodeJS.ProcessEnv {
@@ -130,5 +133,59 @@ describe("las guardas cubren LOS DOS procesos", () => {
         `${archivo} debe comprobar la configuración al arrancar`,
       ).toContain("assertConfiguracionDeArranqueOrExit");
     }
+  });
+});
+
+describe("la carpeta de correos tiene que ser ESCRIBIBLE", () => {
+  // El volumen `kora-staging_correos` nació de root y el worker corre como
+  // `node`: entre el 7 y el 28 de agosto de 2026 CADA correo de pruebas falló
+  // con EACCES y ninguno se escribió. El entorno se veía sano —worker arriba,
+  // eventos consumiéndose, tienda vendiendo— y el síntoma quedaba en
+  // `outbox:status`, donde hay que ir a mirarlo.
+  //
+  // Comprobar que un directorio EXISTE no habría servido de nada: uno de root
+  // también existe. Hay que escribir en él.
+
+  it("un directorio escribible pasa", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "kora-correos-"));
+    try {
+      await expect(
+        assertEmailDirWritable({ EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
+      ).resolves.toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("🔒 uno SIN permiso de escritura tumba el arranque", async () => {
+    const padre = await mkdtemp(join(tmpdir(), "kora-correos-"));
+    const dir = join(padre, "prohibido");
+    try {
+      await chmod(padre, 0o500); // r-x: no se puede crear nada dentro
+      await expect(
+        assertEmailDirWritable({ EMAIL_DEV_DIR: dir } as NodeJS.ProcessEnv),
+      ).rejects.toThrow(EmailDirNotWritableError);
+    } finally {
+      await chmod(padre, 0o700).catch(() => {});
+      await rm(padre, { recursive: true, force: true });
+    }
+  });
+
+  it("el mensaje lleva el comando que lo arregla", async () => {
+    // Se ejecuta con prisa y por alguien que no escribió esto.
+    const e = new EmailDirNotWritableError("/emails", "EACCES");
+    expect(e.message).toContain("chown -R 1000:1000");
+    expect(e.message).toContain("outbox:status");
+  });
+
+  it("en producción no se comprueba: ahí el correo sale por el proveedor", async () => {
+    const prod = {
+      NODE_ENV: "production",
+      KORA_ENV: "production",
+      RESEND_API_KEY: "re_x",
+      EMAIL_FROM: "KORA <a@b.co>",
+      EMAIL_DEV_DIR: "/ruta/que/no/existe/y/da/igual",
+    } as NodeJS.ProcessEnv;
+    await expect(assertEmailDirWritable(prod)).resolves.toBeUndefined();
   });
 });

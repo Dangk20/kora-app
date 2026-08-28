@@ -105,6 +105,20 @@ COPY prisma ./prisma
 COPY scripts ./scripts
 COPY src ./src
 COPY --from=builder /app/src/generated ./src/generated
+
+# El punto de montaje de los correos de PRUEBAS, con dueño `node`.
+#
+# Misma trampa que /data/uploads, y aquí se pagó igual: el volumen
+# `kora-staging_correos` nació de root, el worker corre como `node`, y CADA
+# correo de pruebas falló con EACCES desde el 7 ago hasta el 28 ago 2026 — tres
+# semanas de comprobantes que nunca se escribieron, mientras el entorno se veía
+# sano. Lo peor es para qué existe ese directorio: para que el cliente pueda
+# leer y aprobar los correos antes de que el dominio pueda enviarlos.
+#
+# Solo arregla volúmenes NUEVOS. Uno ya creado como root se corrige con:
+#   docker run --rm -v <pila>_correos:/e alpine chown -R 1000:1000 /e
+RUN mkdir -p /emails && chown -R node:node /emails
+
 USER node
 CMD ["node_modules/.bin/tsx", "scripts/outbox-worker.ts"]
 

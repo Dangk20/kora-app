@@ -13,7 +13,10 @@ import path from "node:path";
 import type { EmailDriver, EmailMessage, SendResult } from "./driver";
 import { fromAddress } from "./driver";
 
-const CARPETA = process.env.EMAIL_DEV_DIR?.trim() || ".emails";
+// La carpeta la decide `file-target.ts`, que es también quien consulta la
+// guarda de arranque: una sola definición, o la comprobación de escritura
+// vigilaría un directorio distinto del que se escribe.
+import { emailDevDir } from "./file-target";
 
 /** Codifica en base64 con saltos, que es lo que un `.eml` espera. */
 function base64(texto: string): string {
@@ -67,7 +70,7 @@ export function buildEml(msg: EmailMessage, from = fromAddress()): string {
   ].join("\r\n");
 }
 
-export function createFileDriver(dir = CARPETA): EmailDriver {
+export function createFileDriver(dir = emailDevDir()): EmailDriver {
   return {
     name: "file",
     async send(msg: EmailMessage): Promise<SendResult> {
