@@ -1,9 +1,13 @@
 # Respaldos de KORA — creación y recuperación ante desastre
 
+> **Respaldo diario ACTIVO desde el 28 de agosto de 2026**, a Google Drive (`respaldos:kora-respaldos/produccion`), 03:30 Colombia. El primer respaldo real de producción está subido y **verificado de punta a punta**: se bajó de Drive a otra máquina, se descifró y se restauró (30 tablas, 4 roles, 34 permisos).
+>
+> ⏳ **Deuda con fecha: el `client_id` compartido de rclone para Google Drive se retira durante 2026** y este remoto lo usa. Cuando deje de funcionar, el respaldo dejará de subir — y dejar de respaldar no produce ningún error por sí mismo, que es justo el fallo que `pnpm backup:status` existe para delatar. Hay que crear un `client_id` propio antes de que ocurra: <https://rclone.org/drive/#making-your-own-client-id>. El aviso sale en cada ejecución.
+>
 > **Última restauración real ejecutada:** ✅ **27 de agosto de 2026.**
 > Respaldo creado por `respaldar.sh` en el VPS sobre el entorno de pruebas (base + imágenes, 4.168.888 bytes cifrados), descargado a otra máquina, descifrado y restaurado ahí. Cuadró exactamente: `orders=3 · order_items=7 · customers=1 · products=20 · variants=27 · stock_movements=34 · product_images=3` y **8 de 8 archivos de imagen**. La base y el volumen de la prueba se eliminaron después.
 >
-> ⚠️ **Lo que esa fecha NO acredita todavía:** el destino era el disco del propio servidor, porque Google Drive sigue sin autorizar. Lo verificado es el **mecanismo** —volcar, cifrar, transferir, descifrar, restaurar, y que un archivo truncado falle—, no la protección contra perder la máquina. Mientras `KORA_BACKUP_REMOTE` no apunte fuera del servidor, **esto no es un respaldo**. Ver «Lo que falta» al final.
+> Ese primer ensayo usó el disco del propio servidor como destino, porque Drive aún no estaba autorizado; **al día siguiente se repitió el ciclo entero contra Drive** y es el que vale.
 
 > **⚠️ El 27 ago 2026 se descubrió que este directorio nunca llegaba al servidor.** El flujo de despliegue copia la configuración con una **lista blanca** de archivos y `backup` no estaba en ella. Resultado: los guiones, este README y todo el sistema existían en el repositorio desde el 7 de agosto y **no existían en la máquina** — tres semanas con cero copias, cero errores y la documentación de recuperación tampoco instalada. Corregido en `.github/workflows/ci.yml`. La lección se generaliza: **una lista blanca falla en silencio**, porque lo que no está no se echa de menos. Cuando algo "está construido", comprobar que además está *donde* tiene que estar.
 
@@ -90,6 +94,8 @@ rclone config
 
 ### 4. Variables en `.env.production`
 
+> ⚠️ **Todo valor con `<`, `>`, espacios o comillas va ENTRECOMILLADO.** Este guion le hace `source` al archivo como shell, y ahí `<` es una redirección. Pasó el 28 ago 2026: `EMAIL_FROM=KORA <no-responder@korashopp.com>` sin comillas dejaba la aplicación funcionando perfectamente —Docker usa su propio analizador— y **el respaldo muerto** con un `syntax error near unexpected token`. Un archivo que dos programas leen con reglas distintas rompe solo al más estricto, y aquí el más estricto es el que protege los datos.
+
 ```
 KORA_BACKUP_CONTAINER=kora-prod-postgres
 KORA_BACKUP_REMOTE=respaldos:kora-respaldos/produccion
@@ -101,9 +107,11 @@ KORA_BACKUP_UPLOADS_VOLUME=kora-prod_uploads
 
 > El volumen de imágenes se lee con un contenedor efímero (`docker run --rm -v … alpine tar`) y no por una ruta del anfitrión: un volumen de Docker vive bajo `/var/lib/docker` con permisos de root, y un bind mount traería el problema de que el usuario del contenedor y el del anfitrión coincidan. Así no depende de ninguna de las dos cosas.
 
-### 5. Programarlo — **solo cuando el destino esté fuera del servidor**
+### 5. Programarlo — **solo cuando el destino esté fuera del servidor** ✅ HECHO
 
-> ⚠️ No programar esto contra un destino local. Un `cron` que copia al disco de la propia máquina hace que `pnpm backup:status` responda "todo bien" mientras nada está protegido: cambia *no tenemos respaldos* por *creemos que tenemos respaldos*, y el segundo se descubre el día de la recuperación. Al 27 ago 2026 **sigue sin programarse**, a la espera del paso 3.
+> ⚠️ No programar esto contra un destino local. Un `cron` que copia al disco de la propia máquina hace que `pnpm backup:status` responda "todo bien" mientras nada está protegido: cambia *no tenemos respaldos* por *creemos que tenemos respaldos*, y el segundo se descubre el día de la recuperación.
+>
+> Instalado el 28 ago 2026, después de que el destino fuera Drive y no el disco local.
 
 ```bash
 sudo touch /var/log/kora-backup.log && sudo chown deploy /var/log/kora-backup.log
@@ -208,53 +216,28 @@ La única forma de que subiera sería darle además una red con internet — es 
 | `pnpm backup:verify` | Ciclo completo contra la base local, incluido que un respaldo truncado falle. |
 | `pnpm backup:status` | Si el respaldo dejó de ocurrir. Sale ≠0 cuando está atrasado o nunca corrió. |
 
-## Lo que falta para que esto proteja algo (al 27 ago 2026)
+## Estado al 28 de agosto de 2026
 
-El mecanismo está verificado de punta a punta y **todavía no hay ni un respaldo real**, porque falta el destino. Dos pasos, y el primero no lo podemos dar nosotros.
+| Pieza | Estado |
+|---|---|
+| `age` y `rclone` en el VPS | ✅ instalados (rclone v1.75 oficial, con `apt-mark hold`) |
+| Par de claves | ✅ generado; la **privada nunca ha tocado el servidor** |
+| Destino fuera del servidor | ✅ Google Drive · `respaldos:kora-respaldos/produccion` |
+| Primer respaldo de producción | ✅ subido y verificado bajándolo y restaurándolo |
+| Trabajo diario | ✅ `cron` a las 03:30 Colombia |
+| **Custodiar la clave privada en dos sitios** | ⏳ **de Daniel** — hoy vive solo en su portátil |
+| `client_id` propio de Google Drive | ⏳ antes de que se retire el compartido, durante 2026 |
 
-### 1. Autorizar Google Drive — **es de Daniel, ~3 minutos**
+**La clave pública**, que es la que va al servidor y no es secreta:
+`age1d26c2fu7gv9j9nwfpjxug6hqttdlqlyzmd9j6pnyknvmxl2dv5xszxq53z`
 
-`rclone` necesita una autorización OAuth con navegador, y el VPS no tiene ninguno. El camino previsto para servidores sin pantalla es autorizar en una máquina que sí lo tenga y pegar el resultado:
-
-```bash
-# EN TU MAC (abre el navegador y devuelve un token)
-rclone authorize "drive"
-```
-
-```bash
-# EN EL VPS: pegar el token cuando lo pida
-ssh deploy@2.24.90.21
-rclone config
-#   n) nuevo remoto · nombre: respaldos · tipo: drive
-#   client_id / client_secret: vacíos
-#   scope: 1 (acceso completo)
-#   Use auto config? → N   ← IMPORTANTE, si no intenta abrir un navegador
-#   pegar el token de arriba
-rclone mkdir respaldos:kora-respaldos/produccion
-rclone lsd respaldos:                      # tiene que listar sin error
-```
-
-### 2. Activar el trabajo diario — solo DESPUÉS del paso 1
-
-**Deliberadamente no está programado todavía.** Un `cron` que copia al disco del propio servidor haría que `pnpm backup:status` respondiera "todo bien" mientras nada está protegido: cambiaría "no tenemos respaldos" por "creemos que tenemos respaldos", que es peor. Se activa cuando `KORA_BACKUP_REMOTE` apunte fuera de la máquina.
+### Comprobar que sigue vivo
 
 ```bash
-crontab -e
+pnpm backup:status                                  # ≠0 si está atrasado o nunca corrió
+rclone lsf respaldos:kora-respaldos/produccion      # lo que hay guardado
+tail /var/log/kora-backup.log                       # la última ejecución
 ```
-
-```cron
-# 03:30 Colombia (08:30 UTC) — después del despliegue nocturno de las 02:00 y
-# lejos del tráfico de la tienda.
-30 8 * * * /home/deploy/kora/deploy/backup/respaldar.sh >> /var/log/kora-backup.log 2>&1
-```
-
-### 3. La clave privada, en dos sitios — **es de Daniel**
-
-Se generó el 27 ago 2026 en la máquina de Daniel, en `~/kora-backup.key`. **No está en ningún otro sitio todavía**, así que hoy el punto único de fallo del sistema de respaldo es un archivo en un portátil.
-
-Hay que custodiarla en dos lugares independientes —el gestor de contraseñas y un segundo sitio— antes de que exista un solo respaldo con datos reales que dependa de ella. Sin la clave, todos los respaldos son ruido.
-
-La **pública**, que es la que va al servidor y no es secreta, es `age1d26c2fu7gv9j9nwfpjxug6hqttdlqlyzmd9j6pnyknvmxl2dv5xszxq53z`.
 
 ### Estado del entorno de pruebas
 
