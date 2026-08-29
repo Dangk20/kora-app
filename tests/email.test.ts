@@ -238,7 +238,25 @@ describe("plantilla de marca", () => {
     const { html } = renderCampaign(BASE);
     expect(html).toContain("<table");
     expect(html).toContain('style="');
-    expect(html).not.toContain("<style");
     expect(html).not.toContain("flex");
+  });
+
+  it("🔒 el correo SIGUE EN PIE sin la hoja de estilos", () => {
+    // Desde el 28 ago 2026 hay un bloque <style>, y hace falta: un `@media
+    // (prefers-color-scheme)` no cabe en un atributo `style`, y sin él Gmail
+    // en el móvil invierte los colores por su cuenta y rompe el botón.
+    //
+    // La regla nunca fue "prohibido <style>" sino "lo esencial va en línea".
+    // Esto es lo que la comprueba de verdad: se le quita la hoja entera y el
+    // correo tiene que conservar su estructura, sus colores y su contenido —
+    // el <style> solo puede AÑADIR el modo oscuro, nunca sostener el diseño.
+    const { html } = renderCampaign({ ...BASE, ctaLabel: "Ir", ctaUrl: "https://x.co" });
+    const sinHoja = html.replace(/<style>[\s\S]*?<\/style>/g, "");
+
+    expect(sinHoja).toContain("<table");
+    expect(sinHoja).toContain(BASE.title);
+    // Colores y botón, en línea y por tanto intactos.
+    expect(sinHoja).toContain("#FF6A00");
+    expect(sinHoja).toContain("color:#ffffff !important");
   });
 });

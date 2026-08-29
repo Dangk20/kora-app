@@ -103,3 +103,41 @@ describe("el lenguaje no le asigna género a nadie", () => {
     }
   });
 });
+
+describe("el correo sobrevive al modo oscuro", () => {
+  // Gmail en el móvil INVIERTE los colores por su cuenta cuando el correo no
+  // declara que entiende los dos esquemas, y lo hace mal: el 28 ago 2026 el
+  // botón salía con texto oscuro sobre naranja —ilegible— y las barras del
+  // recorrido desaparecían del todo.
+  it("declara que entiende los dos esquemas", () => {
+    const { html } = renderCampaign({ ...BASE, ctaLabel: "Ir", ctaUrl: "https://x.co" });
+    expect(html).toContain('name="color-scheme"');
+    expect(html).toContain('name="supported-color-schemes"');
+  });
+
+  it("🔒 el texto del botón se declara blanco con !important", () => {
+    // Es lo único que impide que el inversor de Gmail lo oscurezca.
+    const { html } = renderCampaign({ ...BASE, ctaLabel: "Ir", ctaUrl: "https://x.co" });
+    expect(html).toMatch(/color:#ffffff !important/);
+  });
+
+  it("🔒 las barras del recorrido usan un gris MEDIO, no uno claro", () => {
+    // Un #e4e6ea se invierte a casi negro sobre fondo oscuro y desaparece.
+    const { html } = renderOrderEmail("BUYER_SHIPPED", PEDIDO);
+    expect(html).toContain("#9aa0a8");
+    expect(html).not.toContain("#e4e6ea");
+  });
+
+  it("🔒 los iconos NO son imágenes: no dependen de descargar nada", () => {
+    // Se intentaron como PNG servidos desde la tienda y salieron rotos: una
+    // imagen en un correo necesita una URL pública, y la tienda todavía no la
+    // tiene. Aunque la tuviera, los clientes las bloquean por defecto y el
+    // recorrido dependería de un clic.
+    const { html } = renderOrderEmail("BUYER_SHIPPED", PEDIDO);
+    expect(html).not.toContain("/email/");
+    expect(html).not.toMatch(/<img[^>]+pago/);
+    // Los glifos sí están, y se dibujan sin descargar nada.
+    expect(html).toContain("💳");
+    expect(html).toContain("🚚");
+  });
+});

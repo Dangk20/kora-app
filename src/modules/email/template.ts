@@ -127,7 +127,7 @@ function parrafos(texto: string): string {
     .filter(Boolean)
     .map(
       (p) =>
-        `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:${NEGRO};">${escapeHtml(
+        `<p class="kora-texto" style="margin:0 0 14px;font-size:15px;line-height:1.6;color:${NEGRO};">${escapeHtml(
           p,
         ).replace(/\n/g, "<br />")}</p>`,
     )
@@ -189,8 +189,8 @@ function parrillaProductos(products: TemplateProduct[]): string {
 function bloqueCodigo(code: string | null | undefined): string {
   if (!code) return "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
-      <tr><td align="center" style="background:#F4F5F7;border-radius:12px;padding:22px 16px;">
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:34px;line-height:1.1;font-weight:bold;letter-spacing:10px;color:${NEGRO};">${escapeHtml(
+      <tr><td align="center" class="kora-caja" style="background:#F4F5F7;border-radius:12px;padding:22px 16px;">
+        <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:34px;line-height:1.1;font-weight:bold;letter-spacing:10px;color:${NEGRO};">${escapeHtml(
           code,
         )}</div>
       </td></tr>
@@ -212,31 +212,59 @@ function bloqueCodigo(code: string | null | undefined): string {
 function lineaDeTiempo(t: { steps: string[]; current: number } | null | undefined): string {
   if (!t || t.steps.length === 0) return "";
 
+  // Los iconos son GLIFOS, no imágenes, y esa es una decisión con cicatriz.
+  //
+  // Primero se hicieron como PNG servidos desde la tienda. Salieron rotos en
+  // Gmail el 28 ago 2026, y el motivo es estructural, no un descuido: una
+  // imagen en un correo necesita una URL PÚBLICA, y hoy la tienda no la tiene
+  // —pruebas está tras contraseña y producción todavía no abre—. Aunque la
+  // tuviera, la mayoría de los clientes bloquean las imágenes hasta que alguien
+  // pulsa "mostrar imágenes": el recorrido dependería de un clic.
+  //
+  // Un glifo es un vector de la fuente del sistema. No se descarga, no se
+  // bloquea, no se rompe, y se ve en modo claro y en oscuro. Se pierde el
+  // trazo de marca; se gana que SIEMPRE esté.
+  const ICONOS = ["💳", "📦", "🚚", "✅"];
+
   const celdas = t.steps
     .map((paso, i) => {
       const hecho = i <= t.current;
-      const color = hecho ? NARANJA : "#c9ccd2";
-      const punto = i === t.current
-        ? `<div style="width:15px;height:15px;border-radius:50%;background:${NARANJA};border:3px solid #FFE0CC;margin:0 auto;"></div>`
-        : `<div style="width:13px;height:13px;border-radius:50%;background:${hecho ? NARANJA : "#ffffff"};border:2px solid ${color};margin:0 auto;"></div>`;
+      const icono = ICONOS[i] ?? "•";
 
-      // La barra a la izquierda de cada punto salvo el primero: es lo que hace
-      // que se lea como un recorrido y no como cuatro cosas sueltas.
+      // Gris MEDIO y no claro: en el modo oscuro de Gmail un #e4e6ea se
+      // invierte a casi negro sobre fondo oscuro y la barra desaparece. Un tono
+      // medio se ve en los dos modos, que es lo único que se puede garantizar
+      // cuando el cliente decide invertir por su cuenta.
       const barra = i === 0
         ? ""
-        : `<td width="60" style="padding:0 0 12px;"><div style="height:3px;background:${hecho ? NARANJA : "#e4e6ea"};"></div></td>`;
+        : `<td width="46" valign="top" style="padding:34px 0 0;">
+             <div style="height:3px;line-height:3px;font-size:0;background:${hecho ? NARANJA : "#9aa0a8"};">&nbsp;</div>
+           </td>`;
 
-      return `${barra}<td align="center" valign="top" style="padding:0 4px;">
-          ${punto}
-          <div style="margin-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.3;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:${
-            hecho ? NEGRO : GRIS
-          };">${escapeHtml(paso)}</div>
+      return `${barra}<td align="center" valign="top" style="padding:0 2px;">
+          <!-- El filtro de escala de grises apaga el glifo de los pasos que
+               faltan sin cambiarlo por otro: el recorrido se lee de un vistazo
+               y sigue siendo el mismo icono. Donde el filtro no se soporte, se
+               ve el glifo a color, que es un fallo inofensivo. -->
+          <div style="font-size:24px;line-height:1.1;margin-bottom:6px;${
+            hecho ? "" : "filter:grayscale(100%);opacity:0.45;"
+          }">${icono}</div>
+          <div style="width:13px;height:13px;line-height:13px;font-size:0;border-radius:50%;background:${
+            hecho ? NARANJA : "#9aa0a8"
+          };margin:0 auto;">&nbsp;</div>
+          <!-- Altura fija: sin ella, una etiqueta que envuelve en dos líneas
+               empuja a su columna y el recorrido queda escalonado. Pasó con
+               "EN CAMINO" el 28 ago 2026. -->
+          <div class="${hecho ? "kora-texto" : "kora-suave"}"
+               style="margin-top:8px;height:30px;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;line-height:1.25;font-weight:bold;text-transform:uppercase;letter-spacing:0.4px;color:${
+                 hecho ? NEGRO : GRIS
+               };">${escapeHtml(paso)}</div>
         </td>`;
     })
     .join("");
 
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:#FAF8F5;border-radius:12px;">
-      <tr><td style="padding:22px 14px 18px;">
+  return `<table role="presentation" class="kora-caja" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:#FAF8F5;border-radius:12px;">
+      <tr><td style="padding:20px 10px 16px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${celdas}</tr></table>
       </td></tr>
     </table>`;
@@ -245,16 +273,19 @@ function lineaDeTiempo(t: { steps: string[]; current: number } | null | undefine
 export function renderCampaignHtml(input: TemplateInput): string {
   const base = input.storeBase ?? storeUrl();
   const saludo = input.recipientName
-    ? `<p style="margin:0 0 10px;font-size:15px;color:${NEGRO};">Hola, ${escapeHtml(
+    ? `<p class="kora-texto" style="margin:0 0 10px;font-size:15px;color:${NEGRO};">Hola, ${escapeHtml(
         input.recipientName.split(" ")[0],
       )} 👋</p>`
     : "";
 
   const cta =
     input.ctaLabel && input.ctaUrl
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      ? `<table role="presentation" class="kora-boton" cellpadding="0" cellspacing="0" style="margin:22px 0;">
            <tr><td style="border-radius:999px;background:${NARANJA};">
-             <a href="${input.ctaUrl}" style="display:inline-block;padding:13px 30px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:999px;">${escapeHtml(
+             <!-- El !important del color no sobra: es lo único que evita que
+                  el modo oscuro de Gmail invierta el blanco y deje el texto
+                  ilegible sobre el naranja. Pasó el 28 ago 2026. -->
+             <a href="${input.ctaUrl}" style="display:inline-block;padding:13px 30px;font-size:15px;font-weight:bold;color:#ffffff !important;text-decoration:none;border-radius:999px;">${escapeHtml(
                input.ctaLabel,
              )}</a>
            </td></tr>
@@ -269,9 +300,33 @@ export function renderCampaignHtml(input: TemplateInput): string {
 <html lang="es"><head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<!-- MODO OSCURO. Sin esto, Gmail en el móvil INVIERTE los colores por su
+     cuenta y lo hace mal: el 28 ago 2026 el botón salía con texto oscuro sobre
+     naranja —ilegible— y las barras del recorrido desaparecían.
+     Declarar que el correo entiende los dos esquemas hace que los clientes que
+     lo respetan dejen de inventar, y el bloque de abajo cubre a los que sí
+     aplican prefers-color-scheme (Apple Mail, iOS, Outlook.com). -->
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
 <title>${escapeHtml(input.subject)}</title>
+<style>
+  /* Gmail descarta casi toda la hoja de estilos, por eso TODO lo esencial va
+     en línea. Esto es solo la capa de modo oscuro: si se descarta, el correo
+     sigue siendo el de siempre. */
+  @media (prefers-color-scheme: dark) {
+    .kora-fondo   { background:#141116 !important; }
+    .kora-tarjeta { background:#1C181F !important; }
+    .kora-texto   { color:#F3EDF0 !important; }
+    .kora-suave   { color:#BAB0BE !important; }
+    .kora-caja    { background:#262029 !important; }
+    .kora-borde   { border-color:#362E3B !important; }
+    /* El botón NO se invierte: su texto es blanco sobre el naranja de la marca
+       en los dos modos, que es justo lo que Gmail rompía. */
+    .kora-boton a { color:#ffffff !important; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:${BEIGE};">
+<body class="kora-fondo" style="margin:0;padding:0;background:${BEIGE};">
 <!-- El preheader es lo que la bandeja muestra junto al asunto. Oculto en el
      cuerpo, pero decide si el correo se abre. -->
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
@@ -281,7 +336,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BEIGE};">
 <tr><td align="center" style="padding:24px 12px;">
 
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="kora-tarjeta" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
 
     <tr><td style="background:linear-gradient(135deg,${NARANJA},${MORADO});background-color:${NARANJA};padding:22px 26px;">
       <a href="${base}" style="font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;">KORA</a>
@@ -291,7 +346,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
 
     <tr><td style="padding:26px;font-family:Arial,Helvetica,sans-serif;">
       ${saludo}
-      <h1 style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
+      <h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
         input.title,
       )}</h1>
       ${parrafos(input.body)}
