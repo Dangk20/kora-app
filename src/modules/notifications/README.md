@@ -70,7 +70,8 @@ a mano.
 | `BUYER_SHIPPED` | Comprador | Va en camino |
 | `BUYER_DELIVERED` | Comprador | Entregado, con el cashback y la **ventana de cambios de 30 días** |
 | `BUYER_CANCELLED` | Comprador | Cancelado o expirado, con el cashback devuelto |
-| `STAFF_NEW_ORDER` | Operador | Enlace directo al pedido en el panel |
+| `BUYER_PAYMENT_REMINDER` | Comprador | A una hora de vencer: todavía puedes confirmar |
+| `STAFF_NEW_ORDER` | Equipo | Enlace directo al pedido en el panel |
 
 El evento de cada estado se escribe **dentro de la transacción** que lo cambia
 (`EVENTO_POR_ESTADO` en `orders/actions.ts`), así que una transición rechazada
@@ -103,7 +104,45 @@ que no recibe avisos tiene que poder enterarse.
 **No sale ni un correo todavía:** `korashopp.com` no tiene SPF, DKIM ni DMARC y
 no hay cuenta de proveedor. Insumo del cliente desde el 31 jul.
 
-Mientras tanto todo funciona contra disco: `pnpm emails:preview` genera los siete
+Mientras tanto todo funciona contra disco: `pnpm emails:preview` genera los ocho
 en `.emails/` y se abren con doble clic, así que **el cliente puede aprobarlos
 antes de que el dominio exista**. Activar el envío es configuración, no
 desarrollo.
+
+## El octavo correo es distinto a los otros siete
+
+`BUYER_PAYMENT_REMINDER` **no nace de un cambio de estado**. A una hora de que el
+pedido expire, el estado sigue siendo `PENDING` —no ha cambiado nada— y sin
+embargo hay algo que decir. Por eso no vive en `EVENTO_POR_ESTADO` sino en un
+trabajo programado (`orders:payment-reminder`, cada 10 min) que va a buscarlos.
+
+**La ventana se ancla en `expiresAt`, nunca en `createdAt`.** Escribir "pedidos
+creados hace más de 23 horas" repite la vigencia en un segundo sitio: si mañana
+el cliente pide 48 h, ese 23 se queda obsoleto en silencio y el recordatorio
+empieza a llegar a mitad de la ventana sin que nada falle. Anclado en el
+vencimiento, "una hora antes" sigue siendo una hora antes aunque la vigencia
+cambie.
+
+**La antelación también se deriva** (`leadTimeMs`): una hora, acotada a la mitad
+de la vigencia. Con una vigencia de 30 minutos, "una hora antes" caería en el
+pasado y **todo** pedido entraría en la ventana nada más crearse — el
+recordatorio se convertiría en un segundo correo inmediato.
+
+**Que un pedido caiga en varias pasadas no importa.** Quien garantiza que el
+correo salga una vez es la reserva —índice único `(pedido, tipo, destinatario)`—,
+no la ventana. El filtro que salta los que ya tienen fila es una optimización,
+no la garantía: leer no es reservar.
+
+**No toca el pedido.** Recordar y vencer son trabajos distintos; si este
+cambiara estados, un fallo suyo se convertiría en pedidos cancelados por error.
+
+## A quién llega el aviso de pedido nuevo
+
+Al correo configurado del negocio (`pnpm staff:email`) **más todos los usuarios
+con rol `admin` que estén activos**, sin repetidos. Solo administradores: un
+cajero atiende pedidos pero no tiene por qué recibir en su correo personal el
+aviso de cada venta.
+
+Cada destinatario tiene **su propia reserva**, así que una dirección que rebota
+no deja sin aviso a las demás, y al reintentar quien ya recibió no recibe otra
+vez.

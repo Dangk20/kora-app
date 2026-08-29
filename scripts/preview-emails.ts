@@ -32,6 +32,8 @@ const EJEMPLO: OrderEmailData = {
   cashbackEarned: 5_550,
   cashbackExpiresAt: new Date("2027-08-01T05:00:00Z"),
   cashbackRefunded: 5_000,
+  // Solo lo usa el recordatorio de pago.
+  hoursLeft: 1,
 };
 
 // Los siete, en el orden en que un comprador los recibiría.
@@ -42,6 +44,10 @@ const TODOS: OrderEmailType[] = [
   "BUYER_SHIPPED",
   "BUYER_DELIVERED",
   "BUYER_CANCELLED",
+  // El octavo, y el único que no nace de un cambio de estado: llega cuando al
+  // pedido le queda una hora. Va aquí porque el cliente tiene que aprobarlo
+  // igual que los otros siete.
+  "BUYER_PAYMENT_REMINDER",
   "STAFF_NEW_ORDER",
 ];
 

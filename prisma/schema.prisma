@@ -842,6 +842,12 @@ enum OrderEmailType {
   BUYER_DELIVERED // al comprador: entregado
   BUYER_CANCELLED // al comprador: cancelado o expirado
   STAFF_NEW_ORDER // al operador: entró un pedido
+
+  // El octavo, y el ÚNICO que no nace de un cambio de estado: a una hora de que
+  // el pedido expire, el estado no ha cambiado y sin embargo hay algo que
+  // decir. Por eso no vive en EVENTO_POR_ESTADO sino en un trabajo programado.
+  // Petición del cliente del 7 ago 2026.
+  BUYER_PAYMENT_REMINDER // al comprador: te queda poco para confirmar el pago
 }
 
 model OrderEmail {

@@ -24,6 +24,8 @@ export type OrderEmailData = {
   cashbackRefunded?: number;
   /** Motivo, cuando el pedido se canceló o expiró. */
   cancelReason?: "EXPIRED" | "CANCELLED";
+  /** Horas que le quedan al pedido. Solo para el recordatorio de pago. */
+  hoursLeft?: number;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -175,6 +177,32 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
             "escríbenos por WhatsApp.",
         cta: { label: "Volver a la tienda", url: storeUrl() },
         notes,
+      });
+    }
+
+    case "BUYER_PAYMENT_REMINDER": {
+      // El ÚNICO correo que no nace de un cambio de estado: el pedido sigue
+      // pendiente y sin embargo hay algo que decir. Petición del cliente del
+      // 7 ago 2026.
+      //
+      // El tono importa más aquí que en los otros seis. Quien recibe esto no
+      // hizo nada mal: dejó una compra a medias, que es lo más normal del
+      // mundo. Un recordatorio que suene a reclamo consigue que no vuelva.
+      const restante = data.hoursLeft ?? 1;
+      const cuanto = restante <= 1 ? "menos de una hora" : `${restante} horas`;
+
+      return base(data, {
+        subject: `Tu pedido ${data.orderNumber} está por vencer`,
+        preheader: "Todavía puedes confirmarlo por WhatsApp.",
+        title: "Tu pedido sigue esperándote",
+        body:
+          `Dejaste este pedido listo y todavía no hemos cerrado el pago. Te quedan ` +
+          `${cuanto} para confirmarlo por WhatsApp.\n\n` +
+          "Si ya no lo quieres no tienes que hacer nada: se cancela solo y los productos " +
+          "vuelven a quedar disponibles.",
+        cta: data.whatsappUrl
+          ? { label: "Confirmar por WhatsApp", url: data.whatsappUrl }
+          : { label: "Volver a la tienda", url: storeUrl() },
       });
     }
 

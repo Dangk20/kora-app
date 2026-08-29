@@ -18,6 +18,8 @@ import { expireCashback } from "@/modules/cashback/ledger";
 import { describeVerification, verifyCashbackLedger } from "@/modules/cashback/verify";
 import { findLedgerMismatches } from "@/modules/inventory/engine";
 import { expireStaleOrders } from "@/modules/orders/expire";
+import { ORDER_TTL_HOURS } from "@/modules/orders/status";
+import { sendPaymentReminders } from "@/modules/notifications/reminder";
 import { outboxHealth } from "@/modules/events/health";
 
 /** Lo que un trabajo devuelve para dejar constancia de qué hizo. */
@@ -41,9 +43,11 @@ const HORA = 60 * MINUTO;
 export const JOBS: readonly JobDefinition[] = [
   {
     name: "orders:expire",
-    description: "Cancela los pedidos pendientes que superaron su vigencia de 2 h",
-    // Un pedido vence a las 2 h; 5 min acota el error a un margen despreciable
-    // frente a esa ventana.
+    // La vigencia se DERIVA, no se escribe: decía "2 h" y el 27 ago 2026 pasó a
+    // 24. Un texto de diagnóstico que miente sobre el sistema es peor que no
+    // tenerlo, porque se lee justo cuando algo va mal.
+    description: `Cancela los pedidos pendientes que superaron su vigencia de ${ORDER_TTL_HOURS} h`,
+    // 5 min acota el error a un margen despreciable frente a esa ventana.
     everyMs: 5 * MINUTO,
     timeoutMs: 2 * MINUTO,
     async run() {
@@ -55,6 +59,29 @@ export const JOBS: readonly JobDefinition[] = [
           r.expired === 0
             ? "sin pedidos vencidos"
             : `${r.expired} pedido(s) cancelados: ${r.numbers.join(", ")}`,
+      };
+    },
+  },
+  {
+    name: "orders:payment-reminder",
+    description: "Avisa al comprador cuando a su pedido le queda una hora para vencer",
+    // Cada 10 min sobre una ventana de una hora: cada pedido entra en varias
+    // pasadas, y eso es deliberado. Si una pasada falla —el proveedor caído, el
+    // worker reiniciándose— la siguiente lo recoge. Que no salga dos veces no
+    // depende de esta cadencia sino de la reserva.
+    everyMs: 10 * MINUTO,
+    timeoutMs: 5 * MINUTO,
+    async run() {
+      const r = await sendPaymentReminders();
+      if (r.sent === 0 && r.alreadySent === 0 && r.skipped === 0) {
+        return { summary: "ningún pedido a punto de vencer" };
+      }
+      return {
+        summary:
+          `${r.sent} aviso(s) enviados` +
+          (r.numbers.length > 0 ? `: ${r.numbers.join(", ")}` : "") +
+          (r.alreadySent > 0 ? ` · ${r.alreadySent} ya avisados` : "") +
+          (r.skipped > 0 ? ` · ${r.skipped} omitidos` : ""),
       };
     },
   },
