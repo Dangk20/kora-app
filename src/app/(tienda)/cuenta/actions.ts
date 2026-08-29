@@ -21,6 +21,13 @@ import {
   startBuyerSession,
 } from "@/modules/buyer/session-cookie";
 import { requireBuyer } from "@/modules/buyer/guard";
+import {
+  MENSAJE_ENVIO,
+  confirmPasswordReset,
+  requestPasswordReset,
+} from "@/modules/buyer/reset";
+import { sendResetCode } from "@/modules/buyer/reset-email";
+import { sendWelcomeEmail } from "@/modules/buyer/welcome-email";
 
 export type FormState = { error?: string; ok?: boolean } | null;
 
@@ -73,6 +80,21 @@ export async function crearCuenta(_prev: FormState, formData: FormData): Promise
     phone: String(formData.get("phone") ?? "") || null,
   });
   if (!r.ok) return { error: r.error };
+
+  // La bienvenida sale SOLO si de verdad se creó o activó una cuenta.
+  // `customerId` es null cuando el correo ya tenía cuenta y no se tocó nada:
+  // mandar un "bienvenido" ahí sería avisar a alguien de algo que no pasó, y
+  // encima le confirmaría a quien lo intentó que esa cuenta existe.
+  //
+  // El fallo se traga: nadie debería quedarse sin cuenta porque el proveedor
+  // de correo tuvo un mal segundo. La cuenta es lo que la persona pidió.
+  if (r.customerId) {
+    const cliente = await db.customer.findUnique({
+      where: { id: r.customerId },
+      select: { name: true },
+    });
+    await sendWelcomeEmail(email.trim().toLowerCase(), cliente?.name ?? null).catch(() => false);
+  }
 
   // El registro no delata si la cuenta ya existía, así que tampoco puede
   // entrar a ciegas: se comprueban las credenciales igual que en el acceso.
@@ -130,4 +152,67 @@ export async function cambiarPassword(_prev: FormState, formData: FormData): Pro
   await revokeAllSessions(buyer.customerId, await currentBuyerToken());
 
   return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Recuperación de contraseña por código
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Pide el código.
+ *
+ * Devuelve SIEMPRE lo mismo: exista la cuenta o no, falle el envío o no. Un
+ * "no encontramos ese correo" convertiría esta pantalla en una forma de
+ * averiguar quién compra en KORA; un "no pudimos enviarlo" lo diría igual, solo
+ * que más despacio.
+ */
+export async function pedirCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ip = await origen();
+  const limite = comprobarLimite(ip);
+  if (!limite.permitido) {
+    const min = Math.ceil(limite.esperaSegundos / 60);
+    return { error: `Demasiados intentos. Espera ${min} minuto(s) y vuelve a probar.` };
+  }
+
+  const email = String(formData.get("email") ?? "");
+  const { codigo, customerName } = await requestPasswordReset(email);
+
+  if (codigo) {
+    // El fallo del envío se traga a propósito: decirlo delataría que el correo
+    // tiene cuenta. El código emitido caduca solo y la persona puede pedir otro.
+    await sendResetCode(email.trim().toLowerCase(), codigo, customerName).catch(() => false);
+  } else {
+    // Se gasta un intento igual cuando no hay cuenta: si solo se contaran los
+    // aciertos, el límite mismo revelaría cuáles son.
+    registrarFallo(ip);
+  }
+
+  return { ok: true, error: MENSAJE_ENVIO };
+}
+
+/** Cambia la contraseña con el código. Al lograrlo cierra todas las sesiones. */
+export async function confirmarCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ip = await origen();
+  const limite = comprobarLimite(ip);
+  if (!limite.permitido) {
+    const min = Math.ceil(limite.esperaSegundos / 60);
+    return { error: `Demasiados intentos. Espera ${min} minuto(s) y vuelve a probar.` };
+  }
+
+  const r = await confirmPasswordReset(
+    String(formData.get("email") ?? ""),
+    String(formData.get("code") ?? ""),
+    String(formData.get("password") ?? ""),
+  );
+
+  if (!r.ok) {
+    registrarFallo(ip);
+    return { error: r.error };
+  }
+
+  limpiarIntentos(ip);
+  // NO se inicia sesión sola. Quien acaba de recuperar entra escribiendo su
+  // contraseña nueva: es la comprobación de que la recuerda, y evita que un
+  // código robado se convierta en una sesión sin teclear nada más.
+  redirect("/cuenta/entrar?recuperada=1");
 }

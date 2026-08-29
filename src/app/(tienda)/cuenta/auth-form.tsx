@@ -102,12 +102,14 @@ export function EntrarForm({
 
       <Enviar texto="Entrar" enviando="Entrando…" />
 
-      {/* Sin enlace de recuperación a propósito: el dominio todavía no tiene
-          registros de correo, así que el enlace no entregaría nada. Un flujo
-          que no funciona es peor que no ofrecerlo — el comprador lo intenta
-          tres veces y concluye que la tienda está rota. */}
-      <p className="text-center text-[12.5px] text-muted-foreground">
-        ¿Olvidaste tu contraseña? Escríbenos por WhatsApp y te ayudamos a recuperarla.
+      {/* El enlace vuelve el 28 ago 2026, cuando el dominio pudo enviar correo.
+          Antes decía "escríbenos por WhatsApp y te ayudamos": un apaño que
+          obligaba a que alguien del negocio cambiara la contraseña de otra
+          persona, que es justo lo que un sistema de cuentas debe evitar. */}
+      <p className="text-center text-[12.5px]">
+        <Link href="/cuenta/recuperar" className="text-muted-foreground underline">
+          ¿Olvidaste tu contraseña?
+        </Link>
       </p>
       <p className="text-center text-[13px]">
         ¿No tienes cuenta?{" "}

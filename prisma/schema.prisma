@@ -254,6 +254,7 @@ model Customer {
   orders             Order[]
   cashbackMovements  CashbackMovement[]
   sessions           BuyerSession[]
+  passwordResets     PasswordReset[]
   couponRedemptions  CouponRedemption[]
   campaignRecipients CampaignRecipient[]
   consentEvents      ConsentEvent[]
@@ -518,6 +519,33 @@ model CouponRedemption {
 // surtir efecto YA, y detrás de esta cuenta hay saldo gastable. Es la misma
 // decisión que rige requirePermission(), que verifica contra la base.
 // ─────────────────────────────────────────────────────────────
+
+// Recuperación de contraseña del comprador, por código al correo.
+//
+// Se guarda el HASH del código, nunca el código. Es una credencial: quien pueda
+// leer esta tabla no puede entrar en ninguna cuenta con lo que ve — mismo
+// criterio que las contraseñas y que las sesiones, y por el mismo motivo.
+//
+// Seis dígitos son un millón de combinaciones: sin límite de intentos, un guion
+// las prueba en minutos. Por eso `attempts` no es diagnóstico, es la defensa.
+model PasswordReset {
+  id String @id @default(cuid())
+
+  codeHash String @unique
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  // Un solo uso. Sin esto, quien vea el código una vez —en una pantalla, en un
+  // reenvío— podría volver a usarlo mientras no caduque.
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([customerId, createdAt])
+  @@map("password_resets")
+}
 
 model BuyerSession {
   id String @id @default(cuid())

@@ -6,6 +6,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, MessageCircle } from "lucide-react";
+// El plazo se DERIVA, nunca se escribe. Aquí decía "2 horas" y el 27 ago 2026
+// la vigencia pasó a 24: esta pantalla es lo ÚLTIMO que ve el comprador antes
+// de irse a WhatsApp, así que el número equivocado se lo lleva puesto. Tercer
+// sitio donde estaba escrito a mano; los otros dos eran la página de términos
+// y las plantillas de correo.
+import { ORDER_TTL_HOURS } from "@/modules/orders/status";
 
 export function OrderBridge({
   orderNumber,
@@ -50,7 +56,7 @@ export function OrderBridge({
           <p className="text-[12.5px] leading-relaxed text-[#4a4f58]">
             <strong className="font-semibold text-kora-black">Importante:</strong> tu
             pedido se confirma cuando completes la conversación en WhatsApp.
-            Tiene una validez de <strong>2 horas</strong>.
+            Tiene una validez de <strong>{ORDER_TTL_HOURS} horas</strong>.
           </p>
         </div>
 
