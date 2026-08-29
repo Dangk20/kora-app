@@ -25,6 +25,8 @@ import {
 // Ver el comentario de ORDER_TTL_HOURS en `status.ts`.
 import { ORDER_TTL_MS } from "./status";
 import { whatsappNumberFor } from "./settings";
+import { computeAccrual } from "@/modules/cashback/accrual";
+import { formatMoney } from "@/modules/pricing";
 import { toE164 } from "@/modules/customers/phone";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { resolveOrderCustomer } from "./customer-link";
@@ -75,27 +77,105 @@ const baseSchema = z.object({
 });
 
 export type CheckoutResult =
-  | { ok: true; orderNumber: string; whatsappUrl: string }
+  | {
+      ok: true;
+      orderNumber: string;
+      whatsappUrl: string;
+      /**
+       * Cashback que este pedido GENERARÁ al confirmarse, en su moneda.
+       *
+       * Sale de aquí y no del navegador porque se calcula sobre el total que
+       * quedó GUARDADO —ya neto de cupón y de saldo aplicado—, que es lo que el
+       * operador va a cobrar. Recalcularlo en el cliente sería una segunda
+       * definición de la misma cifra, y la de la pantalla podría alejarse de la
+       * que luego acredita el libro.
+       *
+       * Va en futuro en la interfaz: al crear el pedido el libro todavía no
+       * tiene nada, y la acreditación ocurre al CONFIRMAR.
+       *
+       * Formateado aquí, en su moneda, y `null` cuando no genera nada —una
+       * compra cubierta entera con saldo genera CERO, y "$0" leído en una lista
+       * de beneficios se entiende como un fallo—.
+       */
+      cashbackPrevisto: string | null;
+      /**
+       * Qué ofrecerle al comprador según su correo:
+       *   "none"   → todavía no tiene cuenta: se le invita a crearla.
+       *   "exists" → ya la tiene: se le ofrece entrar para ver este pedido.
+       *
+       * ⚠️ En los dos casos, el pedido YA queda atado a su cliente por el
+       * correo (`resolveOrderCustomer`). Entrar es comodidad —verlo ahora—, no
+       * el requisito para que aparezca en su cuenta. Es exactamente lo que el
+       * correo de bienvenida promete, y hay pruebas que lo sostienen.
+       *
+       * ⚠️ Este dato dice, indirectamente, si un correo tiene cuenta en KORA —
+       * y el resto del módulo del comprador se cuida mucho de no revelarlo:
+       * ni al entrar, ni al registrarse, ni al recuperar la contraseña.
+       *
+       * Aquí se acepta, y conviene entender por qué no es la misma situación.
+       * Aquellas pantallas se prueban gratis: se teclea un correo y se mira la
+       * respuesta. Esta exige llenar el formulario entero, tener un carrito y
+       * CREAR UN PEDIDO REAL — que le llega al operador, le manda correos al
+       * dueño de la dirección y queda en la base a su nombre. Averiguar así
+       * quién tiene cuenta es caro, lento y ruidoso, y deja rastro en la
+       * pantalla de pedidos de alguien.
+       *
+       * A cambio, invitar a quien YA tiene cuenta a crearse otra es enseñarle
+       * un camino que no lleva a ninguna parte.
+       */
+      account: "none" | "exists";
+    }
   | { ok: false; error: string; field?: string };
 
 type OrderRow = {
   number: number;
+  // OBLIGATORIO, no opcional. Si fuera opcional, una consulta futura que
+  // olvidara traerlo compilaría igual y la invitación a crear cuenta
+  // simplemente dejaría de aparecer — sin error, sin aviso, sin nadie
+  // enterándose. Exigiéndolo, el compilador señala el sitio.
+  contactEmail: string | null;
   createdAt: Date;
   currency: "COP" | "USD";
+  // El total GUARDADO, ya neto de cupón y de cashback aplicado. Obligatorio por
+  // el mismo motivo que `contactEmail`: si fuera opcional, una consulta que lo
+  // olvidara compilaría y la cifra de cashback se iría a cero en silencio.
+  total: Prisma.Decimal;
   whatsappMessage: string | null;
 };
 
 /** Respuesta a partir de un pedido ya persistido (nuevo o recuperado). */
 async function orderResult(order: OrderRow): Promise<CheckoutResult> {
   const orderNumber = formatOrderNumber(order.number, order.createdAt);
+  const previsto = computeAccrual({ total: Number(order.total), currency: order.currency });
   return {
     ok: true,
     orderNumber,
+    cashbackPrevisto: previsto > 0 ? formatMoney(previsto, order.currency) : null,
+    account: await estadoDeCuenta(order.contactEmail),
     whatsappUrl: whatsappUrl(
       await whatsappNumberFor(order.currency),
       order.whatsappMessage ?? `Hola KORA 👋, quiero confirmar mi pedido ${orderNumber}`,
     ),
   };
+}
+
+/**
+ * ¿Ese correo tiene cuenta, o solo es un cliente sin credencial?
+ *
+ * Se mira la CREDENCIAL y no la existencia del cliente: quien compró como
+ * invitado ya es cliente —el checkout lo crea en silencio— pero no tiene
+ * cuenta. A esa persona hay que invitarla, y es a quien más le sirve, porque
+ * registrarse le devuelve el historial que ya tiene.
+ */
+async function estadoDeCuenta(email: string | null): Promise<"none" | "exists"> {
+  const limpio = email?.trim().toLowerCase();
+  if (!limpio) return "none";
+
+  const c = await db.customer.findUnique({
+    where: { email: limpio },
+    select: { passwordHash: true, accountActive: true },
+  });
+  return c?.passwordHash && c.accountActive ? "exists" : "none";
 }
 
 export async function createOrder(

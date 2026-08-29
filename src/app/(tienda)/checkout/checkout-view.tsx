@@ -21,6 +21,8 @@ import {
 } from "@/modules/orders/geo";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { OrderBridge } from "./order-bridge";
+import { PantallaProceso } from "./pantalla-proceso";
+import { InvitacionCuenta } from "./invitacion-cuenta";
 
 // `min-h-12` = 48 px: el mínimo táctil del diseño (§05). Y `text-base` en
 // móvil no es estética — iOS hace zoom automático sobre cualquier campo con
@@ -53,9 +55,19 @@ export function CheckoutView({
   const [loading, startLoading] = useTransition();
   const [submitting, startSubmit] = useTransition();
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
-  const [done, setDone] = useState<{ orderNumber: string; whatsappUrl: string } | null>(
-    null,
-  );
+  const [done, setDone] = useState<{
+    orderNumber: string;
+    whatsappUrl: string;
+    account: "none" | "exists";
+    cashbackPrevisto: string | null;
+  } | null>(null);
+  // Se pasa a WhatsApp cuando el comprador decide: creando la cuenta o
+  // diciendo "en otro momento". Nunca se salta la invitación sola.
+  const [seguirYa, setSeguirYa] = useState(false);
+  // La pantalla de proceso terminó de contarse. Se espera A LAS DOS COSAS —el
+  // servidor y el relato— porque el servidor responde en unos 300 ms y sin esto
+  // la pantalla sería un parpadeo.
+  const [procesoContado, setProcesoContado] = useState(false);
   const [country, setCountry] = useState<Country>(initialCountry);
   const [state, setState] = useState("");
 
@@ -116,14 +128,44 @@ export function CheckoutView({
       const result = await createOrder(lines, payload);
       if (result.ok) {
         clear(); // el carrito se vacía SOLO con el pedido ya creado
-        setDone({ orderNumber: result.orderNumber, whatsappUrl: result.whatsappUrl });
+        setDone({
+          orderNumber: result.orderNumber,
+          whatsappUrl: result.whatsappUrl,
+          account: result.account,
+          cashbackPrevisto: result.cashbackPrevisto,
+        });
       } else {
         setError({ message: result.error, field: result.field });
       }
     });
   };
 
+  // Mientras el servidor trabaja Y mientras la pantalla termina de contarse.
+  // Es la única ventana que el comprador tiene a lo que está pasando, y sin
+  // ella algunos vuelven a pulsar.
+  //
+  // Si el pedido FALLA se sale de aquí de inmediato: hacerle mirar una
+  // animación optimista a quien tiene un error esperándole sería burlarse.
+  if (!error && (submitting || (done && !procesoContado))) {
+    return <PantallaProceso onListo={() => setProcesoContado(true)} />;
+  }
+
   if (done) {
+    // Solo se invita a quien todavía no tiene cuenta, y solo hasta que decide.
+    if (!seguirYa && !buyer) {
+      return (
+        <InvitacionCuenta
+          orderNumber={done.orderNumber}
+          checkoutToken={checkoutToken.current}
+          // Lo calcula el SERVIDOR, sobre el total que quedó guardado. Aquí
+          // no se recalcula: sería una segunda definición de la misma cifra, y
+          // la de esta pantalla podría alejarse de la que acredita el libro.
+          cashback={done.cashbackPrevisto}
+          tieneCuenta={done.account === "exists"}
+          onContinuar={() => setSeguirYa(true)}
+        />
+      );
+    }
     return <OrderBridge orderNumber={done.orderNumber} whatsappUrl={done.whatsappUrl} />;
   }
 
