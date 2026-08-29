@@ -55,6 +55,30 @@ export type TemplateInput = {
   order?: TemplateOrder | null;
   recipientName?: string | null;
   storeBase?: string;
+  /**
+   * Código de verificación, en grande y en su propia caja.
+   *
+   * Va como pieza de la plantilla y no como texto del cuerpo porque en un
+   * correo así el código ES el contenido: quien lo abre viene a copiar seis
+   * dígitos, muchas veces en el móvil y con prisa. Perdido en un párrafo hay
+   * que buscarlo, y un dígito mal copiado se vive como que el sistema falla.
+   */
+  code?: string | null;
+  /**
+   * Línea de tiempo del pedido. `current` es el índice del paso en curso.
+   *
+   * Convierte "tu pedido está confirmado" en una respuesta a la pregunta que
+   * el comprador se hace de verdad: y ahora qué, y cuánto falta.
+   */
+  timeline?: { steps: string[]; current: number } | null;
+  /**
+   * Texto que va DESPUÉS del código o de la línea de tiempo.
+   *
+   * Existe porque el orden importa: la caducidad de un código se lee después
+   * del código, no antes. Meterlo todo en `body` obligaría a poner el aviso
+   * arriba y el número abajo, que es justo al revés de como se usa el correo.
+   */
+  footer?: string | null;
 };
 
 export type TemplateOrderLine = {
@@ -154,6 +178,70 @@ function parrillaProductos(products: TemplateProduct[]): string {
   )}</table>`;
 }
 
+/**
+ * El código, grande y en su propia caja.
+ *
+ * Tabla y estilos en línea, no flex ni grid: los clientes de correo son
+ * navegadores de hace quince años y lo que no se dibuje con tablas se rompe en
+ * Outlook. `letter-spacing` separa los dígitos para que se lean de un vistazo
+ * y no se confundan al copiarlos a mano.
+ */
+function bloqueCodigo(code: string | null | undefined): string {
+  if (!code) return "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr><td align="center" style="background:#F4F5F7;border-radius:12px;padding:22px 16px;">
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:34px;line-height:1.1;font-weight:bold;letter-spacing:10px;color:${NEGRO};">${escapeHtml(
+          code,
+        )}</div>
+      </td></tr>
+    </table>`;
+}
+
+/**
+ * La línea de tiempo del pedido.
+ *
+ * Dibujada con una tabla de una fila por el mismo motivo que el bloque del
+ * código. Los pasos ya recorridos van en el naranja de la marca y los que
+ * faltan en gris, con el punto del paso actual relleno: el estado se entiende
+ * sin leer, que es como se mira un correo en el móvil.
+ *
+ * El texto de cada paso va SIEMPRE además en la versión de texto plano: quien
+ * lea el correo sin imágenes ni estilos —o con un lector de pantalla— tiene que
+ * poder saber en qué va su pedido.
+ */
+function lineaDeTiempo(t: { steps: string[]; current: number } | null | undefined): string {
+  if (!t || t.steps.length === 0) return "";
+
+  const celdas = t.steps
+    .map((paso, i) => {
+      const hecho = i <= t.current;
+      const color = hecho ? NARANJA : "#c9ccd2";
+      const punto = i === t.current
+        ? `<div style="width:15px;height:15px;border-radius:50%;background:${NARANJA};border:3px solid #FFE0CC;margin:0 auto;"></div>`
+        : `<div style="width:13px;height:13px;border-radius:50%;background:${hecho ? NARANJA : "#ffffff"};border:2px solid ${color};margin:0 auto;"></div>`;
+
+      // La barra a la izquierda de cada punto salvo el primero: es lo que hace
+      // que se lea como un recorrido y no como cuatro cosas sueltas.
+      const barra = i === 0
+        ? ""
+        : `<td width="60" style="padding:0 0 12px;"><div style="height:3px;background:${hecho ? NARANJA : "#e4e6ea"};"></div></td>`;
+
+      return `${barra}<td align="center" valign="top" style="padding:0 4px;">
+          ${punto}
+          <div style="margin-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.3;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:${
+            hecho ? NEGRO : GRIS
+          };">${escapeHtml(paso)}</div>
+        </td>`;
+    })
+    .join("");
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;background:#FAF8F5;border-radius:12px;">
+      <tr><td style="padding:22px 14px 18px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${celdas}</tr></table>
+      </td></tr>
+    </table>`;
+}
+
 export function renderCampaignHtml(input: TemplateInput): string {
   const base = input.storeBase ?? storeUrl();
   const saludo = input.recipientName
@@ -207,6 +295,9 @@ export function renderCampaignHtml(input: TemplateInput): string {
         input.title,
       )}</h1>
       ${parrafos(input.body)}
+      ${bloqueCodigo(input.code)}
+      ${lineaDeTiempo(input.timeline)}
+      ${input.footer ? parrafos(input.footer) : ""}
       ${cta}
       ${tablaPedido(input.order)}
       ${parrillaProductos(input.products)}
@@ -242,6 +333,23 @@ export function renderCampaignText(input: TemplateInput): string {
   if (input.recipientName) lineas.push(`Hola, ${input.recipientName.split(" ")[0]}`, "");
   lineas.push(input.title.toUpperCase(), "");
   lineas.push(input.body.trim(), "");
+
+  // El código y el estado también aquí, y no como adorno: quien lee sin
+  // imágenes ni estilos —o con un lector de pantalla— viene exactamente a por
+  // esto. Un correo cuya información esencial solo existe en el HTML es un
+  // correo que no sirve para una parte de quien lo recibe.
+  if (input.code) lineas.push(`Tu código: ${input.code}`, "");
+
+  if (input.timeline && input.timeline.steps.length > 0) {
+    lineas.push("Estado de tu pedido:");
+    input.timeline.steps.forEach((paso, i) => {
+      const marca = i < input.timeline!.current ? "[x]" : i === input.timeline!.current ? "[>]" : "[ ]";
+      lineas.push(`  ${marca} ${paso}`);
+    });
+    lineas.push("");
+  }
+
+  if (input.footer) lineas.push(input.footer.trim(), "");
 
   if (input.ctaLabel && input.ctaUrl) lineas.push(`${input.ctaLabel}: ${input.ctaUrl}`, "");
 

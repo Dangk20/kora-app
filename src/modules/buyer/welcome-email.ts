@@ -25,7 +25,17 @@ import { emailDriver } from "@/modules/email";
 import { renderCampaign } from "@/modules/email/template";
 import { storeUrl } from "@/modules/email/driver";
 
-const ASUNTO = "Bienvenido a KORA 🧡";
+// "Te damos la bienvenida" y no "Bienvenido".
+//
+// El asunto es lo primero —y a veces lo único— que alguien lee de KORA, y
+// "bienvenido" le asigna un género a quien todavía no conocemos. La tienda
+// vende belleza, hogar y accesorios: dar por hecho el género de quien compra
+// es equivocarse con una parte de la clientela en el primer contacto.
+//
+// La fórmula neutra no cuesta nada y funciona para todo el mundo. Misma regla
+// para el resto de los correos: nada de "estimado", "querido" ni participios
+// que concuerden con la persona.
+const ASUNTO = "Te damos la bienvenida a KORA 🧡";
 
 /** Manda la bienvenida. Devuelve si salió, para el registro — nunca para la pantalla. */
 export async function sendWelcomeEmail(to: string, name: string | null): Promise<boolean> {

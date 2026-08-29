@@ -35,9 +35,13 @@ export async function sendResetCode(
     subject: "Tu código para cambiar la contraseña",
     preheader: `Código ${code}. Caduca en ${MINUTOS} minutos.`,
     title: "Cambia tu contraseña",
-    body:
-      `Pediste cambiar la contraseña de tu cuenta de KORA. Tu código es:\n\n` +
-      `${code}\n\n` +
+    // El código NO va en el cuerpo: va en `code`, que la plantilla dibuja
+    // grande y en su propia caja. Quien abre este correo viene a copiar seis
+    // dígitos, muchas veces en el móvil; perdidos en un párrafo hay que
+    // buscarlos, y un dígito mal copiado se vive como que el sistema falla.
+    body: "Pediste cambiar la contraseña de tu cuenta de KORA. Este es tu código:",
+    code,
+    footer:
       `Caduca en ${MINUTOS} minutos y solo sirve una vez.\n\n` +
       "Si no fuiste tú, puedes ignorar este correo: tu contraseña no cambia " +
       "mientras nadie use el código, y quien lo pidió no puede verlo.",

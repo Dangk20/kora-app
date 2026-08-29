@@ -36,9 +36,45 @@ const fecha = (d: Date) =>
     timeZone: "America/Bogota",
   }).format(d);
 
+/**
+ * Los cuatro momentos que el comprador reconoce, y en cuál va cada correo.
+ *
+ * Se define UNA vez y aquí, no en cada plantilla: si cada correo dibujara su
+ * propia línea, bastaría con añadir un estado para que unos la mostraran y
+ * otros no, y el comprador vería un recorrido distinto en cada mensaje.
+ *
+ * No son los estados del sistema sino los del COMPRADOR: "confirmado" para
+ * nosotros es una transición de la máquina de estados; para quien compró es
+ * "ya pagué". `PENDING` no aparece porque antes de pagar no hay recorrido que
+ * enseñar, y `CANCELLED` tampoco: un pedido cancelado no está en un punto del
+ * camino, está fuera de él.
+ */
+const PASOS = ["Pago confirmado", "En preparación", "En camino", "Entregado"] as const;
+
+const PASO_POR_CORREO: Partial<Record<OrderEmailType, number>> = {
+  BUYER_CONFIRMED: 0,
+  BUYER_PREPARING: 1,
+  BUYER_SHIPPED: 2,
+  BUYER_DELIVERED: 3,
+};
+
+function lineaDeTiempo(type: OrderEmailType) {
+  const paso = PASO_POR_CORREO[type];
+  return paso === undefined ? null : { steps: [...PASOS], current: paso };
+}
+
 function base(
   data: OrderEmailData,
-  parts: { subject: string; title: string; body: string; preheader: string; cta?: { label: string; url: string } | null; notes?: string[] },
+  parts: {
+    subject: string;
+    title: string;
+    body: string;
+    preheader: string;
+    cta?: { label: string; url: string } | null;
+    notes?: string[];
+    timeline?: { steps: string[]; current: number } | null;
+    code?: string | null;
+  },
 ): RenderedEmail {
   const { html, text } = renderCampaign({
     subject: parts.subject,
@@ -52,12 +88,17 @@ function base(
     ctaLabel: parts.cta?.label ?? null,
     ctaUrl: parts.cta?.url ?? null,
     order: { ...data.order, notes: parts.notes ?? [] },
+    timeline: parts.timeline ?? null,
+    code: parts.code ?? null,
   });
   return { subject: parts.subject, html, text };
 }
 
 export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): RenderedEmail {
   const c = data.order.currency;
+  // El recorrido lo decide el TIPO de correo, no cada plantilla: así añadir un
+  // estado no puede dejar a unos correos con línea y a otros sin ella.
+  const linea = lineaDeTiempo(type);
 
   switch (type) {
     case "BUYER_CREATED":
@@ -95,6 +136,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
         );
       }
       return base(data, {
+        timeline: linea,
         subject: `Confirmamos el pago de tu pedido ${data.orderNumber}`,
         preheader: "Ya lo estamos preparando.",
         title: "Pago confirmado",
@@ -108,6 +150,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
 
     case "BUYER_PREPARING":
       return base(data, {
+        timeline: linea,
         subject: `Estamos preparando tu pedido ${data.orderNumber}`,
         preheader: "Ya lo estamos armando.",
         title: "Manos a la obra",
@@ -119,6 +162,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
 
     case "BUYER_SHIPPED":
       return base(data, {
+        timeline: linea,
         subject: `Tu pedido ${data.orderNumber} va en camino`,
         preheader: "Ya salió hacia tu dirección.",
         title: "Tu pedido va en camino",
@@ -145,6 +189,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
           "estar nuevo, con sus etiquetas y su empaque original.",
       );
       return base(data, {
+        timeline: linea,
         subject: `Tu pedido ${data.orderNumber} fue entregado`,
         preheader: "Gracias por comprar en KORA.",
         title: "Tu pedido llegó",
