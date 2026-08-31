@@ -12,6 +12,7 @@
 // puede salir del correo que de verdad se usó para comprar.
 
 import { headers } from "next/headers";
+import { ipDeConfianza } from "@/modules/geo/ip";
 import { db } from "@/lib/db";
 import { MENSAJE_ACCESO, registerBuyer, verifyBuyer } from "@/modules/buyer/account";
 import { comprobarLimite, limpiarIntentos, registrarFallo } from "@/modules/buyer/rate-limit";
@@ -87,7 +88,9 @@ export async function entrarDesdePedido(
   checkoutToken: string,
   password: string,
 ): Promise<CrearCuentaResult> {
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "desconocido";
+  // La entrada de la DERECHA: la primera la escribe el cliente, y rotarla
+  // en cada intento haría de este limitador un adorno.
+  const ip = ipDeConfianza(await headers()) ?? "desconocido";
   const limite = comprobarLimite(ip);
   if (!limite.permitido) {
     const min = Math.ceil(limite.esperaSegundos / 60);

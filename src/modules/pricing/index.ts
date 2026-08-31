@@ -11,6 +11,8 @@
 //     de tienda en la misma moneda. Si es mayor o igual, se muestra solo el
 //     precio online, sin tachado ni badge: nunca un descuento falso (TIE_HU002 §2).
 
+import type { Origen } from "@/modules/geo";
+
 export type Currency = "COP" | "USD";
 export type Channel = "online" | "store";
 
@@ -100,10 +102,16 @@ export function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * Moneda por país (TIE_HU001 §1): Colombia → COP, resto → USD.
- * Sin país (geolocalización no disponible o fallida) → COP.
+ * Moneda por origen del visitante (TIE_HU001 §1):
+ * Colombia → COP · exterior → USD · no se sabe → COP.
+ *
+ * El caso "no se sabe" cae del lado COP a propósito, y no por comodidad:
+ * enseñar pesos a un extranjero es incómodo y se arregla con el selector;
+ * enseñar dólares a un colombiano puede dejarle una tienda donde nada se
+ * puede comprar, si el catálogo aún no trae sus precios en USD.
  */
-export function currencyForCountry(countryCode: string | null | undefined): Currency {
-  if (!countryCode) return DEFAULT_CURRENCY;
-  return countryCode.toUpperCase() === "CO" ? "COP" : "USD";
+export function currencyForOrigin(origen: Origen): Currency {
+  if (origen === "colombia") return "COP";
+  if (origen === "exterior") return "USD";
+  return DEFAULT_CURRENCY;
 }

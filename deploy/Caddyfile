@@ -53,7 +53,15 @@ test.korashopp.com {
 	import /etc/caddy/auth.caddy
 
 	encode zstd gzip
-	reverse_proxy kora-staging-app:3000
+
+	# La IP real del visitante, y NADA MÁS. `header_up` sobrescribe: lo que el
+	# cliente hubiera escrito en X-Forwarded-For se descarta aquí, en el borde.
+	# Sin esta línea, elegir país —y con él la moneda de la tienda— sería tan
+	# fácil como mandar una cabecera. El código además lee la entrada de la
+	# derecha, por si algún día esta línea desaparece.
+	reverse_proxy kora-staging-app:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -82,6 +90,9 @@ korashopp.com {
 	root * /srv/holding
 	file_server
 
-	# ▼▼▼ GO-LIVE (30 oct): sustituir las dos líneas anteriores por esta ▼▼▼
-	# reverse_proxy kora-prod-app:3000
+	# ▼▼▼ GO-LIVE (30 oct): sustituir las dos líneas anteriores por esto ▼▼▼
+	# El bloque `header_up` no es opcional: ver el mismo comentario en pruebas.
+	# reverse_proxy kora-prod-app:3000 {
+	# 	header_up X-Forwarded-For {remote_host}
+	# }
 }

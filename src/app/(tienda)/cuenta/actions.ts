@@ -28,14 +28,20 @@ import {
 } from "@/modules/buyer/reset";
 import { sendResetCode } from "@/modules/buyer/reset-email";
 import { sendWelcomeEmail } from "@/modules/buyer/welcome-email";
+import { ipDeConfianza } from "@/modules/geo/ip";
 
 export type FormState = { error?: string; ok?: boolean } | null;
 
-/** El origen que se limita. Detrás de un proxy, la cabecera reenviada. */
+/**
+ * El origen que se limita.
+ *
+ * Sale de `ipDeConfianza`, que lee la entrada de la DERECHA de
+ * X-Forwarded-For. Leer la primera —lo que hacía antes— convertía este
+ * limitador en decorativo: esa entrada la escribe el cliente, y basta con
+ * cambiarla en cada intento para que cada uno parezca venir de alguien nuevo.
+ */
 async function origen(): Promise<string> {
-  const h = await headers();
-  const reenviado = h.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return reenviado || h.get("x-real-ip") || "desconocido";
+  return ipDeConfianza(await headers()) ?? "desconocido";
 }
 
 /** Solo destinos internos: un "volver" abierto es una redirección abusable. */

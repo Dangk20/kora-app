@@ -27,7 +27,9 @@
     "spec": "openspec",
     "outbox:worker": "tsx scripts/outbox-worker.ts",
     "outbox:status": "tsx scripts/outbox-status.ts",
-    "jobs:status": "tsx scripts/jobs-status.ts"
+    "jobs:status": "tsx scripts/jobs-status.ts",
+    "geo:update": "tsx scripts/update-geo.ts",
+    "geo:check": "tsx scripts/check-geo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1090.0",

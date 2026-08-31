@@ -2,7 +2,7 @@
 // La regla que más importa: nunca comunicar un descuento que no existe.
 import { describe, expect, it } from "vitest";
 import {
-  currencyForCountry,
+  currencyForOrigin,
   formatMoney,
   formatPriceRange,
   resolvePrice,
@@ -80,17 +80,17 @@ describe("formato de moneda", () => {
   });
 });
 
-describe("moneda por país", () => {
-  it("Colombia usa COP y el resto del mundo USD", () => {
-    expect(currencyForCountry("CO")).toBe("COP");
-    expect(currencyForCountry("co")).toBe("COP");
-    expect(currencyForCountry("US")).toBe("USD");
-    expect(currencyForCountry("ES")).toBe("USD");
+describe("moneda por origen del visitante", () => {
+  it("Colombia usa COP y el exterior USD", () => {
+    expect(currencyForOrigin("colombia")).toBe("COP");
+    expect(currencyForOrigin("exterior")).toBe("USD");
   });
 
-  it("sin país detectado cae a COP, el mercado principal", () => {
-    expect(currencyForCountry(null)).toBe("COP");
-    expect(currencyForCountry("")).toBe("COP");
+  it("sin origen detectado cae a COP, el mercado principal", () => {
+    // No es comodidad: enseñar pesos a un extranjero se arregla con el
+    // selector; enseñar dólares a un colombiano puede dejarle una tienda
+    // donde nada se puede comprar si el catálogo no trae precios en USD.
+    expect(currencyForOrigin("desconocido")).toBe("COP");
   });
 });
 
