@@ -7,6 +7,7 @@
 // la IP no la pueda dictar el visitante.
 //
 // Ver openspec/changes/deteccion-moneda-por-ip — specs/visitor-geolocation.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { origenDesdeCabeceras } from "@/modules/geo";
 import { origenDeIp } from "@/modules/geo/lookup";
@@ -120,5 +121,29 @@ describe("precedencia de fuentes", () => {
   it("CO en la cabecera da Colombia sin mirar la IP", () => {
     const h = cabeceras({ "cf-ipcountry": "co", "x-forwarded-for": IP_ESTADOUNIDENSE });
     expect(origenDesdeCabeceras(h)).toBe("colombia");
+  });
+});
+
+describe("lo que ve un visitante del exterior cuando falta el precio en su moneda", () => {
+  // Decisión de Daniel del 31 ago 2026: quien entre desde fuera de Colombia ve
+  // la tienda en USD, y un producto sin precio en dólares debe decir "no
+  // disponible en USD". Lo que NO puede decir es "Agotado": el producto tiene
+  // stock de sobra, y esa palabra manda a esperar una reposición que no
+  // existe, contradiciendo al precio que justo encima ya dice otra cosa.
+  const ficha = readFileSync("src/app/(tienda)/producto/[slug]/product-detail.tsx", "utf8");
+
+  it("separa 'agotado' de 'sin precio en esta moneda'", () => {
+    expect(ficha).toContain("const agotado = units === 0;");
+    expect(ficha).toContain("const sinPrecioEnMoneda = !price?.available;");
+  });
+
+  it("el motivo que se enseña nombra la moneda", () => {
+    expect(ficha).toContain("`No disponible en ${currency}`");
+  });
+
+  it("no imprime el importe de un precio que no está cargado", () => {
+    // `formatMoney` de un precio no cargado da "$0.00", que se lee como un
+    // producto gratis. La barra de compra móvil lo hacía.
+    expect(ficha).toContain("{price?.available && (");
   });
 });

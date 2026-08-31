@@ -38,7 +38,16 @@ export function ProductDetail({
     product.variants.find((v) => v.id === variantId) ?? product.variants[0];
   const price = variant ? resolvePrice(variant.prices, currency) : null;
   const units = variant?.onlineUnits ?? 0;
-  const soldOut = units === 0 || !price?.available;
+  // DOS motivos distintos para no poder comprar, y decirlos mal miente:
+  // "Agotado" en un producto con stock de sobra, solo porque el catálogo no
+  // trae su precio en la moneda del visitante, manda a esperar un reposición
+  // que no va a llegar — y contradice al propio precio, que justo encima ya
+  // dice "No disponible en USD". Desde que la moneda se detecta por IP
+  // (31 ago 2026) este es el camino de TODO visitante del exterior.
+  const agotado = units === 0;
+  const sinPrecioEnMoneda = !price?.available;
+  const soldOut = agotado || sinPrecioEnMoneda;
+  const motivoNoDisponible = agotado ? "Agotado" : `No disponible en ${currency}`;
   const image = product.images[imageIndex];
 
   // Nunca se puede pedir más que el cupo publicado online.
@@ -200,7 +209,11 @@ export function ProductDetail({
           />
           <p className="text-[13.5px] font-semibold text-kora-black">
             {soldOut ? (
-              "Agotado en la tienda online"
+              agotado ? (
+                "Agotado en la tienda online"
+              ) : (
+                `No disponible en ${currency}`
+              )
             ) : (
               <>
                 Quedan {units} {units === 1 ? "unidad" : "unidades"}
@@ -274,7 +287,7 @@ export function ProductDetail({
             disabled={soldOut}
             className="bg-kora-gradient flex w-full items-center justify-center rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
           >
-            {soldOut ? "Agotado" : "Comprar ahora"}
+            {soldOut ? motivoNoDisponible : "Comprar ahora"}
           </button>
         </div>
         <p className="mt-2.5 text-center text-[11.5px] text-[#8a8f98]">
@@ -299,9 +312,9 @@ export function ProductDetail({
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11.5px] text-[#8a8f98]">
-              {soldOut ? "Sin cupo online" : variant?.name ? variant.name : product.name}
+              {soldOut ? motivoNoDisponible : variant?.name ? variant.name : product.name}
             </p>
-            {price && (
+            {price?.available && (
               <p className="text-[17px] leading-tight font-extrabold text-kora-black">
                 {formatMoney(price.amount, price.currency)}
               </p>
@@ -322,7 +335,7 @@ export function ProductDetail({
             disabled={soldOut}
             className="bg-kora-gradient flex min-h-12 shrink-0 items-center rounded-full px-6 text-[14.5px] font-bold text-white disabled:opacity-45"
           >
-            {soldOut ? "Agotado" : "Comprar"}
+            {soldOut ? (agotado ? "Agotado" : "No disponible") : "Comprar"}
           </button>
         </div>
       </div>
