@@ -108,6 +108,7 @@ model Product {
   featured      Boolean         @default(false)
   images        ProductImage[]
   variants      Variant[]
+  options       ProductOption[]
   showcaseItems ShowcaseItem[]
   banners       Banner[]
   createdAt     DateTime        @default(now())
@@ -137,7 +138,12 @@ model Variant {
   product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   sku        String  @unique
   name       String // "Talla M / Rojo"; para producto simple, "Única"
-  attributes Json? // { talla: "M", color: "Rojo" }
+  /// ⚠️ SUPERADO por `product_options` desde el 1 sep 2026, y sin uso: no lo
+  /// lee ni lo escribe ninguna parte del código. Un JSON no puede contestar
+  /// "¿qué tallas tiene este producto?" sin recorrer todas sus variantes, que
+  /// es justo la consulta de la ficha. Se deja porque hay 13 filas del seed
+  /// con datos; retirarlo es una limpieza aparte.
+  attributes Json?
   barcode    String? @unique
 
   priceCopStore  Decimal @db.Decimal(12, 2)
@@ -157,12 +163,77 @@ model Variant {
 
   stockMovements StockMovement[]
   orderItems     OrderItem[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  freeInCoupons  Coupon[]        @relation("CouponFreeVariant")
+  /// Los valores de opción que COMPONEN esta variante. Vacío = variante suelta
+  /// con nombre libre, que es todo el catálogo anterior al 1 sep 2026 y sigue
+  /// siendo válido.
+  optionValues   VariantOptionValue[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  freeInCoupons  Coupon[]             @relation("CouponFreeVariant")
 
   @@index([productId])
   @@map("variants")
+}
+
+/// El PADRE de una opción: "Talla", "Color".
+///
+/// Existe como tabla y no como JSON en la variante porque la pregunta que hay
+/// que contestar en la ficha es "¿qué tallas tiene este producto?", y con un
+/// JSON por variante eso obliga a leerlas todas y deducirlo.
+model ProductOption {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  name     String /// "Talla"
+  position Int    @default(0) /// El orden en que se enseñan en la ficha.
+
+  values ProductOptionValue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, name])
+  @@index([productId])
+  @@map("product_options")
+}
+
+/// El HIJO: "M", "S" / "Azul", "Rojo".
+model ProductOptionValue {
+  id       String        @id @default(cuid())
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  value    String /// "M"
+  position Int    @default(0)
+
+  variants VariantOptionValue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([optionId, value])
+  @@index([optionId])
+  @@map("product_option_values")
+}
+
+/// Qué valores componen una variante. Una fila por grupo: la variante "M ·
+/// Azul" tiene dos.
+///
+/// ⚠️ El borrado en cascada aquí NO es la regla de negocio. Borrar un valor
+/// debe BORRAR las combinaciones que nunca se vendieron y DESACTIVAR las que
+/// sí —`OrderItem.variant` es Restrict y una variante vendida no se puede
+/// borrar—. La cascada es solo la red de seguridad para que no queden filas
+/// apuntando a un valor que ya no existe.
+model VariantOptionValue {
+  variantId String
+  variant   Variant            @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  valueId   String
+  value     ProductOptionValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, valueId])
+  @@index([valueId])
+  @@map("variant_option_values")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -258,10 +329,51 @@ model Customer {
   couponRedemptions  CouponRedemption[]
   campaignRecipients CampaignRecipient[]
   consentEvents      ConsentEvent[]
+  addresses          CustomerAddress[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@map("customers")
+}
+
+/// Libreta de direcciones del comprador (alcance nuevo, 1 sep 2026).
+///
+/// Los campos son LOS MISMOS que los `ship*` del pedido, y a propósito: elegir
+/// una dirección es copiar sus campos al formulario de entrega, y ese
+/// formulario escribe los `ship*`. Con nombres distintos habría un traductor en
+/// medio, que es justo donde se pierde un barrio o un ZIP sin que nada falle.
+///
+/// El pedido NO guarda una referencia a esta tabla: lleva su propio snapshot.
+/// Una referencia podría apuntar a datos distintos de los que se despacharon,
+/// que es la clase de dato que engaña. Por eso borrar una dirección usada por
+/// un pedido pasado es inofensivo y está permitido.
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// "Casa", "Oficina"… lo escribe el comprador para reconocerla en una lista.
+  label String?
+
+  country      String  @default("CO") // CO | US
+  state        String? // departamento (CO) | estado (US)
+  city         String?
+  address      String?
+  address2     String? // apto/torre/conjunto | Apt/Suite
+  neighborhood String? // barrio (solo CO)
+  zip          String? // ZIP (solo US)
+  notes        String? // "dejar en portería"
+
+  /// Exactamente una por cliente mientras tenga alguna. Se garantiza al
+  /// ESCRIBIR, dentro de una transacción — no calculándolo al leer, que es
+  /// como dos pantallas acaban discrepando sobre cuál manda.
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId, isDefault])
+  @@map("customer_addresses")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -844,7 +956,6 @@ model Setting {
 
   @@map("settings")
 }
-
 
 // ─────────────────────────────────────────────────────────────
 // CORREOS TRANSACCIONALES — el registro de lo ya enviado

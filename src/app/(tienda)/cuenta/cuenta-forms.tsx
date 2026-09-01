@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { LogOut } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { LogOut, Pencil } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,57 +62,180 @@ function Campo({
   );
 }
 
+/**
+ * Tarjeta de "Mis datos": se LEE, y solo se edita al pedirlo.
+ *
+ * Antes los campos estaban siempre abiertos y editables. Una pantalla así
+ * invita a tocar lo que no se venía a tocar —y aquí lo que se toca es la
+ * dirección a la que llega un pedido y el número por el que le escriben—; al
+ * mismo tiempo, no deja LEER los datos de un vistazo, que es a lo que se
+ * entra el 90 % de las veces. Patrón de tienda conocido: leer por omisión,
+ * editar a propósito.
+ */
+function Tarjeta({
+  titulo,
+  accion,
+  editando,
+  onAlternar,
+  children,
+}: {
+  titulo: string;
+  /** "Editar" o "Cambiar": lo que se va a hacer, no lo que se está viendo. */
+  accion: string;
+  editando: boolean;
+  onAlternar: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6">
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-[15.5px] font-extrabold text-kora-black">{titulo}</h2>
+        <button
+          type="button"
+          onClick={onAlternar}
+          className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-coral transition-colors hover:bg-[#FFF4EF]"
+        >
+          {editando ? (
+            "Cancelar"
+          ) : (
+            <>
+              <Pencil className="size-[14px]" aria-hidden /> {accion}
+            </>
+          )}
+        </button>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** Una línea de la vista de lectura. */
+function Fila({ label, valor }: { label: string; valor?: string | null }) {
+  return (
+    <div className="border-b border-[#f3efe9] py-3 last:border-0">
+      <p className="text-[12px] text-[#8a8f98]">{label}</p>
+      <p
+        className={
+          valor
+            ? "mt-0.5 text-[14px] text-kora-black"
+            : "mt-0.5 text-[14px] text-[#b3b8c0] italic"
+        }
+      >
+        {valor || "Sin registrar"}
+      </p>
+    </div>
+  );
+}
+
 export function DatosForm({
   defaults,
 }: {
-  defaults: { name: string; phone: string; city: string; address: string };
+  defaults: {
+    name: string;
+    phone: string;
+    /** Solo para leerlo: es la credencial de acceso, no se edita desde aquí. */
+    email?: string;
+  };
 }) {
   const [state, action] = useActionState(actualizarDatos, null);
+  const [editando, setEditando] = useState(false);
+
+  // Guardado con éxito: la tarjeta vuelve a leerse sola. La acción revalida
+  // /cuenta, así que los valores que se leen ya son los nuevos.
+  useEffect(() => {
+    if (state?.ok) setEditando(false);
+  }, [state]);
+
+  if (!editando) {
+    return (
+      <Tarjeta
+        titulo="Mi información"
+        accion="Editar"
+        editando={false}
+        onAlternar={() => setEditando(true)}
+      >
+        <Fila label="Nombre completo" valor={defaults.name} />
+        {/* El correo se enseña porque es CON LO QUE SE ENTRA, y no se edita
+            aquí: cambiarlo es cambiar la credencial de acceso. */}
+        <Fila label="Correo (con este entras)" valor={defaults.email} />
+        <Fila label="WhatsApp" valor={defaults.phone} />
+        {/* Ciudad y dirección viven en "Mis direcciones" desde el 1 sep 2026.
+            Dejar aquí una dirección suelta mientras existe la libreta serían
+            dos respuestas distintas a la misma pregunta. */}
+        {state?.ok && (
+          <p className="pt-3 text-[12.5px] text-[#2c6b34]">Datos actualizados.</p>
+        )}
+      </Tarjeta>
+    );
+  }
 
   return (
-    <form action={action} className="grid gap-3 rounded-[14px] border border-[#eee9e2] p-5">
-      <Campo id="name" label="Nombre completo" defaultValue={defaults.name} autoComplete="name" />
-      <Campo id="phone" label="WhatsApp" defaultValue={defaults.phone} autoComplete="tel" />
-      <Campo id="city" label="Ciudad" defaultValue={defaults.city} autoComplete="address-level2" />
-      <Campo
-        id="address"
-        label="Dirección"
-        defaultValue={defaults.address}
-        autoComplete="street-address"
-      />
-      <Aviso state={state} exito="Datos actualizados." />
-      <Guardar />
-      {/* Los pedidos ya hechos conservan su propio snapshot: cambiar los datos
-          de la cuenta no reescribe una dirección ya despachada. */}
-      <p className="text-[11.5px] text-muted-foreground">
-        Tus pedidos anteriores conservan los datos con los que se hicieron.
-      </p>
-    </form>
+    <Tarjeta
+      titulo="Mi información"
+      accion="Editar"
+      editando
+      onAlternar={() => setEditando(false)}
+    >
+      <form action={action} className="grid gap-3">
+        <Campo id="name" label="Nombre completo" defaultValue={defaults.name} autoComplete="name" />
+        <Campo id="phone" label="WhatsApp" defaultValue={defaults.phone} autoComplete="tel" />
+        <Aviso state={state} exito="Datos actualizados." />
+        <Guardar />
+        <p className="text-[11.5px] text-muted-foreground">
+          Tus pedidos anteriores conservan los datos con los que se hicieron.
+        </p>
+      </form>
+    </Tarjeta>
   );
 }
 
 export function PasswordForm() {
   const [state, action] = useActionState(cambiarPassword, null);
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    if (state?.ok) setEditando(false);
+  }, [state]);
+
+  if (!editando) {
+    return (
+      <Tarjeta
+        titulo="Contraseña"
+        accion="Cambiar"
+        editando={false}
+        onAlternar={() => setEditando(true)}
+      >
+        <Fila label="Contraseña" valor="••••••••" />
+        {state?.ok && (
+          <p className="pt-3 text-[12.5px] text-[#2c6b34]">
+            Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos.
+          </p>
+        )}
+      </Tarjeta>
+    );
+  }
 
   return (
-    <form action={action} className="grid gap-3 rounded-[14px] border border-[#eee9e2] p-5">
-      <Campo
-        id="actual"
-        label="Contraseña actual"
-        type="password"
-        autoComplete="current-password"
-      />
-      <Campo id="nueva" label="Contraseña nueva" type="password" autoComplete="new-password" />
-      <p className="text-[11.5px] text-muted-foreground">Mínimo {MIN_PASSWORD} caracteres.</p>
-      <Aviso
-        state={state}
-        exito="Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos."
-      />
-      <Guardar texto="Cambiar contraseña" />
-      <p className="text-[11.5px] text-muted-foreground">
-        Al cambiarla se cierran tus sesiones en otros dispositivos.
-      </p>
-    </form>
+    <Tarjeta titulo="Contraseña" accion="Cambiar" editando onAlternar={() => setEditando(false)}>
+      <form action={action} className="grid gap-3">
+        <Campo
+          id="actual"
+          label="Contraseña actual"
+          type="password"
+          autoComplete="current-password"
+        />
+        <Campo id="nueva" label="Contraseña nueva" type="password" autoComplete="new-password" />
+        <p className="text-[11.5px] text-muted-foreground">Mínimo {MIN_PASSWORD} caracteres.</p>
+        <Aviso
+          state={state}
+          exito="Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos."
+        />
+        <Guardar texto="Cambiar contraseña" />
+        <p className="text-[11.5px] text-muted-foreground">
+          Al cambiarla se cierran tus sesiones en otros dispositivos.
+        </p>
+      </form>
+    </Tarjeta>
   );
 }
 

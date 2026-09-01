@@ -11,11 +11,12 @@
 // porque `/cuenta` sin sesión redirige a la pantalla de acceso, y comprobar
 // que responde 307 no es comprobar que la página funciona.
 
-import { Flame, Package, User } from "lucide-react";
+import { Flame, MapPin, Package, User } from "lucide-react";
 
 export const SECCIONES = [
   { id: "pedidos", label: "Mis pedidos", icon: Package },
   { id: "cashback", label: "Kora Cashback", icon: Flame },
+  { id: "direcciones", label: "Mis direcciones", icon: MapPin },
   { id: "datos", label: "Mis datos", icon: User },
 ] as const;
 

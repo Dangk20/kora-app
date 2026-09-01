@@ -13,6 +13,7 @@ import { z } from "zod";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { isUsablePhone, toE164 } from "./phone";
+import { setPrincipalDesdePanel } from "./addresses";
 
 export type CustomerActionResult =
   | { ok: true; id: string }
@@ -100,11 +101,19 @@ export async function createCustomer(formData: FormData): Promise<CustomerAction
       email: d.email ?? null,
       document: d.document ?? null,
       country: d.country,
-      city: d.city ?? null,
-      address: d.address ?? null,
       source: "MANUAL",
     },
     select: { id: true },
+  });
+
+  // La dirección entra por la libreta, no como columnas sueltas: desde el
+  // 1 sep 2026 `customer.city`/`address` son un ESPEJO de la predeterminada y
+  // solo los escribe `sincronizarDireccionPrincipal`. Escribirlos aquí los
+  // separaría del dato real en cuanto el comprador tocara su libreta.
+  await setPrincipalDesdePanel(cliente.id, {
+    city: d.city,
+    address: d.address,
+    country: d.country,
   });
 
   revalidatePath("/admin/clientes");
@@ -148,9 +157,14 @@ export async function updateCustomer(formData: FormData): Promise<CustomerAction
       email: d.email ?? null,
       document: d.document ?? null,
       country: d.country,
-      city: d.city ?? null,
-      address: d.address ?? null,
     },
+  });
+
+  // Igual que al crear: la dirección del panel actualiza la predeterminada.
+  await setPrincipalDesdePanel(d.id, {
+    city: d.city,
+    address: d.address,
+    country: d.country,
   });
 
   revalidatePath("/admin/clientes");

@@ -9,6 +9,8 @@ import { DatosForm, PasswordForm, SalirButton } from "./cuenta-forms";
 import { CuentaSidebar } from "./sidebar";
 import { CuentaMovil } from "./cuenta-movil";
 import { seccionDe } from "./secciones";
+import { Direcciones } from "./direcciones";
+import { listAddresses } from "@/modules/customers/addresses";
 import { EstadoPedido, money } from "./ui";
 
 export const metadata = { title: "Mi cuenta · KORA" };
@@ -24,13 +26,14 @@ export default async function CuentaPage({
   const buyer = await requireBuyer("/cuenta");
   const seccion = seccionDe((await searchParams).seccion);
 
-  const [resumen, pedidos, cliente] = await Promise.all([
+  const [resumen, pedidos, cliente, direcciones] = await Promise.all([
     cashbackSummary(buyer.customerId),
     buyerOrders(buyer.customerId),
     db.customer.findUnique({
       where: { id: buyer.customerId },
-      select: { name: true, email: true, phone: true, city: true, address: true },
+      select: { name: true, email: true, phone: true },
     }),
+    listAddresses(buyer.customerId),
   ]);
 
   return (
@@ -45,18 +48,20 @@ export default async function CuentaPage({
         pedidos={pedidos}
         salir={<SalirButton compacto />}
         datos={
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Sin encabezados fuera: cada tarjeta lleva su propio título y su
+                botón de editar, así que un <h3> encima los duplicaba. */}
             <DatosForm
               defaults={{
                 name: cliente?.name ?? buyer.name,
+                email: buyer.email ?? "",
                 phone: cliente?.phone ?? "",
-                city: cliente?.city ?? "",
-                address: cliente?.address ?? "",
               }}
             />
-            <div>
-              <h3 className="mb-3 text-[14px] font-extrabold text-kora-black">Contraseña</h3>
-              <PasswordForm />
+            <PasswordForm />
+            <div className="pt-2">
+              <h3 className="mb-3 text-[15px] font-extrabold text-kora-black">Mis direcciones</h3>
+              <Direcciones direcciones={direcciones} />
             </div>
           </div>
         }
@@ -144,23 +149,24 @@ export default async function CuentaPage({
             </section>
           )}
 
+          {seccion === "direcciones" && (
+            <section aria-label="Mis direcciones" className="space-y-4">
+              <h2 className="text-[17px] font-extrabold text-kora-black">Mis direcciones</h2>
+              <Direcciones direcciones={direcciones} />
+            </section>
+          )}
+
           {seccion === "datos" && (
-            <section aria-label="Mis datos" className="grid gap-6 lg:grid-cols-2">
-              <div>
-                <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">Mis datos</h2>
-                <DatosForm
-                  defaults={{
-                    name: cliente?.name ?? buyer.name,
-                    phone: cliente?.phone ?? "",
-                    city: cliente?.city ?? "",
-                    address: cliente?.address ?? "",
-                  }}
-                />
-              </div>
-              <div>
-                <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">Contraseña</h2>
-                <PasswordForm />
-              </div>
+            <section aria-label="Mis datos" className="space-y-4">
+              <h2 className="text-[17px] font-extrabold text-kora-black">Mis datos</h2>
+              <DatosForm
+                defaults={{
+                  name: cliente?.name ?? buyer.name,
+                  email: buyer.email ?? "",
+                  phone: cliente?.phone ?? "",
+                }}
+              />
+              <PasswordForm />
             </section>
           )}
         </div>
