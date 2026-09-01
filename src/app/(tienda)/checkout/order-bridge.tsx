@@ -16,18 +16,37 @@ import { ORDER_TTL_HOURS } from "@/modules/orders/status";
 export function OrderBridge({
   orderNumber,
   whatsappUrl,
+  onLlegada,
+  onEnviado,
 }: {
   orderNumber: string;
   whatsappUrl: string;
+  /**
+   * Llegar aquí es el punto donde el carrito se puede vaciar sin riesgo: el
+   * comprador tiene su número de pedido a la vista y el enlace en la mano.
+   * Vaciarlo antes —al crear el pedido, como se hacía— dejaba sin nada a
+   * quien saliera durante la pantalla de carga.
+   */
+  onLlegada?: () => void;
+  /** El comprador se fue a WhatsApp: ya no hace falta ofrecerle volver. */
+  onEnviado?: () => void;
 }) {
   const [opened, setOpened] = useState(false);
 
   useEffect(() => {
+    onLlegada?.();
+    // Solo al montar: `onLlegada` vacía el carrito y no debe repetirse.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       setOpened(true);
+      onEnviado?.();
       window.location.href = whatsappUrl;
     }, 2000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatsappUrl]);
 
   return (
@@ -47,6 +66,7 @@ export function OrderBridge({
 
         <a
           href={whatsappUrl}
+          onClick={() => onEnviado?.()}
           className="bg-kora-gradient mt-7 inline-flex items-center justify-center gap-2.5 rounded-full px-7 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90"
         >
           <MessageCircle className="size-[18px]" /> Abrir WhatsApp

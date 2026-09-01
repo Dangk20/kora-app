@@ -5,7 +5,8 @@
 import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowRight, Loader2, Minus, Plus, ShoppingCart } from "lucide-react";
+import { QuitarDelCarrito } from "@/modules/cart/quitar-boton";
 import { useCart } from "@/modules/cart/cart-context";
 import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
@@ -170,14 +171,12 @@ export function CartView() {
                 </p>
               )}
 
-              <button
-                type="button"
-                aria-label={`Eliminar ${line.productName}`}
-                onClick={() => remove(line.variantId)}
+              <QuitarDelCarrito
+                nombre={line.productName}
+                variante={line.variantName}
+                onQuitar={() => remove(line.variantId)}
                 className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-[#faf6f2] text-[#b3b8c0] hover:bg-[#fdecec] hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </button>
+              />
               </div>
             </div>
           ))}

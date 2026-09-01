@@ -49,15 +49,23 @@ function DialogOverlay({
 
 function DialogContent({
   className,
+  overlayClassName,
   children,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /**
+   * Clases para el velo. Existe porque hay superficies que viven POR ENCIMA
+   * del z-50 por omisión —el panel lateral del carrito va en z-[60]— y sin
+   * esto el velo las deja intactas: lo único sin atenuar en la pantalla
+   * acababa siendo justo aquello sobre lo que se está preguntando.
+   */
+  overlayClassName?: string
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

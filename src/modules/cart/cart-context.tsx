@@ -13,8 +13,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { AvisoDeAgregado, type AvisoAgregado } from "./aviso-agregado";
 
 const STORAGE_KEY = "kora_carrito";
 
@@ -25,7 +27,19 @@ type CartContextValue = {
   /** Unidades totales, para el badge del header. */
   count: number;
   ready: boolean;
-  add: (variantId: string, qty?: number) => void;
+  /**
+   * Agrega al carrito y AVISA.
+   *
+   * El nombre es solo para el aviso —el carrito sigue guardando únicamente
+   * `variantId` + `qty`—. `silencioso` es para "Comprar ahora", que agrega y
+   * navega al checkout de inmediato: confirmar algo que ya no se va a ver es
+   * un parpadeo, no una confirmación.
+   */
+  add: (
+    variantId: string,
+    qty?: number,
+    opciones?: { nombre?: string; silencioso?: boolean },
+  ) => void;
   setQty: (variantId: string, qty: number) => void;
   remove: (variantId: string) => void;
   clear: () => void;
@@ -87,8 +101,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Aviso de "agregado al carrito". Vive aquí y no en cada botón: así el
+  // camino que se añada mañana lo hereda sin que nadie se acuerde de ponerlo.
+  const [aviso, setAviso] = useState<AvisoAgregado | null>(null);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+  }, []);
+
   const add = useCallback(
-    (variantId: string, qty = 1) => {
+    (
+      variantId: string,
+      qty = 1,
+      opciones?: { nombre?: string; silencioso?: boolean },
+    ) => {
       if (qty <= 0) return;
       const current = read();
       const existing = current.find((l) => l.variantId === variantId);
@@ -99,6 +125,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             )
           : [...current, { variantId, qty }],
       );
+      if (opciones?.silencioso) return;
+      // El `id` creciente reinicia la animación cuando se agrega dos veces
+      // seguidas: sin él, el segundo aviso no se distingue del primero y
+      // parece que el clic no hizo nada.
+      setAviso({ id: Date.now(), nombre: opciones?.nombre });
+      if (temporizador.current) clearTimeout(temporizador.current);
+      temporizador.current = setTimeout(() => setAviso(null), 4000);
     },
     [persist],
   );
@@ -157,7 +190,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [lines, ready, add, setQty, remove, clear, drawerOpen, openDrawer, closeDrawer],
   );
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+      <AvisoDeAgregado
+        aviso={aviso}
+        onVerCarrito={() => {
+          setAviso(null);
+          setDrawerOpen(true);
+        }}
+      />
+    </CartContext.Provider>
+  );
 }
 
 export function useCart(): CartContextValue {

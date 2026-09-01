@@ -86,14 +86,16 @@ export function ProductDetail({
 
   const addToCart = () => {
     if (!variant || soldOut) return;
-    cart.add(variant.id, qty);
+    cart.add(variant.id, qty, { nombre: product.name });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2500);
   };
 
   const buyNow = () => {
     if (!variant || soldOut) return;
-    cart.add(variant.id, qty);
+    // En silencio: se navega al checkout de inmediato y confirmar algo que
+    // ya no se va a ver es un parpadeo, no una confirmación.
+    cart.add(variant.id, qty, { silencioso: true });
     router.push("/checkout");
   };
 

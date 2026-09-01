@@ -6,7 +6,8 @@
 import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, Minus, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import { Loader2, Minus, Plus, ShoppingCart, X } from "lucide-react";
+import { QuitarDelCarrito } from "@/modules/cart/quitar-boton";
 import { useCart } from "@/modules/cart/cart-context";
 import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
@@ -163,14 +164,12 @@ export function CartDrawer() {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  aria-label={`Eliminar ${line.productName}`}
-                  onClick={() => remove(line.variantId)}
+                <QuitarDelCarrito
+                  nombre={line.productName}
+                  variante={line.variantName}
+                  onQuitar={() => remove(line.variantId)}
                   className="flex size-[30px] shrink-0 items-start justify-center rounded-lg text-[#b3b8c0] hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                />
               </div>
             ))}
           </div>

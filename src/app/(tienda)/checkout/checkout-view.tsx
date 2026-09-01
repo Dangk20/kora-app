@@ -5,8 +5,15 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Flame, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Flame, Loader2, MessageCircle, ShieldCheck } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
+import {
+  huellaDeCarrito,
+  leerPedidoSinEnviar,
+  olvidarPedidoSinEnviar,
+  recordarPedidoSinEnviar,
+  type PedidoSinEnviar,
+} from "@/modules/cart/pedido-sin-enviar";
 import { applyCoupon } from "@/modules/coupons/apply-action";
 import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
@@ -20,9 +27,11 @@ import {
   US_STATES,
 } from "@/modules/orders/geo";
 import { CategoryTile } from "@/modules/catalog/tiles";
+import type { Address } from "@/modules/customers/addresses";
 import { OrderBridge } from "./order-bridge";
 import { PantallaProceso } from "./pantalla-proceso";
 import { InvitacionCuenta } from "./invitacion-cuenta";
+import { guardarDireccionDelPedido } from "../cuenta/direcciones-actions";
 
 // `min-h-12` = 48 px: el mínimo táctil del diseño (§05). Y `text-base` en
 // móvil no es estética — iOS hace zoom automático sobre cualquier campo con
@@ -41,6 +50,9 @@ export type BuyerDefaults = {
   /** Saldo de Kora Cashback en la moneda activa. Solo informativo: el importe
    *  aplicable lo decide el servidor al crear el pedido. */
   cashback: number;
+  /** Libreta del comprador (alcance nuevo, 1 sep 2026). Vacía = sin sesión o
+   *  sin direcciones guardadas: el checkout entonces es el de siempre. */
+  direcciones: Address[];
 } | null;
 
 export function CheckoutView({
@@ -68,8 +80,66 @@ export function CheckoutView({
   // servidor y el relato— porque el servidor responde en unos 300 ms y sin esto
   // la pantalla sería un parpadeo.
   const [procesoContado, setProcesoContado] = useState(false);
-  const [country, setCountry] = useState<Country>(initialCountry);
-  const [state, setState] = useState("");
+  // ── Libreta de direcciones (alcance nuevo, 1 sep 2026) ──
+  // `null` = "usar otra dirección": los campos quedan libres y vacíos. Con
+  // sesión y al menos una guardada, se arranca en la predeterminada, que es
+  // justo lo que la cuenta debía ahorrarle al comprador.
+  const direcciones = buyer?.direcciones ?? [];
+  const inicial = direcciones.find((d) => d.isDefault) ?? direcciones[0] ?? null;
+
+  // `country` y `state` arrancan EN la dirección inicial, no en blanco. Los
+  // demás campos no lo necesitan porque son no controlados y llevan
+  // `defaultValue`; estos dos son controlados, y dejarlos vacíos aquí
+  // producía un formulario precargado al que le faltaba el departamento —el
+  // único campo obligatorio sin llenar, y el que nadie mira porque el resto
+  // ya está puesto.
+  const [country, setCountry] = useState<Country>(
+    inicial ? (inicial.country === "US" ? "US" : "CO") : initialCountry,
+  );
+  const [state, setState] = useState(inicial?.state ?? "");
+  const [direccionId, setDireccionId] = useState<string | null>(inicial?.id ?? null);
+  const elegida = direcciones.find((d) => d.id === direccionId) ?? null;
+
+  /**
+   * ¿A esta dirección guardada le falta algo obligatorio?
+   *
+   * Importa por las direcciones que vienen del backfill: las que existían como
+   * `customer.address` son texto libre, sin departamento ni barrio. Si se
+   * ocultaran los campos con una de esas elegida, el comprador enviaría un
+   * pedido incompleto y el servidor lo rechazaría señalando un campo que él NO
+   * PUEDE VER. Cuando falta algo, los campos se muestran para completarlos.
+   */
+  const incompleta = (d: Address | null) =>
+    !!d &&
+    (!d.address?.trim() ||
+      !d.city?.trim() ||
+      !d.state?.trim() ||
+      (d.country === "US" ? !d.zip?.trim() : !d.neighborhood?.trim()));
+
+  // Con una dirección elegida y completa, la tarjeta ya la enseña: repetir los
+  // campos debajo es ruido, y encima invita a editar en el checkout algo que
+  // se administra en la cuenta.
+  const camposVisibles = direccionId === null || incompleta(elegida);
+  const [guardarNueva, setGuardarNueva] = useState(false);
+
+  /**
+   * Elegir una dirección llena el formulario.
+   *
+   * El país se cambia también, y no es un detalle: los campos NO son los
+   * mismos —Colombia pide departamento y barrio, EE.UU. estado y ZIP—, así que
+   * sin esto elegir una dirección de Miami dejaría un formulario colombiano
+   * pidiendo un barrio que allá no existe.
+   */
+  const elegirDireccion = (id: string | null) => {
+    setDireccionId(id);
+    const d = direcciones.find((x) => x.id === id);
+    if (!d) {
+      setState("");
+      return;
+    }
+    setCountry(d.country === "US" ? "US" : "CO");
+    setState(d.state ?? "");
+  };
 
   // Cupón: solo el CÓDIGO viaja al servidor; el descuento lo calcula él.
   const [couponInput, setCouponInput] = useState("");
@@ -80,6 +150,11 @@ export function CheckoutView({
   // Kora Cashback: solo viaja el importe PEDIDO. Cuánto se aplica de verdad lo
   // decide el servidor leyendo el libro — igual que con el cupón.
   const [usarCashback, setUsarCashback] = useState(false);
+
+  // ¿Hay un pedido creado que nunca llegó a WhatsApp? Se lee al montar, no en
+  // el render: `localStorage` no existe en el servidor.
+  const [pendiente, setPendiente] = useState<PedidoSinEnviar | null>(null);
+  useEffect(() => setPendiente(leerPedidoSinEnviar()), []);
 
   // Token de idempotencia: el mismo durante toda esta sesión de checkout, así
   // un doble clic o un reintento no crean dos pedidos.
@@ -127,7 +202,33 @@ export function CheckoutView({
     startSubmit(async () => {
       const result = await createOrder(lines, payload);
       if (result.ok) {
-        clear(); // el carrito se vacía SOLO con el pedido ya creado
+        // ⚠️ El carrito NO se vacía aquí, y antes sí. El pedido ya existe en
+        // la base, pero el comprador todavía no ha visto NADA: la pantalla de
+        // proceso sigue contándose. Un "atrás" en esa ventana —un misclic, un
+        // gesto del trackpad— le dejaba el carrito vacío y un pedido que jamás
+        // vio: desde su lado, todo se desvaneció sin saber si compró.
+        // Ahora se vacía en el puente de WhatsApp, que es el primer momento en
+        // que tiene el número del pedido delante. Lo encontró Daniel probando.
+        // Después del pedido y sin bloquearlo: la venta ya está hecha, y una
+        // comodidad no puede tumbarla si falla.
+        if (buyer && direccionId === null && guardarNueva) {
+          void guardarDireccionDelPedido({
+            country: payload.country,
+            state: payload.state,
+            city: payload.city,
+            address: payload.address,
+            address2: payload.address2,
+            neighborhood: payload.neighborhood,
+            zip: payload.zip,
+            notes: payload.notes,
+          }).catch(() => {});
+        }
+
+        recordarPedidoSinEnviar({
+          orderNumber: result.orderNumber,
+          whatsappUrl: result.whatsappUrl,
+          huella: huellaDeCarrito(lines),
+        });
         setDone({
           orderNumber: result.orderNumber,
           whatsappUrl: result.whatsappUrl,
@@ -166,20 +267,81 @@ export function CheckoutView({
         />
       );
     }
-    return <OrderBridge orderNumber={done.orderNumber} whatsappUrl={done.whatsappUrl} />;
+    return (
+      <OrderBridge
+        orderNumber={done.orderNumber}
+        whatsappUrl={done.whatsappUrl}
+        // Aquí, y no antes: es el primer momento en que el comprador tiene su
+        // número de pedido a la vista y el enlace en la mano.
+        onLlegada={clear}
+        onEnviado={olvidarPedidoSinEnviar}
+      />
+    );
   }
+
+  // Rescate de un pedido que se creó y nunca llegó a WhatsApp. Va ANTES de
+  // los estados de carga y de carrito vacío a propósito: si el comprador
+  // volvió atrás y su carrito quedó vacío, este aviso es lo único que le
+  // dice que su pedido existe.
+  const rescate = pendiente ? (
+    <div className="mx-auto mb-6 flex max-w-[1040px] flex-col gap-3 rounded-2xl border border-[#ffd9c2] bg-[#FFF4EF] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-[14px] font-bold text-kora-black">
+          Tu pedido {pendiente.orderNumber} ya está creado
+        </p>
+        <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#6b6f78]">
+          Todavía no lo enviaste por WhatsApp. Ábrelo para confirmarlo con un
+          asesor; no hace falta volver a llenar nada.
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        <a
+          href={pendiente.whatsappUrl}
+          onClick={() => {
+            // Enviar desde aquí cierra el ciclo igual que el puente: el
+            // pedido ya va camino de WhatsApp. Pero el carrito se vacía SOLO
+            // si sigue siendo el mismo del que salió el pedido — si el
+            // comprador volvió atrás y le añadió cosas, vaciarlo le borraría
+            // productos que nunca pidió.
+            if (pendiente.huella && pendiente.huella === huellaDeCarrito(lines)) {
+              clear();
+            }
+            olvidarPedidoSinEnviar();
+            setPendiente(null);
+          }}
+          className="bg-kora-gradient inline-flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-bold whitespace-nowrap text-white hover:opacity-90"
+        >
+          <MessageCircle className="size-4" aria-hidden /> Abrir WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={() => {
+            olvidarPedidoSinEnviar();
+            setPendiente(null);
+          }}
+          className="text-[12.5px] font-semibold whitespace-nowrap text-[#8a8f98] hover:text-kora-black"
+        >
+          Descartar
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   if (!ready || (loading && !cart)) {
     return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="size-7 animate-spin text-[#b3b8c0]" />
+      <div className="px-4 pt-6 sm:px-[22px]">
+        {rescate}
+        <div className="flex justify-center py-20">
+          <Loader2 className="size-7 animate-spin text-[#b3b8c0]" />
+        </div>
       </div>
     );
   }
 
   if (buyable.length === 0) {
     return (
-      <div className="mx-auto max-w-[1040px] px-4 py-20 text-center sm:px-[22px]">
+      <div className="mx-auto max-w-[1040px] px-4 pt-6 pb-20 text-center sm:px-[22px]">
+        {rescate}
         <h1 className="text-2xl font-bold text-kora-black">No hay nada que pedir</h1>
         <p className="mt-2 text-[13.5px] text-[#8a8f98]">
           Tu carrito está vacío o los productos ya no están disponibles.
@@ -219,6 +381,8 @@ export function CheckoutView({
       <p className="mb-6 text-[13.5px] text-[#8a8f98]">
         Completa tus datos y te llevamos a WhatsApp para confirmar el pedido.
       </p>
+
+      {rescate}
 
       <form action={submit} className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
@@ -318,7 +482,99 @@ export function CheckoutView({
               {isCO ? "Dirección de entrega" : "Shipping address"}
             </h2>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            {direcciones.length > 0 && (
+              <div className="mb-5 space-y-2">
+                {direcciones.map((d) => (
+                  <label
+                    key={d.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-[14px] border-[1.6px] p-3.5 transition-colors ${
+                      direccionId === d.id
+                        ? "border-kora-coral bg-[#FFF7F3]"
+                        : "border-[#e2ddd6] hover:border-[#d6d0c8]"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="direccionGuardada"
+                      checked={direccionId === d.id}
+                      onChange={() => elegirDireccion(d.id)}
+                      className="mt-0.5 size-4 accent-kora-coral"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-bold text-kora-black">
+                        {d.label ? `${d.label} · ` : ""}
+                        {[d.address, d.address2].filter(Boolean).join(", ")}
+                      </span>
+                      <span className="block text-[12.5px] text-[#6b6f78]">
+                        {[d.neighborhood, d.city, d.state].filter(Boolean).join(", ")}
+                      </span>
+                    </span>
+                    {d.isDefault && (
+                      <span className="shrink-0 rounded-full bg-[#FFF4EF] px-2 py-0.5 text-[10.5px] font-bold text-kora-coral">
+                        Predeterminada
+                      </span>
+                    )}
+                  </label>
+                ))}
+
+                {/* Siempre disponible: tener direcciones guardadas no puede
+                    impedir mandar un pedido a un sitio nuevo. */}
+                <label
+                  className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.6px] p-3.5 transition-colors ${
+                    direccionId === null
+                      ? "border-kora-coral bg-[#FFF7F3]"
+                      : "border-[#e2ddd6] hover:border-[#d6d0c8]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="direccionGuardada"
+                    checked={direccionId === null}
+                    onChange={() => elegirDireccion(null)}
+                    className="size-4 accent-kora-coral"
+                  />
+                  <span className="text-[13.5px] font-semibold text-kora-black">
+                    Usar otra dirección
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {!camposVisibles && elegida && (
+              // Los valores viajan igual, en campos ocultos: el pedido guarda
+              // su snapshot y no puede depender de que se pinte un formulario.
+              // Sin `required`, que sobre un campo oculto bloquea el envío con
+              // un error que el navegador ni siquiera puede señalar.
+              <>
+                <input type="hidden" name="state" value={elegida.state ?? ""} />
+                <input type="hidden" name="city" value={elegida.city ?? ""} />
+                <input type="hidden" name="address" value={elegida.address ?? ""} />
+                <input type="hidden" name="address2" value={elegida.address2 ?? ""} />
+                <input type="hidden" name="neighborhood" value={elegida.neighborhood ?? ""} />
+                <input type="hidden" name="zip" value={elegida.zip ?? ""} />
+                <input type="hidden" name="notes" value={elegida.notes ?? ""} />
+                <p className="text-[12.5px] text-[#8a8f98]">
+                  Se enviará a la dirección seleccionada. Puedes cambiarla desde{" "}
+                  <Link href="/cuenta?seccion=direcciones" className="font-semibold text-kora-coral underline underline-offset-2">
+                    Mis direcciones
+                  </Link>
+                  .
+                </p>
+              </>
+            )}
+
+            {camposVisibles && elegida && (
+              <p className="mb-4 rounded-[12px] bg-[#FFF4EF] px-4 py-3 text-[12.5px] text-[#6b6f78]">
+                A esta dirección le falta información para poder entregarla.
+                Complétala aquí y quedará guardada.
+              </p>
+            )}
+
+            {camposVisibles && (
+            // Ojo: el bloque se QUITA del DOM, no se esconde con CSS. Oculto
+            // por clase seguiría enviándose, y como arriba ya van los campos
+            // ocultos con la dirección elegida, cada dato viajaría dos veces.
+            <div key={direccionId ?? "nueva"} className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelCls} htmlFor="state">
                   {isCO ? "Departamento" : "State"}
@@ -340,6 +596,7 @@ export function CheckoutView({
                   {isCO ? "Ciudad / Municipio" : "City"}
                 </label>
                 <input id="city" name="city" required className={inputCls}
+                  defaultValue={elegida?.city ?? ""}
                   list={isCO ? "ciudades" : undefined}
                   placeholder={isCO ? "Ej. Bogotá" : "Ex. Miami"} />
                 {isCO && (
@@ -357,6 +614,7 @@ export function CheckoutView({
                   {isCO ? "Dirección" : "Street address"}
                 </label>
                 <input id="address" name="address" required className={inputCls}
+                  defaultValue={elegida?.address ?? ""}
                   placeholder={isCO ? "Ej.: Carrera 7 # 82 - 15" : "Ex. 123 Main St"} />
                 {fieldError("address")}
               </div>
@@ -366,13 +624,15 @@ export function CheckoutView({
                   {isCO ? "Apto / Torre / Conjunto" : "Apt / Suite"}
                   <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
                 </label>
-                <input id="address2" name="address2" className={inputCls} />
+                <input id="address2" name="address2" className={inputCls}
+                  defaultValue={elegida?.address2 ?? ""} />
               </div>
 
               {isCO ? (
                 <div>
                   <label className={labelCls} htmlFor="neighborhood">Barrio</label>
                   <input id="neighborhood" name="neighborhood" required className={inputCls}
+                    defaultValue={elegida?.neighborhood ?? ""}
                     placeholder="Ej. Chapinero" />
                   {fieldError("neighborhood")}
                 </div>
@@ -380,6 +640,7 @@ export function CheckoutView({
                 <div>
                   <label className={labelCls} htmlFor="zip">ZIP code</label>
                   <input id="zip" name="zip" required className={inputCls}
+                    defaultValue={elegida?.zip ?? ""}
                     placeholder="33101" />
                   {fieldError("zip")}
                 </div>
@@ -391,9 +652,24 @@ export function CheckoutView({
                   <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
                 </label>
                 <textarea id="notes" name="notes" rows={2} className={`${inputCls} resize-y`}
+                  defaultValue={elegida?.notes ?? ""}
                   placeholder={isCO ? "Ej. Dejar en portería" : "Ex. Leave at the door"} />
               </div>
+
+              {/* Solo con sesión: sin cuenta no hay libreta donde guardarla. */}
+              {buyer && direccionId === null && (
+                <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-[#4a4f58] sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={guardarNueva}
+                    onChange={(e) => setGuardarNueva(e.target.checked)}
+                    className="size-4 accent-kora-coral"
+                  />
+                  Guardar esta dirección en mi cuenta
+                </label>
+              )}
             </div>
+            )}
           </section>
 
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
