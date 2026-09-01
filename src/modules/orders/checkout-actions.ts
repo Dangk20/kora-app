@@ -296,6 +296,11 @@ export async function createOrder(
         city: data.city,
         address,
         acceptsMarketing: data.acceptsMarketing,
+        state: data.state,
+        address2: data.address2,
+        neighborhood: data.neighborhood,
+        zip: data.zip,
+        notes: data.notes,
       });
 
       // El saldo se consume ANTES de crear el pedido y dentro de su misma

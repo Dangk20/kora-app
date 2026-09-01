@@ -9,6 +9,7 @@
 
 import { db } from "@/lib/db";
 import { hashPassword, passwordProblem, quemarTiempo, verifyPassword } from "./password";
+import { normalizarTelefono } from "@/modules/customers/phone";
 
 /** El mismo mensaje para todo fallo de acceso. No se personaliza jamás. */
 export const MENSAJE_ACCESO = "Correo o contraseña incorrectos.";
@@ -73,11 +74,24 @@ export async function registerBuyer(input: RegisterInput): Promise<RegisterResul
     return { ok: true, customerId: existente.id };
   }
 
+  // El teléfono se guarda en E.164, igual que lo hace el checkout. Antes se
+  // guardaba tal cual lo escribió el comprador, así que el MISMO teléfono
+  // quedaba como "3142751611" desde la cuenta y "+573142751611" desde un
+  // pedido: dos filas para una persona, y el módulo de clientes las ve como
+  // dos. Es dato de contacto, no identidad —esa es el correo—, así que si
+  // choca con otro cliente se guarda vacío en vez de tumbar el registro:
+  // `phone` es ÚNICO en la base y un choque aquí dejaría a alguien sin poder
+  // crear su cuenta, por un dato que ni siquiera usa para entrar.
+  const telefono = normalizarTelefono(input.phone);
+  const libre = telefono
+    ? !(await db.customer.findFirst({ where: { phone: telefono }, select: { id: true } }))
+    : false;
+
   const creado = await db.customer.create({
     data: {
       name,
       email,
-      phone: input.phone?.trim() || null,
+      phone: libre ? telefono : null,
       source: "WEB",
       passwordHash,
       accountCreated: new Date(),

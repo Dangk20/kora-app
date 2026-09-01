@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { normalizarTelefono } from "@/modules/customers/phone";
 import {
   MENSAJE_ACCESO,
   changePassword,
@@ -128,14 +129,34 @@ export async function actualizarDatos(_prev: FormState, formData: FormData): Pro
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 3) return { error: "Escribe tu nombre completo." };
 
+  // El teléfono se guarda en E.164, igual que el checkout y el registro. Sin
+  // normalizar, el MISMO número queda escrito de dos formas según por dónde
+  // entró, y el módulo de clientes ve dos personas.
+  const escrito = String(formData.get("phone") ?? "").trim();
+  const phone = escrito ? normalizarTelefono(escrito) : null;
+  if (escrito && !phone) {
+    return { error: "Ese número de WhatsApp no parece válido. Revísalo." };
+  }
+
+  // `phone` es ÚNICO en la base: guardar el de otro cliente lanzaría una
+  // violación de unicidad y la acción reventaría con un error genérico. Se
+  // comprueba antes para poder decirlo con palabras.
+  if (phone) {
+    const deOtro = await db.customer.findFirst({
+      where: { phone, id: { not: buyer.customerId } },
+      select: { id: true },
+    });
+    if (deOtro) {
+      return { error: "Ese número ya está registrado en otra cuenta." };
+    }
+  }
+
   await db.customer.update({
     where: { id: buyer.customerId },
-    data: {
-      name,
-      phone: String(formData.get("phone") ?? "").trim() || null,
-      city: String(formData.get("city") ?? "").trim() || null,
-      address: String(formData.get("address") ?? "").trim() || null,
-    },
+    // Sin ciudad ni dirección: viven en la libreta (`customer_addresses`) y
+    // `customer.city`/`address` son un espejo que solo escribe
+    // `sincronizarDireccionPrincipal`. Escribirlas aquí las separaría.
+    data: { name, phone },
   });
 
   revalidatePath("/cuenta");

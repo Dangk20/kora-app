@@ -31,3 +31,21 @@ export function isUsablePhone(e164: string): boolean {
   const d = digitsOf(e164);
   return d.length >= 10 && d.length <= 15;
 }
+
+/**
+ * El teléfono que escribió un comprador, en E.164, o `null` si no sirve.
+ *
+ * Se asume Colombia cuando no viene con indicativo: es el mercado principal y
+ * el único cuyo prefijo se puede dar por supuesto sin preguntar. Existe porque
+ * el MISMO número entraba escrito de tres formas distintas —desde el checkout
+ * en E.164, desde el registro y desde "Mis datos" tal cual se tecleó—, y el
+ * módulo de clientes acababa viendo dos personas donde hay una.
+ */
+export function normalizarTelefono(phone: string | null | undefined): string | null {
+  const crudo = phone?.trim();
+  if (!crudo) return null;
+  const e164 = crudo.startsWith("+")
+    ? `+${crudo.replace(/\D/g, "")}`
+    : toE164(crudo, "CO");
+  return isUsablePhone(e164) ? e164 : null;
+}
