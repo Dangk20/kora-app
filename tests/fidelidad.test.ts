@@ -124,3 +124,33 @@ describe("las garantías publicadas son las que el negocio sostiene", () => {
     );
   });
 });
+
+describe("el movimiento de la tarjeta al pasar el cursor", () => {
+  // Tailwind 4 dejó de meter `-translate-y` y `scale` dentro de `transform`:
+  // ahora usa las propiedades CSS `translate` y `scale` por separado. Una
+  // lista arbitraria escrita como `transition-[transform,…]` deja fuera justo
+  // lo que se mueve, y el desplazamiento ocurre DE GOLPE. No da error, se lee
+  // correcto en el código, y ninguna curva ni duración lo arregla porque no
+  // se están aplicando a nada. Pasó exactamente eso: la tarjeta saltaba sus
+  // 8 px en un fotograma.
+  const tarjeta = readFileSync("src/modules/storefront/product-card.tsx", "utf8");
+
+  it("la lista de transiciones nombra `translate`, que es lo que se mueve", () => {
+    expect(tarjeta).toContain("transition-[translate,box-shadow]");
+    expect(tarjeta).toContain("transition-[opacity,translate]");
+  });
+
+  it("ninguna lista arbitraria dice `transform` mientras se usa translate", () => {
+    // Sin las líneas de comentario: ahí SÍ se nombra la forma incorrecta,
+    // justamente para explicar por qué no se usa.
+    const codigo = tarjeta
+      .split("\n")
+      .filter((linea) => !linea.trim().startsWith("//"))
+      .join("\n");
+    expect(codigo).not.toMatch(/transition-\[[^\]]*transform[^\]]*\]/);
+  });
+
+  it("respeta a quien pidió menos movimiento en su sistema", () => {
+    expect(tarjeta).toContain("motion-reduce:transition-none");
+  });
+});

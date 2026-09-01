@@ -62,12 +62,27 @@ export default async function LoginPage({
         </p>
       </section>
 
-      {/* Panel de marca: gradiente oficial 135° con curva inferior izquierda */}
-      <section className="bg-kora-gradient relative hidden overflow-hidden rounded-bl-[160px] lg:flex lg:w-[45%]">
-        {/* Formas fluidas sobre el gradiente */}
-        <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/15 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-1/4 -left-20 h-80 w-80 rounded-full bg-kora-purple/50 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 right-1/4 h-96 w-96 rounded-full bg-kora-black/30 blur-3xl" />
+      {/* Panel de marca: NEGRO FIJO, con el degradado desarrollándose desde la
+          esquina inferior derecha.
+
+          Antes el panel era el gradiente entero, y sobre su tramo naranja el
+          logotipo —que es blanco— se desvanecía en su propio fondo. Con la
+          base negra el logo tiene el contraste máximo, y la marca no se
+          pierde: el degradado sigue siendo el oficial del manual, con sus
+          cinco paradas y en su mismo orden, solo que naciendo de una esquina
+          y disolviéndose en el negro en vez de rellenar el panel. */}
+      <section className="relative hidden overflow-hidden rounded-bl-[160px] bg-kora-black lg:flex lg:w-[45%]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            // Radial anclado en la esquina (100% 100%): las paradas son las
+            // mismas del gradiente de marca —#ff6a00 → #7a3db8— y la última
+            // es transparente, que es lo que lo funde con el negro sin borde.
+            backgroundImage:
+              "radial-gradient(105% 68% at 100% 100%, #ff6a00 0%, #ff5a1f 16%, #f2357e 34%, #c026d3 52%, #7a3db8 70%, rgba(122,61,184,0) 100%)",
+          }}
+        />
 
         <div className="relative z-10 flex w-full flex-col items-center justify-center gap-10 p-12">
           <Image

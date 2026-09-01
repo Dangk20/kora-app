@@ -75,18 +75,42 @@ export default async function StoreLayout({
 
           <CurrencySwitch current={currency} />
 
-          <Link
-            href={buyer ? "/cuenta" : "/cuenta/entrar"}
-            className="hidden items-center gap-2.5 text-[#A0A4AD] hover:text-white lg:flex"
-          >
-            <User className="size-[21px]" aria-hidden />
-            <div className="text-[11px] leading-tight">
-              <p>{buyer ? "Mi cuenta" : "Entrar"}</p>
-              <p className="font-semibold text-[#F5F5F7]">
-                {buyer ? buyer.name.split(" ")[0] : "Crear cuenta"}
-              </p>
+          {/* Con sesión es UNA sola cosa —tu cuenta— y va con su icono.
+              Sin sesión son DOS acciones distintas y se presentan como tales:
+              antes eran un único enlace con dos líneas de texto, así que
+              "Crear cuenta" llevaba a la pantalla de entrar. Parecían dos
+              opciones y hacían lo mismo. Separadas, además, cada una puede
+              apuntar a donde debe (/cuenta/crear y /cuenta/entrar). */}
+          {buyer ? (
+            <Link
+              href="/cuenta"
+              className="hidden shrink-0 items-center gap-2.5 text-[#A0A4AD] hover:text-white lg:flex"
+            >
+              <User className="size-[21px]" aria-hidden />
+              <div className="text-[11px] leading-tight">
+                <p>Mi cuenta</p>
+                <p className="font-semibold text-[#F5F5F7]">
+                  {buyer.name.split(" ")[0]}
+                </p>
+              </div>
+            </Link>
+          ) : (
+            <div className="hidden shrink-0 items-center gap-3.5 lg:flex">
+              <Link
+                href="/cuenta/crear"
+                className="text-[13px] font-semibold whitespace-nowrap text-[#F5F5F7] hover:text-white"
+              >
+                Crear cuenta
+              </Link>
+              <span className="h-[18px] w-px bg-[#2a2e36]" aria-hidden />
+              <Link
+                href="/cuenta/entrar"
+                className="text-[13px] font-medium whitespace-nowrap text-[#A0A4AD] hover:text-white"
+              >
+                Entrar
+              </Link>
             </div>
-          </Link>
+          )}
           <CartButton />
         </div>
 

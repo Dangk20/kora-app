@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { formatCop } from "@/lib/format";
 import { storage } from "@/modules/storage";
 import { CategoryTile } from "@/modules/catalog/tiles";
-import { ProductSheet } from "./product-sheet";
+import { ProductModal } from "./product-modal";
 import { ImportSheet } from "./import-sheet";
 import { CatalogToolbar } from "./catalog-toolbar";
 import { StatusSwitch } from "./status-switch";
@@ -109,7 +109,20 @@ export default async function CatalogPage({
     ? await db.product.findUnique({
         where: { id: editar },
         include: {
-          variants: { orderBy: { createdAt: "asc" } },
+          // ⚠️ Las opciones y el enlace de cada variante con sus valores se
+          // cargan SIEMPRE. Sin esto, editar un producto con variantes abría
+          // el formulario con los grupos vacíos y guardarlo los BORRABA —el
+          // formulario manda la estructura completa, así que "sin grupos"
+          // significa "quítalos todos"—. El producto perdía sus opciones y sus
+          // variantes quedaban sueltas, sin ningún error.
+          options: {
+            orderBy: { position: "asc" },
+            include: { values: { orderBy: { position: "asc" } } },
+          },
+          variants: {
+            orderBy: { createdAt: "asc" },
+            include: { optionValues: { include: { value: true } } },
+          },
           images: { orderBy: { position: "asc" } },
         },
       })
@@ -128,6 +141,11 @@ export default async function CatalogPage({
         url: storage().urlFor(img.url),
         alt: img.alt,
       })),
+      options: editing.options.map((o) => ({
+        id: o.id,
+        name: o.name,
+        values: o.values.map((v) => ({ id: v.id, value: v.value })),
+      })),
       variants: editing.variants
         .filter((v) => v.active)
         .map((v) => ({
@@ -143,10 +161,23 @@ export default async function CatalogPage({
           initialStock: "0",
           active: v.active,
           stockActual: v.stockActual,
+          // Los valores EN EL ORDEN DE LOS GRUPOS, no en el que los devolvió
+          // la base: la matriz cruza las variantes con las combinaciones por
+          // posición, y desordenados no encontraría ninguna — el producto
+          // aparecería con todas sus combinaciones "por crear".
+          optionValues: editing.options.map(
+            (o) =>
+              v.optionValues.find((ov) => o.values.some((val) => val.id === ov.valueId))
+                ?.value.value ?? "",
+          ),
         })),
     };
   }
-  const sheetOpen = (Boolean(nuevo) && canCreate) || (Boolean(editing) && canEdit);
+  // Dos contenedores para dos gestos distintos: el ALTA es un recorrido y va
+  // en un modal grande; EDITAR es entrar a cambiar una cosa y sigue en el
+  // panel lateral. Ver openspec/changes/variantes-por-opciones — decisión 9.
+  const altaAbierta = Boolean(nuevo) && canCreate;
+  const edicionAbierta = Boolean(editing) && canEdit;
 
   return (
     <>
@@ -165,8 +196,13 @@ export default async function CatalogPage({
         >
           <span>Producto</span>
           <span>Categoría</span>
-          <span>Precio</span>
-          <span>Stock</span>
+          {/* Precio y stock alineados a la DERECHA, como toda columna de
+              números: así los importes terminan en la misma vertical y se
+              comparan de un vistazo sin leer cifra por cifra. Es también lo que
+              impide que el "Desde" de un producto con varios precios empuje su
+              importe y lo desalinee del resto. */}
+          <span className="text-right">Precio</span>
+          <span className="text-right">Stock</span>
           <span>Estado</span>
           <span />
         </div>
@@ -218,16 +254,35 @@ export default async function CatalogPage({
                   : p.category.name}
               </span>
 
-              <span className="font-bold text-kora-black">
+              {/* "Desde" va ARRIBA y en pequeño, no al lado del importe: en
+                  línea competía con la cifra y ensuciaba la columna entera por
+                  dos filas de veinte.
+
+                  ⚠️ La línea se reserva SIEMPRE, también cuando está vacía. Si
+                  solo existiera en los productos de varios precios, esas filas
+                  empujarían su importe hacia abajo y la columna volvería a
+                  bailar — ahora en vertical en vez de en horizontal.
+
+                  `tabular-nums`: sin cifras de ancho fijo, un 1 ocupa menos que
+                  un 8 y los números se desalinean aunque la columna no lo esté. */}
+              <span className="relative flex flex-col items-end">
+                {/* La etiqueta va POSICIONADA, fuera del flujo: así no ocupa
+                    alto y el importe queda a la misma altura en TODAS las
+                    filas, con etiqueta o sin ella. Reservarle una línea —lo
+                    obvio— hundía cada precio media línea respecto al stock de
+                    al lado, y la columna volvía a bailar, ahora en vertical. */}
                 {variesPrice && (
-                  <span className="mr-1 text-[11.5px] font-medium text-[#9aa0ab]">
+                  <span className="absolute -top-[11px] right-0 text-[9.5px] font-bold tracking-[0.5px] text-[#c4c8cf] uppercase">
                     Desde
                   </span>
                 )}
-                {formatCop(min)}
+                <span className="font-bold tabular-nums text-kora-black">{formatCop(min)}</span>
               </span>
 
-              <span className="font-bold" style={{ color: low ? "#E5484D" : "#16181D" }}>
+              <span
+                className="text-right font-bold tabular-nums"
+                style={{ color: low ? "#E5484D" : "#16181D" }}
+              >
                 {stock}
               </span>
 
@@ -288,8 +343,10 @@ export default async function CatalogPage({
         basePath="/admin/catalogo"
       />
 
-      {sheetOpen && (
-        <ProductSheet categories={categoryTree(categories)} initial={sheetInitial} />
+      {/* Mismo contenedor para crear y para editar: dos interfaces para el
+          mismo objeto es lo que hace dudar al operador. */}
+      {(altaAbierta || edicionAbierta) && (
+        <ProductModal categories={categoryTree(categories)} initial={sheetInitial} />
       )}
 
       {Boolean(importar) && canCreate && <ImportSheet />}

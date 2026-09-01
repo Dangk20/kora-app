@@ -62,8 +62,35 @@ export function ProductCard({
       ? Math.round(((price.storeAmount - price.amount) / price.storeAmount) * 100)
       : null;
 
+  // Movimiento de la tarjeta al pasar el cursor.
+  //
+  // UNA sola curva para las tres cosas que se mueven —la tarjeta, la foto y la
+  // pastilla— y no la de por defecto. Antes cada una tenía su duración (200,
+  // 300 y 200 ms) con la curva del navegador: empezaban juntas y terminaban
+  // en tres momentos distintos, y eso es lo que se siente como un tirón en
+  // vez de un movimiento. `cubic-bezier(0.22,1,0.36,1)` sale rápido y frena
+  // largo, que es como se mueven las cosas con peso.
+  //
+  // Entrar es lento (se disfruta), salir es rápido (nadie quiere esperar a
+  // que una tarjeta que ya dejó de mirar termine de bajar): de ahí las dos
+  // duraciones, la corta en la base y la larga en `group-hover`.
+  //
+  // ⚠️ La lista de propiedades dice `translate`, NO `transform`, y ahí estaba
+  // el tirón. Tailwind 4 dejó de meter `-translate-y` y `scale` dentro de
+  // `transform`: ahora usa las propiedades CSS `translate` y `scale` por
+  // separado. Una lista escrita a mano con `transition-[transform,…]` deja
+  // fuera justo lo que se mueve, así que el desplazamiento ocurre DE GOLPE
+  // —sin transición— y ninguna curva ni duración lo suaviza, porque no se
+  // están aplicando a nada. No da error y en el código se lee correcto.
+  // Las utilidades propias de Tailwind (`transition-transform`) sí incluyen
+  // las cuatro; el riesgo está solo en las listas arbitrarias.
+  const CURVA = "ease-[cubic-bezier(0.22,1,0.36,1)]";
   const clases =
-    "group flex flex-col overflow-hidden rounded-2xl border border-[#efe9e1] bg-white transition-[transform,box-shadow] duration-200 hover:-translate-y-1.5 hover:shadow-[0_18px_38px_rgba(0,0,0,0.1)]";
+    "group flex flex-col overflow-hidden rounded-2xl border border-[#efe9e1] bg-white " +
+    `transition-[translate,box-shadow] duration-200 ${CURVA} ` +
+    "hover:-translate-y-2 hover:duration-[420ms] " +
+    "hover:shadow-[0_22px_46px_-14px_rgba(22,24,29,0.22)] " +
+    "motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
   // Un solo elemento envolviendo toda la tarjeta: un objetivo táctil y un
   // único enlace anunciado por lector de pantalla, con el nombre del producto.
@@ -99,17 +126,29 @@ export function ProductCard({
             // alta pierde la jarra, un teclado ancho pierde las teclas de los
             // extremos. Hoy no se nota porque no hay ni una foto cargada; se
             // notaría en TODAS las tarjetas el día que llegue el catálogo real.
-            className="object-contain p-4 transition-transform duration-300 group-hover:scale-[1.04]"
+            // El acercamiento va MUY lento a propósito (700 ms): un zoom
+            // rápido se lee como un salto; uno lento se lee como que la
+            // tarjeta respira. Es la parte llamativa del gesto.
+            className={`object-contain p-4 transition-transform duration-300 ${CURVA} group-hover:scale-[1.07] group-hover:duration-700 motion-reduce:transition-none motion-reduce:group-hover:scale-100`}
             unoptimized
           />
         ) : (
           // Sin foto todavía: el glifo de la categoría, como el prototipo.
-          <CategoryTile
-            color={product.category.color}
-            icon={product.category.icon}
-            size={96}
-            radius={0}
-          />
+          //
+          // Lleva el MISMO acercamiento que llevaría la foto. Si no, el gesto
+          // del cursor dependería de si el producto tiene imagen cargada: la
+          // mitad del catálogo respiraría y la otra mitad no, sin ninguna
+          // razón que el comprador pueda ver.
+          <span
+            className={`transition-transform duration-300 ${CURVA} group-hover:scale-[1.07] group-hover:duration-700 motion-reduce:transition-none motion-reduce:group-hover:scale-100`}
+          >
+            <CategoryTile
+              color={product.category.color}
+              icon={product.category.icon}
+              size={96}
+              radius={0}
+            />
+          </span>
         )}
 
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
@@ -147,7 +186,19 @@ export function ProductCard({
         {!preview && !soldOut && (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-2 rounded-full bg-kora-black/90 py-2 text-center text-[12px] font-bold text-white opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:block"
+            className={
+              "pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-3 rounded-full " +
+              "bg-kora-black/90 py-2 text-center text-[12px] font-bold text-white opacity-0 " +
+              "shadow-[0_10px_24px_-6px_rgba(22,24,29,0.45)] " +
+              // El retardo va SOLO en `group-hover`, no en la base: así entra
+              // un instante después de que la tarjeta empieza a subir —que es
+              // lo que hace que el gesto se lea como uno y no como tres cosas
+              // disparadas a la vez— pero al salir se va sin quedarse colgada.
+              `transition-[opacity,translate] duration-200 delay-0 ${CURVA} ` +
+              "group-hover:translate-y-0 group-hover:opacity-100 group-hover:delay-[70ms] group-hover:duration-[360ms] " +
+              "motion-reduce:transition-none " +
+              "[@media(hover:hover)_and_(pointer:fine)]:block"
+            }
           >
             Ver producto
           </span>
