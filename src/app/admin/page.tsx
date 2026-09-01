@@ -97,13 +97,21 @@ export default async function AdminPage({
         _count: true,
         where: { currency, confirmedAt: { gte: startOfMonth } },
       }),
-      db.order.count({ where: { status: "PENDING" } }),
+      // ⚠️ Filtra por moneda desde el 1 sep 2026. Antes no: con el panel en
+      // USD seguía contando los pedidos pendientes en pesos, así que el
+      // selector parecía roto — y peor, dos tarjetas de la MISMA pantalla
+      // hablaban de universos distintos sin decirlo en ninguna parte.
+      db.order.count({ where: { status: "PENDING", currency } }),
       db.variant.count({
         where: { active: true, product: { active: true }, stockActual: { lte: db.variant.fields.stockMin } },
       }),
+      // Igual que los pendientes: con el panel en USD, esta tabla listaba
+      // pedidos en pesos. Un filtro que no filtra la mitad de la pantalla no
+      // es un filtro, y hace dudar del resto de las cifras.
       db.order.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
+        where: { currency },
         include: { customer: true },
       }),
       // Top por unidades REALMENTE vendidas. Antes ordenaba por "destacado",
@@ -122,8 +130,8 @@ export default async function AdminPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[13px] text-muted-foreground">
-          Cifras de ventas en <strong className="text-kora-black">{currency}</strong>. Las dos
-          monedas no se suman: no existe tasa de cambio en KORA.
+          Todo lo de abajo es de <strong className="text-kora-black">{currency}</strong> — cifras,
+          pedidos y productos. Las dos monedas no se suman: no existe tasa de cambio en KORA.
         </p>
         <CurrencyTabs current={currency} hrefFor={(c) => `/admin?moneda=${c}`} />
       </div>
@@ -131,7 +139,7 @@ export default async function AdminPage({
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         <MetricCard label={`Ventas hoy · ${currency}`} value={money(Number(ventasHoy._sum.total ?? 0))} icon={BarChart3} iconBg="#EFE6F7" iconColor="#7A3DB8" />
         <MetricCard label={`Ventas del mes · ${currency}`} value={money(mesTotal)} icon={Tag} iconBg="#FFE9DD" iconColor="#FF5A1F" />
-        <MetricCard label="Pedidos pendientes" value={String(pendientes)} icon={ClipboardList} iconBg="#FBDCE9" iconColor="#D81B60" />
+        <MetricCard label={`Pedidos pendientes · ${currency}`} value={String(pendientes)} icon={ClipboardList} iconBg="#FBDCE9" iconColor="#D81B60" />
         <MetricCard label={`Ticket promedio · ${currency}`} value={money(ticket)} icon={ShoppingCart} iconBg="#ECE0F5" iconColor="#8a5cb0" />
         {/* La card oscura del prototipo: stock bajo */}
         <div className="bg-kora-black rounded-2xl p-5">
@@ -238,9 +246,11 @@ export default async function AdminPage({
                 <span className="text-muted-foreground">
                   {o.channel === "POS" ? "POS" : "Online"}
                 </span>
-                {/* Cada pedido en SU moneda: aquí no se filtra por la del
-                    dashboard, así que formatear todo como pesos convertiría un
-                    pedido de USD 40 en "$40". */}
+                {/* Se formatea por la moneda DEL PEDIDO, no por la del panel,
+                    aunque desde el 1 sep la tabla ya solo trae la moneda
+                    seleccionada. Es la defensa que sobrevive al día que
+                    alguien quite ese filtro: sin ella, un pedido de USD 40 se
+                    imprimiría como "$40" y nadie lo notaría. */}
                 <span className="font-semibold text-kora-black">
                   {o.currency === "USD" ? formatUsd(Number(o.total)) : formatCop(Number(o.total))}
                   <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
