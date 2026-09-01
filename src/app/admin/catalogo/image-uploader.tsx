@@ -136,9 +136,19 @@ export function ImageUploader({
         </label>
       </div>
 
+      {/* La recomendación es CONCRETA porque una vaga no la sigue nadie.
+          Cuadrada porque las tarjetas del catálogo y la ficha usan un
+          contenedor cuadrado con `object-contain`: una foto apaisada no se
+          recorta —eso arruinaría el producto— pero deja franjas a los lados.
+          1200 px cubre la ficha en pantallas de alta densidad sin pesar. */}
       <p className="text-[11.5px] leading-relaxed text-[#8a8f98]">
-        JPG, PNG, WebP o AVIF · máximo 5 MB c/u. La primera imagen es la que se
-        ve en la tienda; pasa el cursor sobre otra para hacerla principal.
+        <span className="font-semibold text-[#6b6f78]">
+          Recomendado: 1200 × 1200 px, cuadrada, fondo claro.
+        </span>{" "}
+        JPG, PNG, WebP o AVIF · máximo {MAX_MB} MB c/u. Las fotos que no son
+        cuadradas no se recortan, pero se ven con franjas a los lados. La
+        primera imagen es la que se ve en la tienda; pasa el cursor sobre otra
+        para hacerla principal.
       </p>
       {error && <p className="text-[11.5px] font-semibold text-destructive">{error}</p>}
 

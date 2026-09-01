@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
+import { receiveStock } from "@/modules/inventory/engine";
 import { uniqueSlug } from "./slug";
 
 export type ActionResult = { ok: true } | { ok: false; error: string } | null;
@@ -28,6 +29,19 @@ const variantSchema = z.object({
   // Solo aplica a variantes nuevas: entra por el libro contable.
   initialStock: z.coerce.number().int().min(0, "Stock inicial inválido").default(0),
   active: z.boolean().default(true),
+  /**
+   * Los valores que componen esta variante, UNO POR GRUPO y en el orden de los
+   * grupos. Vacío = variante suelta con nombre libre, que es todo el catálogo
+   * anterior al 1 sep 2026 y sigue siendo válido.
+   */
+  optionValues: z.array(z.string().trim()).default([]),
+});
+
+const optionSchema = z.object({
+  name: z.string().trim().min(1, "Cada grupo de opciones necesita nombre"),
+  values: z
+    .array(z.string().trim().min(1, "Cada opción necesita un valor"))
+    .min(1, "Cada grupo necesita al menos un valor"),
 });
 
 const productSchema = z.object({
@@ -47,6 +61,11 @@ const productSchema = z.object({
   active: z.boolean(),
   featured: z.boolean(),
   variants: z.array(variantSchema).min(1, "El producto necesita al menos una variante"),
+  /**
+   * Grupos de opciones: Talla → M, S. Máximo dos en esta versión — con tres,
+   * la matriz pasa de cuatro filas a decenas y el panel necesita otra pantalla.
+   */
+  options: z.array(optionSchema).max(2, "Por ahora, máximo dos grupos de opciones").default([]),
 });
 
 const productSlugExists = (slug: string) =>
@@ -119,6 +138,46 @@ export async function upsertProduct(
             },
           });
 
+      // ── Grupos de opciones ──────────────────────────────────────────────
+      // Se reescriben enteros: el formulario manda la estructura completa, y
+      // reconciliar diferencias parciales sobre dos niveles (grupos y valores)
+      // añade estados imposibles de probar. Borrar un grupo arrastra sus
+      // valores por cascada; las variantes que dependían de él ya no vienen en
+      // el formulario y quedan desactivadas por el paso de abajo — no borradas,
+      // porque pueden estar vendidas.
+      await tx.productOption.deleteMany({
+        where: {
+          productId: product.id,
+          name: { notIn: data.options.map((o) => o.name) },
+        },
+      });
+
+      /** valor → id, para enlazar las variantes. Clave: "Talla|M". */
+      const idPorValor = new Map<string, string>();
+
+      for (const [i, grupo] of data.options.entries()) {
+        const opcion = await tx.productOption.upsert({
+          where: { productId_name: { productId: product.id, name: grupo.name } },
+          create: { productId: product.id, name: grupo.name, position: i },
+          update: { position: i },
+          select: { id: true },
+        });
+
+        await tx.productOptionValue.deleteMany({
+          where: { optionId: opcion.id, value: { notIn: grupo.values } },
+        });
+
+        for (const [j, valor] of grupo.values.entries()) {
+          const fila = await tx.productOptionValue.upsert({
+            where: { optionId_value: { optionId: opcion.id, value: valor } },
+            create: { optionId: opcion.id, value: valor, position: j },
+            update: { position: j },
+            select: { id: true },
+          });
+          idPorValor.set(`${grupo.name}|${valor}`, fila.id);
+        }
+      }
+
       const keptIds: string[] = [];
       for (const v of data.variants) {
         const variantBase = {
@@ -143,23 +202,45 @@ export async function upsertProduct(
           });
           keptIds.push(created.id);
           if (v.initialStock > 0) {
-            await tx.stockMovement.create({
-              data: {
-                variantId: created.id,
-                delta: v.initialStock,
-                reason: "COMPRA_INICIAL",
-                channel: "ADMIN",
-                actorId: session.user.id,
-                note: "Stock inicial al crear la variante",
-              },
-            });
-            // Por defecto todo el stock inicial queda publicado online;
-            // la asignación se afina desde Inventario.
-            await tx.variant.update({
-              where: { id: created.id },
-              data: { stockActual: v.initialStock, onlineUnits: v.initialStock },
+            // ⚠️ Por `receiveStock()`, no escribiendo `stockActual` a mano.
+            //
+            // Hasta el 1 sep 2026 esto creaba el movimiento y materializaba
+            // `stockActual` y `onlineUnits` por su cuenta — la regla 1 del
+            // proyecto dice que esas dos columnas SOLO cambian dentro del
+            // motor de inventario, y el importador ya lo hacía bien. Dos
+            // caminos para mover inventario es exactamente lo que esa regla
+            // existe para impedir: el día que el motor gane una comprobación,
+            // este camino no la tendría y nadie se enteraría.
+            //
+            // `allOnline` deja todo el stock inicial publicado, como antes;
+            // la asignación por canal se afina desde Inventario.
+            await receiveStock(tx, {
+              variantId: created.id,
+              qty: v.initialStock,
+              actorId: session.user.id,
+              note: "Stock inicial al crear la variante",
+              allOnline: true,
             });
           }
+        }
+      }
+
+      // ── Enlace variante → valores ───────────────────────────────────────
+      // También se reescribe entero, por variante: es un conjunto pequeño y
+      // fijo (un valor por grupo), y calcular la diferencia costaría más que
+      // rehacerlo.
+      for (const [indice, v] of data.variants.entries()) {
+        const variantId = keptIds[indice];
+        await tx.variantOptionValue.deleteMany({ where: { variantId } });
+
+        const valueIds = v.optionValues
+          .map((valor, i) => idPorValor.get(`${data.options[i]?.name}|${valor}`))
+          .filter((id): id is string => Boolean(id));
+
+        if (valueIds.length > 0) {
+          await tx.variantOptionValue.createMany({
+            data: valueIds.map((valueId) => ({ variantId, valueId })),
+          });
         }
       }
 
