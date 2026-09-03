@@ -500,6 +500,7 @@ model Order {
 
   items             OrderItem[]
   emailsSent        OrderEmail[]
+  salesDocument     SalesDocument?
   stockMovements    StockMovement[]
   statusHistory     OrderStatusHistory[]
   cashbackMovements CashbackMovement[]
@@ -1037,6 +1038,49 @@ enum OrderEmailType {
   // decir. Por eso no vive en EVENTO_POR_ESTADO sino en un trabajo programado.
   // Petición del cliente del 7 ago 2026.
   BUYER_PAYMENT_REMINDER // al comprador: te queda poco para confirmar el pago
+}
+
+/// El documento que KORA emite cuando un pedido se confirma.
+///
+/// NO es una factura electrónica de venta. Una "Factura de Venta" numerada
+/// exige numeración autorizada por la DIAN; y cuando esa exista habrá DOS
+/// documentos por la misma compra, con numeraciones distintas. Si ambos se
+/// llamaran factura, el comprador tendría dos facturas de un solo pago y
+/// ninguna forma de saber cuál vale.
+///
+/// SE CONGELA EL CONTENIDO, NO EL PDF. `snapshot` guarda lo que el documento
+/// dice —comerciante, comprador, entrega, líneas, totales— y el PDF se
+/// renderiza cada vez que alguien lo pide. Guardar los bytes congelaría también
+/// la maqueta, y con ella cualquier error de diseño, para siempre; además
+/// obligaría a elegir entre inflar la base (que es lo que tiene que restaurar
+/// cuando nada más funciona) o acoplarlo al almacenamiento de imágenes y a su
+/// guarda de arranque, que cuenta archivos contra la base.
+///
+/// Contrapartida aceptada: rediseñar la maqueta cambia el ASPECTO de los
+/// comprobantes viejos. Lo que dicen no cambia — eso lo garantiza el snapshot.
+model SalesDocument {
+  id      String @id @default(cuid())
+  orderId String @unique // uno por pedido, y lo impide el índice, no una lectura previa
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// El MISMO número del pedido, copiado. Sin serie propia: una segunda
+  /// numeración solo se justificaría si fuera fiscal y sin huecos, y la fiscal
+  /// la asignará la DIAN. Se copia en vez de leerse del pedido para que el
+  /// documento se sostenga solo.
+  number Int
+
+  /// Cuándo se emitió = cuándo se confirmó el pedido. En los comprobantes que
+  /// se emiten al vuelo para pedidos anteriores a este módulo, es la fecha de
+  /// confirmación REAL, no la del momento en que alguien lo pidió.
+  issuedAt DateTime
+  currency Currency
+
+  /// Todo lo que el documento dice. Ver `src/modules/invoicing/snapshot.ts`.
+  snapshot Json
+
+  createdAt DateTime @default(now())
+
+  @@map("sales_documents")
 }
 
 model OrderEmail {

@@ -48,6 +48,17 @@ export function createResendDriver(apiKey: string, from = fromAddress()): EmailD
             html: msg.html,
             text: msg.text,
             ...(Object.keys(headers).length > 0 ? { headers } : {}),
+            // El proveedor recibe el contenido en base64 dentro del JSON. No
+            // se manda `content_type`: lo deduce de la extensión, y mandarlo
+            // mal es peor que no mandarlo.
+            ...(msg.attachments && msg.attachments.length > 0
+              ? {
+                  attachments: msg.attachments.map((a) => ({
+                    filename: a.filename,
+                    content: Buffer.from(a.content).toString("base64"),
+                  })),
+                }
+              : {}),
           }),
         });
 

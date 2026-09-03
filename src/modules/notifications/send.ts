@@ -18,6 +18,7 @@
 // chocaba contra la reserva del primero y se quedaba sin correo.
 
 import type { OrderEmailType } from "@/generated/prisma/enums";
+import type { EmailAttachment } from "@/modules/email/driver";
 import { db } from "@/lib/db";
 import { emailDriver } from "@/modules/email";
 import { canSendTransactional } from "./guard";
@@ -99,6 +100,8 @@ export type SendArgs = {
   email: RenderedEmail;
   /** Un aviso al operador no pasa por la lista de supresión del comprador. */
   skipGuard?: boolean;
+  /** Archivos que viajan con el correo. Hoy: el comprobante de pedido. */
+  attachments?: EmailAttachment[];
 };
 
 export async function sendOrderEmail(args: SendArgs): Promise<SendOutcome> {
@@ -129,6 +132,9 @@ export async function sendOrderEmail(args: SendArgs): Promise<SendOutcome> {
     subject: args.email.subject,
     html: args.email.html,
     text: args.email.text,
+    ...(args.attachments && args.attachments.length > 0
+      ? { attachments: args.attachments }
+      : {}),
     // Sin cabecera de baja: no es un correo comercial.
   });
 

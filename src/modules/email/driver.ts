@@ -6,6 +6,19 @@
 // del cuerpo, y el enlace de baja como dato de primera clase porque los
 // clientes de correo lo usan para su botón nativo.
 
+/**
+ * Un archivo que viaja con el correo.
+ *
+ * `content` son los BYTES, no una ruta: quien envía puede ser el worker, que
+ * corre en su propio contenedor, y una ruta obligaría a que ambos vieran el
+ * mismo disco.
+ */
+export type EmailAttachment = {
+  filename: string;
+  content: Uint8Array;
+  contentType: string;
+};
+
 export type EmailMessage = {
   to: string;
   toName?: string;
@@ -15,6 +28,12 @@ export type EmailMessage = {
   text: string;
   /** Para el encabezado `List-Unsubscribe`: el botón nativo de Gmail/Outlook. */
   unsubscribeUrl?: string;
+  /**
+   * Archivos adjuntos. Los dos drivers TIENEN que entregarlos: el de
+   * producción con el mensaje, el de desarrollo escribiéndolos a disco para
+   * que se puedan abrir y revisar.
+   */
+  attachments?: EmailAttachment[];
 };
 
 export type SendResult =

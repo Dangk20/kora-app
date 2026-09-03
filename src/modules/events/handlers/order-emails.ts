@@ -12,6 +12,7 @@
 
 import type { OrderEmailType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { comprobanteAdjunto } from "@/modules/invoicing/attachment";
 import { orderEmailContext } from "@/modules/notifications/order-data";
 import { renderOrderEmail } from "@/modules/notifications/render";
 import { sendOrderEmail } from "@/modules/notifications/send";
@@ -53,12 +54,20 @@ async function alComprador(
   if (!ctx) throw new Error(`El pedido ${orderId} no existe (evento ${event.id})`);
 
   const email = renderOrderEmail(type, { ...ctx, ...extra });
+
+  // El comprobante viaja SOLO con la confirmación: es el correo del momento en
+  // que la venta ocurrió. Adjuntarlo a "en preparación" o "entregado" mandaría
+  // el mismo documento cuatro veces, y el comprador tendría que adivinar cuál
+  // de los cuatro es el bueno.
+  const comprobante = type === "BUYER_CONFIRMED" ? await comprobanteAdjunto(orderId) : null;
+
   const r = await sendOrderEmail({
     orderId,
     type,
     to: ctx.buyerEmail,
     toName: ctx.buyerName,
     email,
+    ...(comprobante ? { attachments: [comprobante] } : {}),
   });
 
   if (r.sent || r.reason === "YA_ENVIADO") return;

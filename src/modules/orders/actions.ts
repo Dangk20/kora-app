@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { CashbackError, consumeCashback } from "@/modules/cashback/ledger";
 import { outstandingCashback, refundOrderCashback } from "@/modules/cashback/refund";
 import { applyStockMovement, StockError } from "@/modules/inventory/engine";
+import { freezeSalesDocument } from "@/modules/invoicing/document";
 import { canTransition, STATUS_LABEL } from "./status";
 
 export type OrderActionResult =
@@ -97,11 +98,18 @@ export async function confirmOrder(orderId: string): Promise<OrderActionResult> 
           }
         }
 
+        // UN solo instante para todo el acto. Antes se llamaba a `new Date()`
+        // dos veces —una para `confirmedAt` y otra para el evento— y quedaban
+        // separadas por microsegundos; ahora además el comprobante tiene que
+        // llevar EXACTAMENTE la fecha de confirmación del pedido, no una
+        // parecida.
+        const ahora = new Date();
+
         const order = await tx.order.update({
           where: { id: orderId },
           data: {
             status: "CONFIRMED",
-            confirmedAt: new Date(),
+            confirmedAt: ahora,
             confirmedById: session.user.id,
             expiresAt: null, // ya no expira
           },
@@ -117,6 +125,13 @@ export async function confirmOrder(orderId: string): Promise<OrderActionResult> 
           },
         });
 
+        // El comprobante se congela AQUÍ DENTRO, no después. Fuera de la
+        // transacción existiría una ventana con un comprobante de un pedido
+        // que todavía podría no confirmarse; y, peor, un pedido confirmado
+        // podría quedarse sin comprobante SIN DAR NINGÚN ERROR — eso se
+        // descubre el día que alguien lo pide.
+        await freezeSalesDocument(tx, orderId, ahora);
+
         // Outbox: el evento se escribe en la MISMA transacción, así que no
         // puede existir un pedido confirmado sin su evento, ni al revés.
         await tx.domainEvent.create({
@@ -128,7 +143,7 @@ export async function confirmOrder(orderId: string): Promise<OrderActionResult> 
               customerId: order.customerId,
               currency: order.currency,
               total: order.total.toString(),
-              confirmedAt: new Date().toISOString(),
+              confirmedAt: ahora.toISOString(),
               confirmedById: session.user.id,
             },
           },

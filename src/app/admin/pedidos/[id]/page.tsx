@@ -11,6 +11,8 @@ import {
   STATUS_LABEL,
   STATUS_STYLE,
 } from "@/modules/orders/status";
+import { CONFIRMED_STATUSES } from "@/modules/customers/confirmed";
+import { DocumentosDelPedido } from "./documentos";
 import { OrderActions } from "./order-actions";
 
 export default async function OrderDetailPage({
@@ -254,6 +256,10 @@ export default async function OrderDetailPage({
 
         {/* Datos del comprador */}
         <div className="space-y-5">
+          {/* Solo si llegó a venderse: un pedido pendiente o cancelado no tiene
+              documento, y ofrecerlo mandaría a buscar algo que no existe. */}
+          {CONFIRMED_STATUSES.includes(order.status) && <DocumentosDelPedido orderId={order.id} />}
+
           <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
             <h2 className="mb-4 text-[15px] font-bold text-kora-black">Comprador</h2>
             <dl className="space-y-3 text-[13px]">

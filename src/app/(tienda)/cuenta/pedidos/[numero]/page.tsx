@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { formatOrderNumber } from "@/modules/orders/message";
 import { notFound } from "next/navigation";
-import { MessageCircle } from "lucide-react";
+import { Download, MessageCircle } from "lucide-react";
 import { requireBuyer } from "@/modules/buyer/guard";
+import { CONFIRMED_STATUSES } from "@/modules/customers/confirmed";
 import { buyerOrder } from "@/modules/buyer/orders";
 import { whatsappUrl } from "@/modules/orders/message";
 import { whatsappNumberFor } from "@/modules/orders/settings";
@@ -75,6 +76,28 @@ export default async function PedidoPage({
             </p>
           )}
         </div>
+      )}
+
+      {/* El comprobante también vive aquí, no solo en el correo: quien borra
+          el correo se queda sin la única constancia de una compra que pagó por
+          fuera de la plataforma. */}
+      {CONFIRMED_STATUSES.includes(pedido.status) && (
+        <a
+          href={`/cuenta/pedidos/${pedido.number}/comprobante?descargar`}
+          className="mb-6 flex items-center gap-3 rounded-[14px] border border-[#eee9e2] px-5 py-4 transition-colors hover:border-kora-coral"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#FFE9DD] text-kora-coral">
+            <Download className="size-[17px]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14.5px] font-semibold text-kora-black">
+              Descargar comprobante
+            </span>
+            <span className="block text-[12.5px] text-muted-foreground">
+              El mismo que te enviamos por correo al confirmar
+            </span>
+          </span>
+        </a>
       )}
 
       <section className="rounded-[14px] border border-[#eee9e2]">
