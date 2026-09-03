@@ -1,8 +1,13 @@
 "use client";
 
-// Barra de búsqueda y filtros del listado de productos. Todo vive en la URL
+// Barra de búsqueda y filtros de un listado del panel. Todo vive en la URL
 // (?q=&categoria=&estado=&por=&pagina=) para que un filtro se pueda compartir
 // o recargar sin perderlo.
+//
+// La usan Productos e Inventario. Es UNA sola barra y no dos copias: son la
+// misma clase de listado —buscar, filtrar por categoría, filtrar por estado,
+// paginar— y con dos implementaciones basta que alguien arregle el retardo de
+// la búsqueda en una para que la otra siga disparando una consulta por tecla.
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
@@ -12,12 +17,28 @@ export type ToolbarCategory = { id: string; name: string; parentName: string | n
 const selectCls =
   "rounded-[10px] border-[1.6px] border-[#e2ddd6] bg-white px-3 py-2.5 text-[13px] font-semibold text-kora-black outline-none focus:border-kora-coral";
 
+/** Opción del filtro de estado. Cada pantalla trae las suyas. */
+export type ToolbarEstado = { value: string; label: string };
+
 export function CatalogToolbar({
   categories,
   total,
+  basePath = "/admin/catalogo",
+  estados = [
+    { value: "activo", label: "Activos" },
+    { value: "inactivo", label: "Inactivos" },
+    { value: "agotado", label: "Agotados" },
+  ],
+  sustantivo = ["producto", "productos"],
+  buscarEn = "Buscar por nombre o SKU…",
 }: {
   categories: ToolbarCategory[];
   total: number;
+  basePath?: string;
+  estados?: ToolbarEstado[];
+  /** [singular, plural] para el contador. */
+  sustantivo?: [string, string];
+  buscarEn?: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -33,7 +54,7 @@ export function CatalogToolbar({
     // Cualquier cambio de filtro vuelve a la página 1: si estabas en la 3 y
     // filtras a 5 resultados, la 3 estaría vacía.
     next.delete("pagina");
-    router.push(`/admin/catalogo?${next}`);
+    router.push(`${basePath}?${next}`);
   };
 
   // Búsqueda con espera: no dispara una consulta por cada tecla.
@@ -61,8 +82,8 @@ export function CatalogToolbar({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre o SKU…"
-          aria-label="Buscar productos"
+          placeholder={buscarEn}
+          aria-label={`Buscar ${sustantivo[1]}`}
           className="w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] bg-white py-2.5 pr-9 pl-10 text-[13.5px] outline-none focus:border-kora-coral"
         />
         {query && (
@@ -98,9 +119,11 @@ export function CatalogToolbar({
         className={selectCls}
       >
         <option value="">Todos los estados</option>
-        <option value="activo">Activos</option>
-        <option value="inactivo">Inactivos</option>
-        <option value="agotado">Agotados</option>
+        {estados.map((e) => (
+          <option key={e.value} value={e.value}>
+            {e.label}
+          </option>
+        ))}
       </select>
 
       {hasFilters && (
@@ -108,7 +131,7 @@ export function CatalogToolbar({
           type="button"
           onClick={() => {
             setQuery("");
-            router.push("/admin/catalogo");
+            router.push(basePath);
           }}
           className="text-[12.5px] font-semibold text-kora-coral hover:opacity-80"
         >
@@ -118,12 +141,12 @@ export function CatalogToolbar({
 
       <div className="ml-auto flex items-center gap-2.5">
         <span className="text-[12.5px] text-[#8a8f98]">
-          {total} {total === 1 ? "producto" : "productos"}
+          {total} {total === 1 ? sustantivo[0] : sustantivo[1]}
         </span>
         <select
           value={porPagina}
           onChange={(e) => push({ por: e.target.value })}
-          aria-label="Productos por página"
+          aria-label={`${sustantivo[1]} por página`}
           className={selectCls}
         >
           {[20, 50, 100].map((n) => (

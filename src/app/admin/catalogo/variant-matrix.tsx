@@ -17,6 +17,7 @@ import {
   type OptionGroup,
 } from "@/modules/catalog/options";
 import type { VariantDraft } from "./product-form";
+import { MoneyInput } from "./money-input";
 
 const inputCls =
   "w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3 py-2.5 text-sm outline-none focus:border-kora-coral";
@@ -171,38 +172,62 @@ export function VariantMatrix({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl bg-[#faf8f5] p-3.5">
-        <p className="mb-2.5 text-[12.5px] font-bold text-kora-black">
-          Aplicar a todas las combinaciones
+      <div className="rounded-xl border-[1.6px] border-dashed border-[#e2ddd6] bg-[#faf8f5] p-4">
+        {/* El título solo decía "Aplicar a todas las combinaciones" y la
+            explicación estaba DEBAJO del botón, donde se lee después de
+            haberlo pulsado. Ahora dice qué es antes de pedir nada. */}
+        <p className="text-[13px] font-bold text-kora-black">
+          ¿Todas valen lo mismo?
+        </p>
+        <p className="mt-1 mb-3 text-[12px] leading-relaxed text-[#6b6f78]">
+          Escribe el precio una vez y se copia a las{" "}
+          <span className="font-semibold text-kora-black">
+            {combinaciones.length} combinaciones
+          </span>{" "}
+          — y a las que crees después. Lo que dejes vacío no se toca, y luego
+          puedes cambiar cualquiera por separado con su botón{" "}
+          <span className="font-semibold text-kora-black">Editar</span>.
         </p>
         <div className="grid grid-cols-2 gap-2.5">
           <div>
             <label className={labelCls}>COP tienda</label>
-            <input type="number" min="0" step="any" className={inputCls}
+            <MoneyInput
+              moneda="COP"
               value={bloque.priceCopStore}
-              onChange={(e) => setBloque({ ...bloque, priceCopStore: e.target.value })}
-              placeholder="129900" />
+              onChange={(crudo) => setBloque({ ...bloque, priceCopStore: crudo })}
+              placeholder="129.900"
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>COP online</label>
-            <input type="number" min="0" step="any" className={inputCls}
+            <MoneyInput
+              moneda="COP"
               value={bloque.priceCopOnline}
-              onChange={(e) => setBloque({ ...bloque, priceCopOnline: e.target.value })}
-              placeholder="119900" />
+              onChange={(crudo) => setBloque({ ...bloque, priceCopOnline: crudo })}
+              placeholder="119.900"
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>USD tienda</label>
-            <input type="number" min="0" step="any" className={inputCls}
+            <MoneyInput
+              moneda="USD"
               value={bloque.priceUsdStore}
-              onChange={(e) => setBloque({ ...bloque, priceUsdStore: e.target.value })}
-              placeholder="32" />
+              onChange={(crudo) => setBloque({ ...bloque, priceUsdStore: crudo })}
+              placeholder="32.00"
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>USD online</label>
-            <input type="number" min="0" step="any" className={inputCls}
+            <MoneyInput
+              moneda="USD"
               value={bloque.priceUsdOnline}
-              onChange={(e) => setBloque({ ...bloque, priceUsdOnline: e.target.value })}
-              placeholder="30" />
+              onChange={(crudo) => setBloque({ ...bloque, priceUsdOnline: crudo })}
+              placeholder="30.00"
+              className={inputCls}
+            />
           </div>
           {conStock && (
             <div>
@@ -213,20 +238,19 @@ export function VariantMatrix({
                 placeholder="10" />
             </div>
           )}
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={aplicarATodas}
-              className="w-full rounded-[10px] bg-kora-black py-2.5 text-[13px] font-bold text-white hover:bg-kora-gray-dark"
-            >
-              Aplicar
-            </button>
-          </div>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-[#8a8f98]">
-          Solo se aplica a las combinaciones que ya creaste, y a las que crees
-          después. Lo que dejes vacío no se toca.
-        </p>
+
+        {/* Centrado y sin ocupar todo el ancho: es una acción opcional, no el
+            botón principal del paso. */}
+        <div className="mt-3.5 flex justify-center">
+          <button
+            type="button"
+            onClick={aplicarATodas}
+            className="rounded-full bg-kora-black px-8 py-2.5 text-[13px] font-bold text-white hover:bg-kora-gray-dark"
+          >
+            Copiar a las {combinaciones.length}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">

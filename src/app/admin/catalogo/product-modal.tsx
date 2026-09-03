@@ -45,11 +45,17 @@ export function ProductModal({
       className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(14,15,18,0.5)] p-4 sm:p-8"
       onClick={close}
     >
-      {/* `max-h` + scroll interno: en un portátil de 13" el alta completa no
-          cabe de alto, y un modal que se sale de la pantalla esconde su propio
-          botón de guardar. */}
+      {/* Alto ESTABLE, no "el que pida el contenido": con la altura libre, el
+          modal medía 745 px en el paso 1 y 590 en el 3, y cambiaba de tamaño
+          bajo el cursor al avanzar. Un recorrido tiene que sentirse como una
+          sola ventana con el contenido moviéndose dentro, no como tres
+          ventanas distintas.
+
+          `min()` contra el alto de la ventana: en un portátil de 13" el alta
+          completa no cabe, y un modal que se sale de la pantalla esconde su
+          propio botón de guardar. */}
       <div
-        className="flex max-h-full w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_40px_100px_-20px_rgba(14,15,18,0.5)]"
+        className="flex h-[min(88vh,760px)] w-full max-w-[820px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_40px_100px_-20px_rgba(14,15,18,0.5)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#f0ece6] px-7 py-5">

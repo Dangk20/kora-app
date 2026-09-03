@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Inbox } from "lucide-react";
+import { Eye, Inbox } from "lucide-react";
 import type { OrderStatus } from "@/generated/prisma/client";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { ACTION_ICON_ROW } from "../_components/action-icon";
 import { formatMoney } from "@/modules/pricing";
 import { formatOrderNumber } from "@/modules/orders/message";
 import {
@@ -117,7 +118,7 @@ export default async function OrdersPage({
             <Link
               key={o.id}
               href={`/admin/pedidos/${o.id}`}
-              className={`${GRID} border-b border-[#f7f4f0] py-3.5 text-[13px] last:border-0 hover:bg-[#faf8f5]`}
+              className={`${GRID} group border-b border-[#f7f4f0] py-3.5 text-[13px] last:border-0 hover:bg-[#faf8f5]`}
             >
               <div>
                 <div className="font-semibold text-kora-black">
@@ -176,8 +177,13 @@ export default async function OrdersPage({
                   : "—"}
               </span>
 
-              <span className="justify-self-end rounded-lg bg-[#f5f3f0] px-3.5 py-2 text-[12.5px] font-semibold text-kora-black">
-                Ver
+              {/* La fila ENTERA es el enlace, así que esto es una señal de
+                  que se puede abrir, no un botón aparte. */}
+              <span
+                aria-hidden
+                className={`${ACTION_ICON_ROW} justify-self-end`}
+              >
+                <Eye className="size-[15px]" />
               </span>
             </Link>
           );

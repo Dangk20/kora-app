@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ACTION_ICON } from "../_components/action-icon";
 import Link from "next/link";
 import { Eye, Pencil, Plus, Search, UsersRound } from "lucide-react";
 import { auth } from "@/auth";
@@ -174,7 +175,7 @@ export default async function ClientesPage({
                       <Link
                         href={`/admin/clientes?ver=${c.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                         aria-label={`Ver ${c.name}`}
-                        className="flex size-8 items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black"
+                        className={ACTION_ICON}
                       >
                         <Eye className="size-4" />
                       </Link>
@@ -182,7 +183,7 @@ export default async function ClientesPage({
                         <Link
                           href={`/admin/clientes?editar=${c.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                           aria-label={`Editar ${c.name}`}
-                          className="flex size-8 items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black"
+                          className={ACTION_ICON}
                         >
                           <Pencil className="size-4" />
                         </Link>

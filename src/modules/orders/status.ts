@@ -105,3 +105,23 @@ export function formatTimeLeft(minutes: number | null): string {
   if (hours === 0) return `${rest} min`;
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
+
+/**
+ * Pedidos EN CURSO: los que todavía tienen que pasar algo.
+ *
+ * Una sola definición, como `CONFIRMED_STATUSES`. La usa el retiro de
+ * productos: no se puede sacar del catálogo algo que alguien está esperando
+ * recibir — el operador se quedaría sin la ficha justo cuando tiene que
+ * empacarlo, y el comprador con un pedido de un producto que ya no existe.
+ *
+ * `DELIVERED` y `CANCELLED` quedan fuera: ya no hay nada pendiente con ellos.
+ */
+export const IN_PROGRESS_STATUSES: OrderStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "SHIPPED",
+];
+
+/** Filtro de Prisma para pedidos en curso. */
+export const inProgressFilter = { status: { in: IN_PROGRESS_STATUSES } } as const;

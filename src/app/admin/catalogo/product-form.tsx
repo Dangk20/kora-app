@@ -148,9 +148,12 @@ function InlineCreate({
 const NEW_OPTION = "__nueva__";
 
 const PASOS = [
-  { titulo: "Qué es", ayuda: "Cómo se llama, de qué categoría es y cómo se ve.", Icono: Package },
-  { titulo: "Cómo se vende", ayuda: "Sus opciones, sus códigos y sus precios.", Icono: Tags },
-  { titulo: "Cuánto hay", ayuda: "Las unidades con las que arranca cada una.", Icono: Boxes },
+  // Ayudas CORTAS: las pestañas miden lo mismo las tres, así que un texto
+  // largo no las ensancha — se corta con puntos suspensivos, que es peor que
+  // decirlo en menos palabras.
+  { titulo: "Qué es", ayuda: "Nombre, categoría y fotos.", Icono: Package },
+  { titulo: "Cómo se vende", ayuda: "Opciones, códigos y precios.", Icono: Tags },
+  { titulo: "Cuánto hay", ayuda: "Unidades con las que arranca.", Icono: Boxes },
 ] as const;
 
 /** La barra de pasos. Siempre visible: saber dónde se está evita abandonar. */
@@ -174,7 +177,12 @@ function PasosCabecera({
               type="button"
               onClick={() => onIr(i)}
               aria-current={actual ? "step" : undefined}
-              className={`flex flex-1 items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors ${
+              // ⚠️ `min-w-0`: sin él, `flex-1` NO reparte por igual. Su
+              // `min-width: auto` deja que el contenido empuje, y como solo la
+              // pestaña activa muestra su subtítulo, esa se ensancha y las
+              // otras dos se encogen — las tres cambian de tamaño al avanzar.
+              // Es la misma trampa que los banners de la portada en móvil.
+              className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors ${
                 actual
                   ? "bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)]"
                   : "hover:bg-white/70"
@@ -326,6 +334,22 @@ export function ProductForm({
   const [paso, setPaso] = useState(0);
   /** En un ALTA se avanza; en una EDICIÓN se guarda desde donde se esté. */
   const esAlta = !initial;
+
+  /**
+   * ¿Se puede enviar? Si no, salta al paso del primer campo que falta.
+   *
+   * Vive aparte del botón porque hay DOS caminos hasta el envío —el botón y la
+   * tecla Enter— y con la comprobación solo en el botón, Enter se la saltaba.
+   */
+  const puedeEnviar = (form: HTMLFormElement): boolean => {
+    if (form.checkValidity()) return true;
+    const invalido = form.querySelector(":invalid");
+    const bloque = invalido?.closest<HTMLElement>("[data-paso]");
+    if (bloque?.dataset.paso) setPaso(Number(bloque.dataset.paso));
+    // Tras el repintado: antes, el campo sigue oculto y no se puede señalar.
+    requestAnimationFrame(() => form.reportValidity());
+    return false;
+  };
   const router = useRouter();
   const [state, formAction, pending] = useActionState(upsertProduct, null);
   const [product, setProduct] = useState<ProductDraft>(
@@ -449,7 +473,31 @@ export function ProductForm({
   });
 
   return (
-    <form action={formAction} className="flex flex-1 flex-col">
+    <form
+      action={formAction}
+      className="flex flex-1 flex-col"
+      onKeyDown={(e) => {
+        // ⚠️ EL FALLO QUE ESTO IMPIDE (2 sep 2026, lo encontró Daniel): en un
+        // `<form action={…}>`, pulsar Enter en cualquier campo ENVÍA. En un
+        // recorrido de tres pasos eso guardaba el producto desde el paso 1 o
+        // el 2 —a medio llenar y sin stock— y el modal se cerraba solo. Desde
+        // fuera parecía que se cerraba sin guardar; en realidad guardaba mal.
+        if (e.key !== "Enter" || !porPasos) return;
+        const destino = e.target as HTMLElement;
+        // En un área de texto, Enter es un salto de línea legítimo.
+        if (destino.tagName === "TEXTAREA") return;
+
+        e.preventDefault();
+
+        // En un alta, Enter AVANZA: es lo que espera quien viene de teclear.
+        if (esAlta && paso < 2) {
+          setPaso(paso + 1);
+          return;
+        }
+        const form = e.currentTarget;
+        if (puedeEnviar(form)) form.requestSubmit();
+      }}
+    >
       <input type="hidden" name="payload" value={payload} />
       {product.id && <input type="hidden" name="id" value={product.id} />}
 
@@ -784,18 +832,11 @@ export function ProductForm({
             disabled={pending}
             onClick={(e) => {
               // Con las pestañas navegables, un campo obligatorio del paso 1
-              // puede estar OCULTO al guardar desde el 3. El navegador bloquea
+              // puede estar OCULTO al guardar desde el 3: el navegador bloquea
               // el envío y no puede enseñar el mensaje —no se puede enfocar lo
               // que no se ve—, así que el botón parecería no hacer nada.
-              // Se salta al paso del primer campo inválido y ahí sí se enseña.
               const form = e.currentTarget.form;
-              if (!form || form.checkValidity()) return;
-              e.preventDefault();
-              const invalido = form.querySelector(":invalid");
-              const bloque = invalido?.closest<HTMLElement>("[data-paso]");
-              if (bloque?.dataset.paso) setPaso(Number(bloque.dataset.paso));
-              // Tras el repintado: antes, el campo sigue oculto.
-              requestAnimationFrame(() => form.reportValidity());
+              if (form && !puedeEnviar(form)) e.preventDefault();
             }}
             className="bg-kora-gradient flex-1 rounded-[11px] py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(255,90,31,0.3)] hover:opacity-90 disabled:opacity-60"
           >

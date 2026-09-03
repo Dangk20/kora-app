@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileSpreadsheet, Plus, Tags } from "lucide-react";
+import { FileSpreadsheet, Plus, Tags, Archive } from "lucide-react";
 
 // Título + subtítulo por vista, como la topbar del prototipo aprobado.
 const VIEWS: { prefix: string; title: string; subtitle: string }[] = [
@@ -47,6 +47,16 @@ export function Topbar({
             className="flex items-center gap-2 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-kora-black hover:bg-muted"
           >
             <Tags className="size-4" /> Gestionar categorías
+          </Link>
+        )}
+        {/* Solo para quien puede retirar productos: es un registro de
+            decisiones, no información de catálogo. */}
+        {isProducts && permissions.includes("catalog:delete") && (
+          <Link
+            href="/admin/catalogo?historial=1"
+            className="flex items-center gap-2 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-4 py-2.5 text-[13.5px] font-semibold text-kora-black hover:bg-muted"
+          >
+            <Archive className="size-4" /> Retirados
           </Link>
         )}
         {isProducts && permissions.includes("catalog:create") && (

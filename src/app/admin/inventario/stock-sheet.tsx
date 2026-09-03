@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { adjustStock } from "@/modules/inventory/actions";
@@ -60,6 +60,11 @@ export function StockSheet({
   const [state, formAction, pending] = useActionState(adjustStock, null);
   const close = () => router.push("/admin/inventario");
 
+  // Controlados para poder DERIVAR las unidades de tienda mientras se escribe.
+  const [total, setTotal] = useState(String(variant.stockActual));
+  const [online, setOnline] = useState(String(variant.onlineUnits));
+  const enTienda = Math.max(0, (Number(total) || 0) - (Number(online) || 0));
+
   useEffect(() => {
     if (state?.ok) {
       router.refresh();
@@ -68,15 +73,19 @@ export function StockSheet({
   }, [state, router]);
 
   return (
+    // Modal CENTRADO y en dos columnas, no panel lateral: el ajuste se decide
+    // mirando el historial —"¿esto ya lo conté ayer?"—, y en 440 px el
+    // formulario y los movimientos no caben a la vez, así que había que
+    // desplazar para comparar lo que se está escribiendo con lo que pasó.
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-[rgba(14,15,18,0.5)]"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(14,15,18,0.5)] p-4 sm:p-8"
       onClick={close}
     >
       <div
-        className="flex h-full w-[440px] max-w-full flex-col overflow-y-auto bg-white shadow-[-20px_0_60px_rgba(0,0,0,0.3)]"
+        className="flex h-[min(88vh,720px)] w-full max-w-[900px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_40px_100px_-20px_rgba(14,15,18,0.5)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#f0ece6] bg-white px-6 py-5">
+        <div className="flex items-center justify-between border-b border-[#f0ece6] bg-white px-6 py-5">
           <h2 className="text-lg font-bold text-kora-black">Ajustar stock</h2>
           <button
             onClick={close}
@@ -87,8 +96,8 @@ export function StockSheet({
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 px-6 py-5">
-          <div className="flex items-center gap-3">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5">
+          <div className="mb-5 flex items-center gap-3">
             <CategoryTile color={variant.color} icon={variant.icon} size={48} radius={12} />
             <div className="min-w-0">
               <div className="truncate font-semibold text-kora-black">
@@ -107,7 +116,8 @@ export function StockSheet({
             </div>
           </div>
 
-          <form action={formAction} className="space-y-3.5 rounded-xl border-[1.6px] border-[#eee9e2] p-4">
+          <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
+          <form action={formAction} className="h-fit space-y-3.5 rounded-xl border-[1.6px] border-[#eee9e2] p-4">
             <input type="hidden" name="variantId" value={variant.id} />
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -118,9 +128,10 @@ export function StockSheet({
                   type="number"
                   min="0"
                   step="1"
-                  defaultValue={variant.stockActual}
+                  value={total}
+                  onChange={(e) => setTotal(e.target.value)}
                   required
-                  className={inputCls}
+                  className={`${inputCls} text-right tabular-nums`}
                 />
               </div>
               <div>
@@ -131,13 +142,45 @@ export function StockSheet({
                   type="number"
                   min="0"
                   step="1"
-                  defaultValue={variant.onlineUnits}
+                  value={online}
+                  onChange={(e) => setOnline(e.target.value)}
                   required
-                  className={inputCls}
+                  className={`${inputCls} text-right tabular-nums`}
+                />
+              </div>
+
+              {/* Unidades de tienda: se VE, no se escribe.
+                  Es un dato DERIVADO —total menos online—, y darle su propio
+                  campo editable crearía una tercera cifra que puede
+                  contradecir a las otras dos. Enseñarlo sí importa: el
+                  operador está repartiendo un mismo inventario entre dos
+                  canales, y sin ver la otra mitad decide a ciegas. Se
+                  recalcula mientras escribe, así que el reparto se entiende
+                  antes de aplicarlo. */}
+              <div className="col-span-2">
+                <label className={labelCls} htmlFor="enTienda">
+                  Unidades en tienda física{" "}
+                  <span className="font-normal text-[#9aa0ab]">
+                    (se calcula: total − online)
+                  </span>
+                </label>
+                <input
+                  id="enTienda"
+                  value={enTienda}
+                  readOnly
+                  disabled
+                  aria-describedby="enTienda-ayuda"
+                  className={`${inputCls} cursor-not-allowed border-dashed bg-[#faf8f5] text-right font-semibold tabular-nums text-[#6b6f78]`}
                 />
               </div>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
+
+            {(Number(online) || 0) > (Number(total) || 0) && (
+              <p role="alert" className="text-[12px] font-semibold text-destructive">
+                Las unidades online no pueden superar el stock total.
+              </p>
+            )}
+            <p id="enTienda-ayuda" className="text-[11px] leading-relaxed text-muted-foreground">
               Es un solo inventario: lo que no publiques online queda para la
               tienda física. Si el POS vende unidades asignadas a online, el cupo
               se recorta solo — la caja nunca se bloquea.
@@ -173,11 +216,11 @@ export function StockSheet({
             </button>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               El ajuste entra como un movimiento al libro contable — el historial
-              completo queda abajo.
+              está al lado.
             </p>
           </form>
 
-          <div>
+          <div className="min-h-0 lg:overflow-y-auto">
             <div className="mb-2.5 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase">
               Últimos movimientos
             </div>
@@ -211,6 +254,7 @@ export function StockSheet({
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </div>
       </div>

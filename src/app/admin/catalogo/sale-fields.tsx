@@ -10,6 +10,7 @@
 // falle.
 
 import type { VariantDraft } from "./product-form";
+import { MoneyInput } from "./money-input";
 
 const inputCls =
   "w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral";
@@ -67,31 +68,47 @@ export function CamposDeVenta({
       <div className="grid grid-cols-2 gap-2.5">
         <div>
           <label className={labelCls}>COP tienda</label>
-          <input type="number" min="0" step="any" className={inputCls}
+          <MoneyInput
+            moneda="COP"
             value={v.priceCopStore}
-            onChange={(e) => onChange({ priceCopStore: e.target.value })}
-            placeholder="129900" required />
+            onChange={(crudo) => onChange({ priceCopStore: crudo })}
+            placeholder="129.900"
+            className={inputCls}
+            required
+          />
         </div>
         <div>
           <label className={labelCls}>COP online</label>
-          <input type="number" min="0" step="any" className={inputCls}
+          <MoneyInput
+            moneda="COP"
             value={v.priceCopOnline}
-            onChange={(e) => onChange({ priceCopOnline: e.target.value })}
-            placeholder="119900" required />
+            onChange={(crudo) => onChange({ priceCopOnline: crudo })}
+            placeholder="119.900"
+            className={inputCls}
+            required
+          />
         </div>
         <div>
           <label className={labelCls}>USD tienda</label>
-          <input type="number" min="0" step="any" className={inputCls}
+          <MoneyInput
+            moneda="USD"
             value={v.priceUsdStore}
-            onChange={(e) => onChange({ priceUsdStore: e.target.value })}
-            placeholder="32" required />
+            onChange={(crudo) => onChange({ priceUsdStore: crudo })}
+            placeholder="32.00"
+            className={inputCls}
+            required
+          />
         </div>
         <div>
           <label className={labelCls}>USD online</label>
-          <input type="number" min="0" step="any" className={inputCls}
+          <MoneyInput
+            moneda="USD"
             value={v.priceUsdOnline}
-            onChange={(e) => onChange({ priceUsdOnline: e.target.value })}
-            placeholder="30" required />
+            onChange={(crudo) => onChange({ priceUsdOnline: crudo })}
+            placeholder="30.00"
+            className={inputCls}
+            required
+          />
         </div>
       </div>
 

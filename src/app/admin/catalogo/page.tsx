@@ -1,13 +1,17 @@
 import Image from "next/image";
+import { ACTION_ICON } from "../_components/action-icon";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, Pencil } from "lucide-react";
+import { inProgressFilter } from "@/modules/orders/status";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { formatCop } from "@/lib/format";
 import { storage } from "@/modules/storage";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { ProductModal } from "./product-modal";
+import { ArchiveButton } from "./archive-button";
+import { ArchiveHistory } from "./archive-history";
 import { ImportSheet } from "./import-sheet";
 import { CatalogToolbar } from "./catalog-toolbar";
 import { StatusSwitch } from "./status-switch";
@@ -30,7 +34,7 @@ function categoryTree(cats: { id: string; name: string; parentId: string | null 
 }
 
 const GRID =
-  "grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_1fr_0.6fr] items-center gap-3.5 px-6";
+  "grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_1fr_0.6fr_auto] items-center gap-3.5 px-6";
 
 export default async function CatalogPage({
   searchParams,
@@ -38,6 +42,7 @@ export default async function CatalogPage({
   searchParams: Promise<{
     nuevo?: string;
     editar?: string;
+    historial?: string;
     importar?: string;
     q?: string;
     categoria?: string;
@@ -50,8 +55,9 @@ export default async function CatalogPage({
   if (!session?.user.permissions.includes("catalog:view")) redirect("/admin");
   const canEdit = session.user.permissions.includes("catalog:edit");
   const canCreate = session.user.permissions.includes("catalog:create");
+  const canDelete = session.user.permissions.includes("catalog:delete");
   const sp = await searchParams;
-  const { nuevo, editar, importar, q, categoria, estado } = sp;
+  const { nuevo, editar, importar, historial, q, categoria, estado } = sp;
 
   const perPage = PER_PAGE_OPTIONS.includes(Number(sp.por))
     ? Number(sp.por)
@@ -60,7 +66,9 @@ export default async function CatalogPage({
 
   // Filtros del listado. El estado "agotado" se resuelve sobre las variantes
   // activas: un producto está agotado si ninguna tiene stock.
-  const where: Record<string, unknown> = {};
+  // Los retirados NO aparecen en el catálogo: para eso se retiran. Se
+  // consultan en "Retirados", donde además está su motivo y quién lo decidió.
+  const where: Record<string, unknown> = { archivedAt: null };
   if (q?.trim()) {
     const term = q.trim();
     where.OR = [
@@ -76,18 +84,31 @@ export default async function CatalogPage({
     where.variants = { every: { OR: [{ active: false }, { stockActual: 0 }] } };
   }
 
-  const [total, products, categories] = await Promise.all([
+  const [total, products, pedidosEnCurso, categories] = await Promise.all([
     db.product.count({ where }),
     db.product.findMany({
       where,
       include: {
         category: { include: { parent: true } },
-        variants: { orderBy: { createdAt: "asc" } },
+        variants: {
+          orderBy: { createdAt: "asc" },
+          // Las ventas de cada variante deciden si retirar el producto lo
+          // ARCHIVA o lo borra: sin historia no hay nada que conservar.
+          include: { _count: { select: { orderItems: true } } },
+        },
         images: { orderBy: { position: "asc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * perPage,
       take: perPage,
+    }),
+    // Pedidos SIN ENTREGAR por producto: con uno solo, el producto no se
+    // puede retirar. Se cuenta aquí, agrupado, para no hacer una consulta por
+    // fila del listado.
+    db.orderItem.groupBy({
+      by: ["variantId"],
+      where: { order: inProgressFilter },
+      _count: { _all: true },
     }),
     db.category.findMany({
       where: { active: true },
@@ -102,6 +123,10 @@ export default async function CatalogPage({
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+  const enCursoPorVariante = new Map(
+    pedidosEnCurso.map((f) => [f.variantId, f._count._all]),
+  );
 
   // Slide-over controlado por URL: ?nuevo=1 / ?editar=<id>
   let sheetInitial: ProductDraft | undefined;
@@ -176,6 +201,22 @@ export default async function CatalogPage({
   // Dos contenedores para dos gestos distintos: el ALTA es un recorrido y va
   // en un modal grande; EDITAR es entrar a cambiar una cosa y sigue en el
   // panel lateral. Ver openspec/changes/variantes-por-opciones — decisión 9.
+  // El historial solo lo ve quien puede retirar productos: es un registro de
+  // decisiones, no información de catálogo.
+  const historialAbierto = Boolean(historial) && canDelete;
+  const retirados = historialAbierto
+    ? await db.productArchive.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          actor: { select: { name: true } },
+          // Para saber si sigue retirado: un producto devuelto al catálogo no
+          // se puede "devolver" otra vez, y ofrecerlo confundiría.
+          product: { select: { id: true, archivedAt: true } },
+        },
+      })
+    : [];
+
   const altaAbierta = Boolean(nuevo) && canCreate;
   const edicionAbierta = Boolean(editing) && canEdit;
 
@@ -204,6 +245,7 @@ export default async function CatalogPage({
           <span className="text-right">Precio</span>
           <span className="text-right">Stock</span>
           <span>Estado</span>
+          <span />
           <span />
         </div>
 
@@ -304,12 +346,32 @@ export default async function CatalogPage({
               </span>
 
               {canEdit ? (
+                // Icono, no texto: la columna de al lado es un icono, y
+                // mezclar los dos formatos hace que parezcan acciones de
+                // distinto rango cuando son la misma clase de cosa.
                 <Link
                   href={`/admin/catalogo?editar=${p.id}`}
-                  className="justify-self-end rounded-lg bg-[#f5f3f0] px-3.5 py-2 text-[12.5px] font-semibold text-kora-black hover:bg-[#FFE9DD] hover:text-kora-coral"
+                  aria-label={`Editar ${p.name}`}
+                  title="Editar"
+                  className={`${ACTION_ICON} justify-self-end`}
                 >
-                  Editar
+                  <Pencil className="size-[15px]" />
                 </Link>
+              ) : (
+                <span />
+              )}
+
+              {canDelete ? (
+                <ArchiveButton
+                  productId={p.id}
+                  nombre={p.name}
+                  stock={stock}
+                  ventas={activeVariants.reduce((n, v) => n + v._count.orderItems, 0)}
+                  enCurso={p.variants.reduce(
+                    (n, v) => n + (enCursoPorVariante.get(v.id) ?? 0),
+                    0,
+                  )}
+                />
               ) : (
                 <span />
               )}
@@ -345,6 +407,31 @@ export default async function CatalogPage({
 
       {/* Mismo contenedor para crear y para editar: dos interfaces para el
           mismo objeto es lo que hace dudar al operador. */}
+      {historialAbierto && (
+        <ArchiveHistory
+          filas={retirados.map((r) => ({
+            id: r.id,
+            productName: r.productName,
+            reason: r.reason,
+            hadStock: r.hadStock,
+            hadOrders: r.hadOrders,
+            deleted: r.deleted,
+            restaurableId: r.product?.archivedAt ? r.product.id : null,
+            actor: r.actor.name,
+            // Con HORA: un registro de auditoría sin hora no sirve para
+            // reconstruir qué pasó en un día con varios movimientos, que es
+            // justo cuando se consulta.
+            fecha: r.createdAt.toLocaleString("es-CO", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          }))}
+        />
+      )}
+
       {(altaAbierta || edicionAbierta) && (
         <ProductModal categories={categoryTree(categories)} initial={sheetInitial} />
       )}

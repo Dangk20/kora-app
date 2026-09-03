@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ACTION_ICON } from "../_components/action-icon";
 import Link from "next/link";
 import { Pencil, Plus, Search, Ticket } from "lucide-react";
 import { auth } from "@/auth";
@@ -172,7 +173,7 @@ export default async function CuponesPage({
                           <Link
                             href={href({ editar: c.id })}
                             aria-label={`Editar ${c.code}`}
-                            className="flex size-8 items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black"
+                            className={ACTION_ICON}
                           >
                             <Pencil className="size-4" />
                           </Link>

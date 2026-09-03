@@ -1,30 +1,98 @@
 import Link from "next/link";
+import { ACTION_ICON } from "../_components/action-icon";
 import { redirect } from "next/navigation";
-import { Layers } from "lucide-react";
+import { Layers, SlidersHorizontal } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { StockSheet } from "./stock-sheet";
+import { CatalogToolbar } from "../catalogo/catalog-toolbar";
+import { Pagination } from "../_components/pagination";
 
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ajustar?: string }>;
+  searchParams: Promise<{
+    ajustar?: string;
+    q?: string;
+    categoria?: string;
+    estado?: string;
+    por?: string;
+    pagina?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user.permissions.includes("inventory:view")) redirect("/admin");
   const canAdjust = session.user.permissions.includes("inventory:adjust");
-  const { ajustar } = await searchParams;
+  const sp = await searchParams;
+  const { ajustar, q, categoria, estado } = sp;
 
-  const variants = await db.variant.findMany({
-    where: { active: true, product: { active: true } },
-    include: { product: { include: { category: true } } },
-    orderBy: [{ product: { name: "asc" } }, { name: "asc" }],
-  });
-  const lowCount = variants.filter((v) => v.stockActual <= v.stockMin).length;
+  const perPage = [20, 50, 100].includes(Number(sp.por)) ? Number(sp.por) : 20;
+  const page = Math.max(1, Number(sp.pagina) || 1);
+
+  // El inventario mira VARIANTES, no productos: es donde vive el stock. Los
+  // retirados quedan fuera, igual que en el catálogo — no tiene sentido
+  // ajustarle unidades a algo que ya no se vende.
+  const where: Record<string, unknown> = {
+    active: true,
+    product: { active: true, archivedAt: null },
+  };
+
+  if (q?.trim()) {
+    const term = q.trim();
+    where.OR = [
+      { sku: { contains: term, mode: "insensitive" } },
+      // El código de barras también: quien escanea espera encontrar.
+      { barcode: { contains: term, mode: "insensitive" } },
+      { name: { contains: term, mode: "insensitive" } },
+      { product: { name: { contains: term, mode: "insensitive" } } },
+    ];
+  }
+  if (categoria) {
+    where.product = { ...(where.product as object), categoryId: categoria };
+  }
+  // Filtros propios del inventario: aquí "estado" no es activo/inactivo —eso
+  // es del catálogo—, es en qué situación está el stock.
+  if (estado === "bajo") where.stockActual = { lte: db.variant.fields.stockMin };
+  if (estado === "agotado") where.stockActual = 0;
+  if (estado === "sin-publicar") where.onlineUnits = 0;
+  if (estado === "con-stock") where.stockActual = { gt: 0 };
+
+  const [total, variants, categories, lowCount] = await Promise.all([
+    db.variant.count({ where }),
+    db.variant.findMany({
+      where,
+      include: { product: { include: { category: true } } },
+      orderBy: [{ product: { name: "asc" } }, { name: "asc" }],
+      skip: (page - 1) * perPage,
+      take: perPage,
+    }),
+    db.category.findMany({
+      where: { active: true },
+      orderBy: { position: "asc" },
+      select: { id: true, name: true, parent: { select: { name: true } } },
+    }),
+    // El contador de alerta cuenta SOBRE TODO el inventario, no sobre la
+    // página: "3 con stock bajo" tiene que significar tres en la tienda, no
+    // tres entre los veinte que estás viendo.
+    db.variant.count({
+      where: {
+        active: true,
+        product: { active: true, archivedAt: null },
+        stockActual: { lte: db.variant.fields.stockMin },
+      },
+    }),
+  ]);
 
   // Slide-over de ajuste controlado por URL (?ajustar=<variantId>)
-  const adjusting = ajustar ? variants.find((v) => v.id === ajustar) : undefined;
+  // Se busca en la base, no en la página: con paginación, la variante que se
+  // está ajustando puede no estar entre las veinte que se ven.
+  const adjusting = ajustar
+    ? ((await db.variant.findUnique({
+        where: { id: ajustar },
+        include: { product: { include: { category: true } } },
+      })) ?? undefined)
+    : undefined;
   const movements = adjusting
     ? await db.stockMovement.findMany({
         where: { variantId: adjusting.id },
@@ -50,12 +118,40 @@ export default async function InventoryPage({
       </div>
 
       {lowCount > 0 && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-[#fce8e8] px-5 py-3 text-[13px] font-semibold text-[#b3373b]">
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-xl bg-[#fce8e8] px-5 py-3 text-[13px] font-semibold text-[#b3373b]">
           <Layers className="size-[18px]" strokeWidth={1.8} />
           {lowCount} variante(s) con stock en o por debajo de su alerta requieren
           reposición.
+          {/* Enlace directo al filtro: el aviso dice cuántas, y esto lleva a
+              verlas. Sin él hay que leer el número y buscarlas a mano. */}
+          <Link
+            href="/admin/inventario?estado=bajo"
+            className="ml-auto rounded-full bg-white/70 px-3 py-1 text-[12px] font-bold hover:bg-white"
+          >
+            Ver solo esas
+          </Link>
         </div>
       )}
+
+      <CatalogToolbar
+        basePath="/admin/inventario"
+        total={total}
+        sustantivo={["variante", "variantes"]}
+        buscarEn="Buscar por producto, variante, SKU o código de barras…"
+        categories={categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          parentName: c.parent?.name ?? null,
+        }))}
+        // Aquí "estado" es la situación del STOCK, no activo/inactivo: eso es
+        // del catálogo, y en inventario todo lo que se ve está activo.
+        estados={[
+          { value: "bajo", label: "Stock bajo" },
+          { value: "agotado", label: "Agotados" },
+          { value: "con-stock", label: "Con stock" },
+          { value: "sin-publicar", label: "Sin publicar online" },
+        ]}
+      />
 
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
         <div className="grid grid-cols-[2.2fr_0.9fr_0.7fr_0.7fr_0.8fr_0.6fr_0.5fr] gap-3.5 border-b border-[#f0ece6] px-6 py-4 text-[11.5px] font-bold tracking-wide text-[#9aa0ab] uppercase">
@@ -110,9 +206,13 @@ export default async function InventoryPage({
               {canAdjust ? (
                 <Link
                   href={`/admin/inventario?ajustar=${v.id}`}
-                  className="justify-self-end rounded-lg bg-[#f5f3f0] px-3.5 py-2 text-[12.5px] font-semibold text-kora-black hover:bg-[#FFE9DD] hover:text-kora-coral"
+                  aria-label={`Ajustar stock de ${v.product.name} · ${v.name}`}
+                  title="Ajustar stock"
+                  className={`${ACTION_ICON} justify-self-end`}
                 >
-                  Ajustar
+                  {/* Icono, como en Productos: en una tabla de números, un
+                      botón con texto en cada fila pesa más que los datos. */}
+                  <SlidersHorizontal className="size-[15px]" />
                 </Link>
               ) : (
                 <span />
@@ -122,10 +222,21 @@ export default async function InventoryPage({
         })}
         {variants.length === 0 && (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            No hay variantes activas todavía.
+            {q || categoria || estado
+              ? "Ningún artículo coincide con lo que buscas."
+              : "No hay variantes activas todavía."}
           </p>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={Math.max(1, Math.ceil(total / perPage))}
+        perPage={perPage}
+        total={total}
+        params={sp}
+        basePath="/admin/inventario"
+      />
 
       {adjusting && canAdjust && (
         <StockSheet

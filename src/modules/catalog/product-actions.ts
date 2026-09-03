@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { receiveStock } from "@/modules/inventory/engine";
+import { inProgressFilter } from "@/modules/orders/status";
 import { uniqueSlug } from "./slug";
 
 export type ActionResult = { ok: true } | { ok: false; error: string } | null;
@@ -257,6 +258,154 @@ export async function upsertProduct(
     }
     throw e;
   }
+
+  revalidatePath("/admin/catalogo");
+  return { ok: true };
+}
+
+/**
+ * Retirar un producto del catálogo.
+ *
+ * ARCHIVA, y solo borra de verdad cuando no hay nada que perder. La diferencia
+ * no es una preferencia: una variante con un movimiento de inventario o una
+ * venta NO se puede borrar —la base lo impide con Restrict— y no debería
+ * poderse. El libro de inventario y el historial de pedidos son la verdad del
+ * negocio; borrarlos dejaría pedidos apuntando al vacío y cuadres imposibles.
+ *
+ * - Nunca tuvo movimientos ni ventas → se BORRA. Es el producto creado por
+ *   error, y dejarlo archivado solo ensucia el catálogo.
+ * - Tuvo algo → se ARCHIVA: sale de la tienda y del listado, su historia queda.
+ *
+ * En los dos casos se exige un motivo y se deja registro de quién y cuándo.
+ */
+export async function archiveProduct(
+  productId: string,
+  reason: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await requirePermission("catalog:delete");
+
+  const motivo = reason.trim();
+  if (motivo.length < 10) {
+    return {
+      ok: false,
+      error: "Escribe el motivo (mínimo 10 caracteres): queda en el historial.",
+    };
+  }
+
+  const producto = await db.product.findUnique({
+    where: { id: productId },
+    select: {
+      id: true,
+      name: true,
+      archivedAt: true,
+      variants: {
+        select: {
+          id: true,
+          stockActual: true,
+          _count: { select: { orderItems: true, stockMovements: true } },
+        },
+      },
+    },
+  });
+  if (!producto) return { ok: false, error: "Ese producto ya no existe" };
+  // Retirar dos veces el mismo producto dejaba dos registros idénticos en el
+  // historial y hacía dudar de él. Pasaba porque el archivado no se distinguía
+  // de "inactivo", así que el producto seguía en la lista con su botón.
+  if (producto.archivedAt) {
+    return { ok: false, error: "Este producto ya está retirado del catálogo." };
+  }
+
+  const stock = producto.variants.reduce((s, v) => s + v.stockActual, 0);
+  const ventas = producto.variants.reduce((s, v) => s + v._count.orderItems, 0);
+  const movimientos = producto.variants.reduce(
+    (s, v) => s + v._count.stockMovements,
+    0,
+  );
+  const sinHistoria = ventas === 0 && movimientos === 0;
+
+  // ⚠️ No se retira algo que alguien está esperando recibir. El operador se
+  // quedaría sin la ficha justo cuando tiene que empacarlo, y el comprador con
+  // un pedido de un producto que ya no está en el catálogo. Se dice CUÁNTOS,
+  // porque "tiene pedidos" sin número no le dice al operador si son dos que
+  // puede despachar hoy o veinte.
+  const enCurso = await db.orderItem.count({
+    where: { variant: { productId: producto.id }, order: inProgressFilter },
+  });
+  if (enCurso > 0) {
+    return {
+      ok: false,
+      error: `No se puede retirar: tiene ${enCurso} ${enCurso === 1 ? "pedido" : "pedidos"} sin entregar. Despáchalos o cancélalos primero.`,
+    };
+  }
+
+  await db.$transaction(async (tx) => {
+    // El registro se escribe ANTES de tocar nada: si el borrado falla, queda
+    // constancia del intento en vez de un producto a medio retirar.
+    await tx.productArchive.create({
+      data: {
+        productId: sinHistoria ? null : producto.id,
+        productName: producto.name,
+        reason: motivo,
+        hadStock: stock,
+        hadOrders: ventas,
+        deleted: sinHistoria,
+        actorId: session.user.id,
+      },
+    });
+
+    if (sinHistoria) {
+      await tx.product.delete({ where: { id: producto.id } });
+      return;
+    }
+
+    // Archivar: fuera de la tienda y del listado, pero sigue existiendo.
+    //
+    // `archivedAt` y NO solo `active = false`: son dos cosas distintas.
+    // "Inactivo" es un estado temporal del interruptor —se agotó, no es
+    // temporada—; archivado es una decisión con motivo. Con un solo campo, el
+    // archivado quedaba en la lista indistinguible de un inactivo cualquiera.
+    await tx.variant.updateMany({
+      where: { productId: producto.id },
+      data: { active: false },
+    });
+    await tx.product.update({
+      where: { id: producto.id },
+      data: { active: false, featured: false, archivedAt: new Date() },
+    });
+  });
+
+  revalidatePath("/admin/catalogo");
+  return { ok: true };
+}
+
+/**
+ * Devolver un producto retirado al catálogo.
+ *
+ * Sin esto, archivar por error no tiene vuelta atrás y la única salida es
+ * volver a crear el producto —perdiendo su historial de inventario y sus
+ * ventas, que es justo lo que archivar existía para conservar.
+ *
+ * Vuelve INACTIVO, no activo: quien lo retiró tenía un motivo, y republicarlo
+ * en la tienda de golpe es una decisión aparte que se toma con el interruptor.
+ */
+export async function restoreProduct(
+  productId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requirePermission("catalog:delete");
+
+  const producto = await db.product.findUnique({
+    where: { id: productId },
+    select: { id: true, archivedAt: true },
+  });
+  if (!producto) return { ok: false, error: "Ese producto ya no existe" };
+  if (!producto.archivedAt) {
+    return { ok: false, error: "Ese producto no está retirado." };
+  }
+
+  await db.product.update({
+    where: { id: producto.id },
+    data: { archivedAt: null },
+  });
 
   revalidatePath("/admin/catalogo");
   return { ok: true };

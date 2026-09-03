@@ -4,6 +4,7 @@
 // Es la ÚNICA forma de sacar un cupón de circulación: no existe eliminar.
 
 import { useActionState, useEffect } from "react";
+import { ACTION_ICON } from "../_components/action-icon";
 import { useRouter } from "next/navigation";
 import { Pause, Play } from "lucide-react";
 import { toggleCoupon, type CouponActionResult } from "@/modules/coupons/actions";
@@ -35,7 +36,7 @@ export function ToggleButton({
         disabled={pending}
         aria-label={active ? `Pausar ${code}` : `Activar ${code}`}
         title={active ? "Pausar: el checkout dejará de aceptarlo" : "Activar"}
-        className="flex size-8 items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black disabled:opacity-50"
+        className={`${ACTION_ICON} disabled:opacity-50`}
       >
         {active ? <Pause className="size-4" /> : <Play className="size-4" />}
       </button>

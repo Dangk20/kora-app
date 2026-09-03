@@ -36,6 +36,7 @@ model User {
   confirmedOrders Order[]              @relation("OrderConfirmedBy")
   statusChanges   OrderStatusHistory[]
   campaigns       Campaign[]
+  productArchives ProductArchive[]
 
   @@map("users")
 }
@@ -97,22 +98,33 @@ model Category {
 }
 
 model Product {
-  id            String          @id @default(cuid())
-  name          String
-  slug          String          @unique
-  description   String?
-  brand         String?
-  categoryId    String
-  category      Category        @relation(fields: [categoryId], references: [id])
-  active        Boolean         @default(true)
-  featured      Boolean         @default(false)
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  brand       String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  active      Boolean  @default(true)
+  featured    Boolean  @default(false)
+
+  /// Retirado del catálogo, con su motivo en `product_archives`.
+  ///
+  /// ⚠️ NO es lo mismo que `active = false`. "Inactivo" es un estado temporal
+  /// que el operador enciende y apaga con un interruptor —se agotó, no es
+  /// temporada—; "archivado" es una decisión con motivo y registro, y el
+  /// producto deja de aparecer en el catálogo. Usar `active` para las dos
+  /// cosas dejaba los archivados en la lista, indistinguibles de los
+  /// inactivos, y permitía retirarlos una y otra vez.
+  archivedAt    DateTime?
   images        ProductImage[]
   variants      Variant[]
   options       ProductOption[]
+  archives      ProductArchive[]
   showcaseItems ShowcaseItem[]
   banners       Banner[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   couponScopes  CouponProduct[]
 
   @@index([categoryId])
@@ -173,6 +185,44 @@ model Variant {
 
   @@index([productId])
   @@map("variants")
+}
+
+/// Registro de un producto retirado del catálogo.
+///
+/// POR QUÉ ARCHIVAR Y NO BORRAR: una variante con un solo movimiento de
+/// inventario o una sola venta NO se puede borrar —`StockMovement.variant` y
+/// `OrderItem.variant` son Restrict— y no debería poderse: el libro de
+/// inventario y el historial de pedidos son la verdad del negocio, y un
+/// borrado los dejaría apuntando al vacío. Solo se borra de verdad un producto
+/// que nunca tuvo ni movimientos ni ventas: el que se creó por error.
+///
+/// El registro sobrevive al producto (`productId` nulo si se borró), guarda el
+/// nombre y CUÁNTO tenía en el momento — sin eso, "se archivó con stock" es
+/// una frase que nadie puede volver a comprobar.
+model ProductArchive {
+  id String @id @default(cuid())
+
+  /// Nulo cuando el producto se borró de verdad.
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName String /// Snapshot: el nombre tiene que sobrevivir al borrado.
+
+  reason String
+
+  /// Lo que tenía al retirarlo. Es lo que permite juzgar la decisión después.
+  hadStock  Int @default(0)
+  hadOrders Int @default(0)
+
+  /// true = se borró de la base. false = se archivó y sigue existiendo.
+  deleted Boolean @default(false)
+
+  actorId String
+  actor   User   @relation(fields: [actorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("product_archives")
 }
 
 /// El PADRE de una opción: "Talla", "Color".
