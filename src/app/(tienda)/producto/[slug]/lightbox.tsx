@@ -89,7 +89,11 @@ export function Lightbox({
       >
         <DialogTitle className="sr-only">{nombre} — foto {index + 1} de {total}</DialogTitle>
 
-        <div className="relative flex h-full w-full flex-col" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {/* `min-w-0` y `overflow-hidden`: en móvil las miniaturas no caben y
+            desbordan; como el contenido del diálogo es una rejilla, la columna
+            se ensanchaba a lo que ocupaban y la X quedaba fuera de la pantalla
+            (lo vio Daniel en iPhone, 12 sep 2026). */}
+        <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {/* Barra superior: contador y cerrar */}
           <div className="flex items-center justify-between px-4 py-3 text-white sm:px-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <span className="text-[13px] tabular-nums opacity-80">{index + 1} / {total}</span>
@@ -125,11 +129,14 @@ export function Lightbox({
               </button>
 
               {/* Miniaturas abajo, para saltar directo */}
-              <div className="flex justify-center gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+              {/* Las miniaturas se desplazan de lado cuando no caben, en vez
+                  de desbordar. `justify-center` solo si sobra sitio: con
+                  overflow, centrar dejaría inalcanzables las de la izquierda. */}
+              <div className="flex gap-2 overflow-x-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] [-ms-overflow-style:none] [scrollbar-width:none] sm:justify-center [&::-webkit-scrollbar]:hidden" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                 {images.map((m, i) => (
                   <button key={m.url} type="button" onClick={() => onIndex(i)} aria-label={`Foto ${i + 1}`}
                     aria-current={i === index}
-                    className={`relative size-12 overflow-hidden rounded-lg border-2 bg-[#1c1a1f] transition-opacity ${i === index ? "border-kora-coral" : "border-transparent opacity-60 hover:opacity-100"}`}>
+                    className={`relative size-12 shrink-0 overflow-hidden rounded-lg border-2 bg-[#1c1a1f] transition-opacity ${i === index ? "border-kora-coral" : "border-transparent opacity-60 hover:opacity-100"}`}>
                     <Image src={m.url} alt="" fill sizes="48px" className="object-contain" unoptimized />
                   </button>
                 ))}
