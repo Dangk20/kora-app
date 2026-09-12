@@ -190,12 +190,21 @@ export async function importCatalogRows(
             continue;
           }
 
-          // Producto: reusar por nombre o crear con su categoría.
-          const productKey = normalize(data.producto);
+          // Producto: reusar por nombre Y MARCA, o crear con su categoría.
+          //
+          // La marca entra en la identidad desde el 12 sep 2026, al cargar el
+          // catálogo real: "Camiseta hombre blanca" de DKNY y la de otra marca
+          // son piezas distintas con fotos distintas, y agrupar solo por nombre
+          // las fundía en un producto con dos tallas. Filas con el mismo nombre
+          // y la misma marca siguen siendo variantes del mismo producto.
+          const productKey = `${normalize(data.producto)}|${normalize(data.marca ?? "")}`;
           let productId = productCache.get(productKey);
           if (!productId) {
             const found = await tx.product.findFirst({
-              where: { name: { equals: data.producto, mode: "insensitive" } },
+              where: {
+                name: { equals: data.producto, mode: "insensitive" },
+                brand: data.marca ? { equals: data.marca, mode: "insensitive" } : null,
+              },
               select: { id: true },
             });
             if (found) {

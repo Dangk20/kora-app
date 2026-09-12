@@ -130,6 +130,12 @@ services:
     environment:
       KORA_STORAGE_DRIVER: disk
       KORA_UPLOADS_DIR: /data/uploads
+    # El MISMO volumen de imágenes que la app. El worker no las sirve, pero
+    # es donde corre `pnpm photos:import` en el servidor (tiene tsx y scripts;
+    # la imagen de la app no): sin el volumen, subiría las fotos a su propia
+    # capa efímera y el siguiente despliegue las borraría.
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy

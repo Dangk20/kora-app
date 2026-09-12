@@ -72,6 +72,13 @@ pnpm geo:update     # regenera la tabla IP → país. A mano, nunca en el build 
 pnpm staff:email <correo>  # a dónde llegan los avisos de pedido nuevo
 pnpm emails:preview        # escribe un ejemplo de cada correo del pedido en .emails/
 pnpm invoice:preview [n]   # el comprobante de pedido en .invoices/ (sin número: uno de ejemplo)
+pnpm catalog:import <xlsx> [--simular]   # el Excel DEL CLIENTE (sus columnas), traducido a la plantilla
+                    # y metido por el mismo runImport del panel. Cada referencia = un producto.
+pnpm photos:import <carpeta> [--simular] # una carpeta por referencia → fotos del producto. IDEMPOTENTE
+                    # por huella SHA-256 del original (ProductImage.sourceHash): correrlo N veces
+                    # no duplica. En el servidor corre DENTRO del worker (tiene tsx; la app no):
+                    #   docker cp fotos/ kora-staging-worker:/tmp/fotos && docker exec kora-staging-worker \
+                    #     node_modules/.bin/tsx scripts/import-photos.ts /tmp/fotos
 pnpm legal:export          # las tres páginas legales en Markdown, en .legal/, para aprobación del cliente
 # Los correos de desarrollo se escriben en .emails/ (ignorado por git)
 ```

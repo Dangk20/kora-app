@@ -104,6 +104,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    # El MISMO volumen de imágenes que la app: es donde corre
+    # `pnpm photos:import` en el servidor (el worker tiene tsx y scripts; la
+    # imagen de la app no). Sin el volumen, subiría las fotos a su capa efímera
+    # y el siguiente despliegue las borraría.
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy

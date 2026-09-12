@@ -139,7 +139,14 @@ model ProductImage {
   alt       String?
   position  Int     @default(0)
 
+  /// Huella SHA-256 del archivo ORIGINAL cuando la foto entró por el importador
+  /// masivo (`pnpm photos:import`). Es lo que lo hace idempotente: el cliente
+  /// va añadiendo fotos a las mismas carpetas, y correrlo otra vez no puede
+  /// duplicar las que ya estaban. Nula para las fotos subidas desde el panel.
+  sourceHash String?
+
   @@index([productId])
+  @@index([sourceHash])
   @@map("product_images")
 }
 
