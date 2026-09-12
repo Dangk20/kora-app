@@ -124,27 +124,25 @@ services:
     # es exactamente cómo el worker acabó subiendo sano en una producción sin
     # correo configurado.
     #
-    # No necesita el volumen: la guarda comprueba que las variables estén
-    # elegidas, no que el directorio exista — eso lo hace la aplicación, que sí
-    # escribe ahí.
     environment:
       KORA_STORAGE_DRIVER: disk
       KORA_UPLOADS_DIR: /data/uploads
-    # El MISMO volumen de imágenes que la app. El worker no las sirve, pero
-    # es donde corre `pnpm photos:import` en el servidor (tiene tsx y scripts;
-    # la imagen de la app no): sin el volumen, subiría las fotos a su propia
-    # capa efímera y el siguiente despliegue las borraría.
-    volumes:
-      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
     mem_limit: 256m
-    # En PRUEBAS el correo NO sale a internet: se escribe aquí y se lee. Es
-    # deliberado — un entorno de pruebas que enviara de verdad le escribiría a
-    # direcciones de clientes reales mientras alguien ensaya un pedido.
-    # Para leerlos:  docker exec kora-staging-worker ls /emails
+    # ⚠️ UN solo bloque `volumes`: YAML no admite la clave dos veces y compose
+    # rechaza el archivo entero — el despliegue del 12 sep falló por eso, con
+    # el mensaje escondido en el paso de migración.
     volumes:
+      # El MISMO volumen de imágenes que la app. El worker no las sirve, pero
+      # es donde corre `pnpm photos:import` en el servidor (tiene tsx y
+      # scripts; la imagen de la app no): sin el volumen, subiría las fotos a
+      # su capa efímera y el siguiente despliegue las borraría.
+      - uploads:/data/uploads
+      # En PRUEBAS el correo NO sale a internet salvo a la lista permitida: el
+      # resto se escribe aquí y se lee. Para leerlos:
+      #   docker exec kora-staging-worker ls /emails
       - correos:/emails
     networks:
       - interna

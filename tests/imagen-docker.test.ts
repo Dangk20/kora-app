@@ -52,3 +52,23 @@ describe("sharp en la imagen de producción", () => {
     expect(config).not.toMatch(/^\s*outputFileTracingIncludes\s*:/m);
   });
 });
+
+describe("los archivos de compose son YAML válido", () => {
+  // El 12 sep 2026 un `volumes:` duplicado en el worker de pruebas tumbó el
+  // despliegue: YAML no admite la clave dos veces y compose rechaza el archivo
+  // ENTERO, con el error escondido en el paso de migración. El CI había pasado.
+  it("ningún servicio repite una clave", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["deploy/docker-compose.staging.yml", "deploy/docker-compose.prod.yml", "deploy/docker-compose.edge.yml"]) {
+      const texto = readFileSync(f, "utf8");
+      // Dentro de cada servicio (bloques indentados a 2 espacios bajo `services:`),
+      // una clave de nivel de servicio (4 espacios) no puede aparecer dos veces.
+      const servicios = texto.split(/\n  (?=[a-z][\w-]*:\s*$)/m);
+      for (const s of servicios) {
+        const claves = [...s.matchAll(/^    ([a-z_]+):/gm)].map((m) => m[1]);
+        const repetidas = claves.filter((c, i) => claves.indexOf(c) !== i);
+        expect(repetidas, `${f}: clave repetida en un servicio`).toEqual([]);
+      }
+    }
+  });
+});
