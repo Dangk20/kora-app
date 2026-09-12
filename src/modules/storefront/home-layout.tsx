@@ -243,10 +243,13 @@ export function StoreHomeLayout({
                 </Region>
               )}
 
+              {/* 3:5 exacto: es el "600 × 1000" que Vitrina le pide al
+                  cliente. Con una altura mínima suelta la proporción dependía
+                  de lo que hubiera al lado, y la pieza real se recortaba. */}
               <Region id="banner:promo_secundaria" editControl={editControl}>
                 <BannerSlot
                   banners={banners.get("promo_secundaria")}
-                  className="min-h-[420px]"
+                  className="aspect-[3/5] w-full"
                   placeholderLabel="Promo de la parrilla — cárgala desde Vitrina"
                 />
               </Region>
