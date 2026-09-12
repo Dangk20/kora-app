@@ -45,22 +45,36 @@ test.korashopp.com {
 		X-Robots-Tag "noindex, nofollow, noarchive"
 	}
 
-	# La credencial NO pasa por variables de entorno: un hash bcrypt empieza por
-	# `$2a$14$...` y Docker Compose interpreta esos `$` como variables, entregando
-	# el hash mutilado (48 caracteres en vez de 60) sin avisar de nada — la
-	# autenticación simplemente rechaza siempre, incluso con la contraseña buena.
-	# El archivo importado vive SOLO en el servidor; su plantilla es auth.caddy.example.
-	import /etc/caddy/auth.caddy
-
 	encode zstd gzip
 
-	# La IP real del visitante, y NADA MÁS. `header_up` sobrescribe: lo que el
-	# cliente hubiera escrito en X-Forwarded-For se descarta aquí, en el borde.
-	# Sin esta línea, elegir país —y con él la moneda de la tienda— sería tan
-	# fácil como mandar una cabecera. El código además lee la entrada de la
-	# derecha, por si algún día esta línea desaparece.
-	reverse_proxy kora-staging-app:3000 {
-		header_up X-Forwarded-For {remote_host}
+	# Los webhooks del proveedor de correo entran SIN contraseña: el proveedor
+	# no sabe contraseñas, y lo que protege esa ruta es la firma que verifica
+	# la aplicación (specs/email-provider-events). Dos bloques `handle` porque
+	# son excluyentes: el primero que coincide gana, y así `auth.caddy` no
+	# cambia ni necesita un matcher.
+	@webhook path /api/webhooks/*
+	handle @webhook {
+		reverse_proxy kora-staging-app:3000 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	handle {
+		# La credencial NO pasa por variables de entorno: un hash bcrypt empieza por
+		# `$2a$14$...` y Docker Compose interpreta esos `$` como variables, entregando
+		# el hash mutilado (48 caracteres en vez de 60) sin avisar de nada — la
+		# autenticación simplemente rechaza siempre, incluso con la contraseña buena.
+		# El archivo importado vive SOLO en el servidor; su plantilla es auth.caddy.example.
+		import /etc/caddy/auth.caddy
+
+		# La IP real del visitante, y NADA MÁS. `header_up` sobrescribe: lo que el
+		# cliente hubiera escrito en X-Forwarded-For se descarta aquí, en el borde.
+		# Sin esta línea, elegir país —y con él la moneda de la tienda— sería tan
+		# fácil como mandar una cabecera. El código además lee la entrada de la
+		# derecha, por si algún día esta línea desaparece.
+		reverse_proxy kora-staging-app:3000 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 }
 

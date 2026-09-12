@@ -34,15 +34,51 @@ export function createAllowlistDriver(
   };
 }
 
+/**
+ * Anota cada correo que el proveedor ACEPTÓ. Es el contador de consumo del
+ * plan, y va aquí —envolviendo al proveedor— y no en cada módulo, para que el
+ * correo de prueba de campaña, que llama al driver directamente, cuente igual
+ * que un pedido. Un fallo al anotar no convierte un envío correcto en fallido:
+ * el correo ya salió.
+ */
+export function createAccountingDriver(
+  real: EmailDriver,
+  anotar: (r: { providerId: string; to: string; subject: string }) => Promise<void>,
+): EmailDriver {
+  return {
+    name: `contable(${real.name})`,
+    async send(msg: EmailMessage): Promise<SendResult> {
+      const r = await real.send(msg);
+      if (r.ok) {
+        try {
+          await anotar({ providerId: r.providerId, to: msg.to, subject: msg.subject });
+        } catch (e) {
+          console.error("[email] el correo salió pero no se pudo anotar el consumo:", e);
+        }
+      }
+      return r;
+    },
+  };
+}
+
+async function anotarEnBase(r: { providerId: string; to: string; subject: string }) {
+  const { db } = await import("@/lib/db");
+  await db.providerSend.create({ data: r });
+}
+
 export function emailDriver(env = process.env): EmailDriver {
   if (cache) return cache;
   if (!emailProviderConfigured(env)) {
     cache = createFileDriver();
     return cache;
   }
-  const real = createResendDriver(env.RESEND_API_KEY!.trim(), env.EMAIL_FROM!.trim());
+  const real = createAccountingDriver(
+    createResendDriver(env.RESEND_API_KEY!.trim(), env.EMAIL_FROM!.trim()),
+    anotarEnBase,
+  );
   // En producción la guarda de arranque ya impidió que exista una lista; aquí
   // no se vuelve a decidir. Fuera de producción, la guarda exigió que la haya.
+  // Orden: lista → contable → proveedor. Lo que va a disco nunca se cuenta.
   cache = esProduccion(env) ? real : createAllowlistDriver(emailAllowlist(env), real, createFileDriver());
   return cache;
 }

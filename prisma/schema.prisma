@@ -1083,6 +1083,46 @@ model SalesDocument {
   @@map("sales_documents")
 }
 
+/// Cada correo que el PROVEEDOR aceptó. Es el contador de consumo del plan.
+///
+/// El proveedor no expone su contador y la clave es de solo envío, así que lo
+/// llevamos nosotros. Lo escribe UN driver contable que envuelve al del
+/// proveedor —no cada módulo— para que el correo de prueba de campaña, que va
+/// directo al driver, cuente igual que un pedido. Lo que se escribe a disco
+/// nunca pasa por aquí.
+model ProviderSend {
+  id         String   @id @default(cuid())
+  providerId String // identificador del mensaje en el proveedor
+  to         String
+  subject    String
+  sentAt     DateTime @default(now())
+
+  @@index([sentAt])
+  @@map("provider_sends")
+}
+
+/// Un evento que el proveedor reportó sobre un mensaje: entregado, abierto,
+/// clic, rebote, queja, retraso. Entra por el webhook, firmado.
+///
+/// `svixId` es el identificador de ENTREGA del webhook, único: el proveedor
+/// reintenta hasta recibir 200, y guardar dos veces contaría dos aperturas de
+/// una. No sirve `providerId + type`, porque un mismo mensaje se abre varias
+/// veces y cada apertura es un evento distinto.
+model EmailEvent {
+  id         String   @id @default(cuid())
+  svixId     String   @unique
+  providerId String // email_id del mensaje al que se refiere
+  type       String // email.delivered, email.opened, email.clicked, email.bounced, email.complained, …
+  to         String?
+  occurredAt DateTime
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([providerId])
+  @@index([type, occurredAt])
+  @@map("email_events")
+}
+
 model OrderEmail {
   id      String         @id @default(cuid())
   orderId String

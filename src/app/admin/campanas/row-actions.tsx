@@ -69,7 +69,16 @@ export function RowActions({
             // La confirmación repite el número: es lo último que separa
             // segmentar de escribirle a toda la base.
             if (!confirm("¿Enviar esta campaña ahora a los destinatarios del segmento?")) return;
-            correr(() => sendNow(id));
+            correr(async () => {
+              const r = await sendNow(id);
+              if (r.ok || !r.partial) return r;
+              // No cabe en el cupo de hoy. Se puede enviar igual —el resto
+              // sale en los días siguientes— pero eso lo decide quien envía.
+              const seguir = confirm(
+                `${r.error}\n\n¿Enviar de todas formas? El resto saldrá solo cuando haya cupo.`,
+              );
+              return seguir ? sendNow(id, { acceptPartial: true }) : { ok: true as const };
+            });
           }}
         >
           <Send className="size-3.5" /> Enviar

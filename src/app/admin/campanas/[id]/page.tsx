@@ -10,6 +10,12 @@ export const metadata = { title: "Campaña · KORA" };
 const fecha = (d: Date | null) =>
   d ? new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeStyle: "short" }).format(d) : "—";
 
+/** "12 % de los entregados", o nada si aún no hay base para el porcentaje. */
+function pct(parte: number, base: number): string | undefined {
+  if (base === 0) return undefined;
+  return `${Math.round((parte / base) * 100)} % de los entregados`;
+}
+
 function Metrica({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-[12px] border border-[#eee9e2] px-4 py-3">
@@ -85,9 +91,39 @@ export default async function CampanaDetallePage({
             Aperturas, clics, entregas confirmadas y rebotes: no disponibles todavía
           </p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-            Esas métricas las reporta el proveedor de correo, que aún no está configurado. No se
-            muestran en cero a propósito: un cero se leería como “nadie abrió el correo”.
+            Esas métricas las reporta el proveedor de correo por webhook, y el webhook no está
+            configurado en este entorno. No se muestran en cero a propósito: un cero se leería
+            como “nadie abrió el correo”.
           </p>
+        </div>
+      )}
+
+      {/* Con el webhook configurado, un cero real SÍ es un dato. Se cuentan
+          destinatarios distintos, no eventos: tres aperturas de la misma
+          persona son una apertura. */}
+      {c.providerMetricsAvailable && c.providerMetrics && (
+        <div className="mb-6">
+          <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase">
+            Según el proveedor
+            {c.sent > 0 &&
+              c.providerMetrics.delivered + c.providerMetrics.bounced === 0 &&
+              " · por ahora, sin eventos"}
+          </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <Metrica label="Entregados" value={String(c.providerMetrics.delivered)} />
+            <Metrica
+              label="Aperturas"
+              value={String(c.providerMetrics.opened)}
+              hint={pct(c.providerMetrics.opened, c.providerMetrics.delivered)}
+            />
+            <Metrica
+              label="Clics"
+              value={String(c.providerMetrics.clicked)}
+              hint={pct(c.providerMetrics.clicked, c.providerMetrics.delivered)}
+            />
+            <Metrica label="Rebotes" value={String(c.providerMetrics.bounced)} />
+            <Metrica label="Quejas de spam" value={String(c.providerMetrics.complained)} />
+          </div>
         </div>
       )}
 

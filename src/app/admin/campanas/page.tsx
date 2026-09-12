@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Mail, Plus, Users } from "lucide-react";
+import { emailUsage } from "@/modules/email/usage";
+import { ConsumoDelPlan } from "./consumo";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { listCampaigns } from "@/modules/campaigns/queries";
@@ -45,8 +47,9 @@ export default async function CampanasPage({
   const campañas = await listCampaigns();
   const filtradas = estado === "ALL" ? campañas : campañas.filter((c) => c.status === estado);
 
-  const [suscritos, categorias, productos] = await Promise.all([
+  const [suscritos, usage, categorias, productos] = await Promise.all([
     subscriberCount(),
+    emailUsage(),
     db.category.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.product.findMany({
       where: { active: true },
@@ -90,6 +93,9 @@ export default async function CampanasPage({
           </Link>
         )}
       </div>
+
+      {/* Con proveedor, lo que importa es cuánto cupo queda. */}
+      {emailProviderConfigured() && <ConsumoDelPlan usage={usage} />}
 
       {/* Sin proveedor no sale ni un correo. Decirlo arriba y con el motivo
           evita que el operador prepare una campaña creyendo que se enviará. */}

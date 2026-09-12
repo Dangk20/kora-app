@@ -3,7 +3,8 @@
 
 import type { CampaignStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { emailProviderConfigured } from "@/modules/email/config";
+import { EVENT_TYPES } from "@/modules/email/events";
+import { webhookSecret } from "@/modules/email/webhook";
 import { countAudience, describeSegment, type Segment } from "./audience";
 
 export type CampaignRow = {
@@ -100,11 +101,44 @@ export async function campaignDetail(id: string) {
     unsubscribeCount: c.unsubscribeCount,
     /**
      * Las métricas del proveedor (entregas confirmadas, aperturas, clics,
-     * rebotes) llegan por webhook. Sin proveedor configurado NO se muestran
+     * rebotes) llegan por webhook. Sin el webhook configurado NO se muestran
      * como cero: un cero se lee como "nadie lo abrió" y sobre esa lectura se
      * toman decisiones comerciales. Decir que no se mide todavía es
-     * información; un cero es una afirmación falsa.
+     * información; un cero es una afirmación falsa. CON webhook, un cero real
+     * sí es un dato.
      */
-    providerMetricsAvailable: emailProviderConfigured(),
+    providerMetricsAvailable: webhookSecret() !== null,
+    providerMetrics: webhookSecret() !== null ? await providerMetrics(id) : null,
+  };
+}
+
+export type ProviderMetrics = {
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  complained: number;
+};
+
+/**
+ * Cuenta DESTINATARIOS distintos con cada evento, no eventos: tres aperturas
+ * del mismo comprador son una apertura. Es lo que el operador entiende por
+ * "cuántos abrieron".
+ */
+async function providerMetrics(campaignId: string): Promise<ProviderMetrics> {
+  const filas = await db.$queryRaw<{ type: string; n: bigint }[]>`
+    SELECT e.type, COUNT(DISTINCT r.id) AS n
+    FROM campaign_recipients r
+    JOIN email_events e ON e."providerId" = r."providerId"
+    WHERE r."campaignId" = ${campaignId}
+    GROUP BY e.type
+  `;
+  const por = Object.fromEntries(filas.map((f) => [f.type, Number(f.n)]));
+  return {
+    delivered: por[EVENT_TYPES.delivered] ?? 0,
+    opened: por[EVENT_TYPES.opened] ?? 0,
+    clicked: por[EVENT_TYPES.clicked] ?? 0,
+    bounced: por[EVENT_TYPES.bounced] ?? 0,
+    complained: por[EVENT_TYPES.complained] ?? 0,
   };
 }

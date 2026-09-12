@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { emailDriver } from "@/modules/email";
+import { checkQuota, emailUsage } from "@/modules/email/usage";
 import { unsubscribeUrl } from "@/modules/consent/token";
 import { SEGMENTO_VACIO, countAudience, type Segment } from "./audience";
 import { renderCampaignFor, validateContent, type CampaignContent } from "./content";
@@ -23,7 +24,13 @@ const RUTA = "/admin/campanas";
 
 export type ActionResult =
   | { ok: true; id?: string; message?: string }
-  | { ok: false; error: string; field?: string };
+  | {
+      ok: false;
+      error: string;
+      field?: string;
+      /** No cabe en el cupo de hoy: se puede enviar igual, pero hay que decirlo. */
+      partial?: { today: number; later: number };
+    };
 
 function revalidar(id?: string) {
   revalidatePath(RUTA);
@@ -171,10 +178,44 @@ export async function scheduleCampaign(id: string, when: Date): Promise<ActionRe
   return { ok: true, id };
 }
 
-/** Dispara el envío. Idempotente: la garantía está en `startCampaign`. */
-export async function sendNow(id: string): Promise<ActionResult> {
+/**
+ * Dispara el envío. Idempotente: la garantía está en `startCampaign`.
+ *
+ * Antes de arrancar comprueba el cupo del plan del proveedor. Si la audiencia
+ * no cabe en lo que queda del MES, no arranca: nunca terminaría. Si cabe en el
+ * mes pero no en el DÍA, avisa y pide confirmar —el módulo ya drena en días
+ * sucesivos ante un rechazo por cupo; lo que falta es que el operador lo sepa
+ * antes y no a la mañana siguiente—.
+ */
+export async function sendNow(
+  id: string,
+  opciones: { acceptPartial?: boolean } = {},
+): Promise<ActionResult> {
   await requirePermission("marketing:send");
   assertMarketingUnlocked();
+
+  const c = await db.campaign.findUnique({ where: { id }, select: { segment: true } });
+  if (!c) return { ok: false, error: "La campaña no existe." };
+  const audiencia = await countAudience(c.segment as unknown as Segment);
+  const cupo = checkQuota(audiencia, await emailUsage());
+  if (cupo.fits === "no") {
+    return {
+      ok: false,
+      error:
+        `Esta campaña tiene ${audiencia} destinatarios y este mes solo caben ${cupo.remainingMonth} ` +
+        "más en el plan del proveedor. Reduce la audiencia o cambia de plan.",
+    };
+  }
+  if (cupo.fits === "partial" && !opciones.acceptPartial) {
+    return {
+      ok: false,
+      error:
+        `Hoy caben ${cupo.today} envíos en el plan: ${cupo.today} saldrían hoy y ` +
+        `${cupo.later} en los días siguientes.`,
+      partial: { today: cupo.today, later: cupo.later },
+    };
+  }
+
   const r = await startCampaign(id);
   revalidar(id);
   return r.ok
