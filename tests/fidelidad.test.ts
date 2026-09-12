@@ -173,8 +173,8 @@ describe("el banner principal mide lo que Vitrina le pide al cliente", () => {
     // Y la promo de la parrilla, 3:5 (600 × 1000).
     const promo = maqueta.slice(maqueta.indexOf('id="banner:promo_secundaria"'));
     expect(promo.slice(0, promo.indexOf("</Region>"))).toContain("aspect-[3/5]");
-    expect(vitrina).toContain("600 × 1000");
     const vitrina = readFileSync("src/modules/showcase/sections.ts", "utf8");
+    expect(vitrina).toContain("600 × 1000");
     expect(vitrina).toContain("1200 × 800");
   });
 });

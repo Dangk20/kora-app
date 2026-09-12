@@ -55,6 +55,28 @@ export function Lightbox({
     if (Math.abs(dx) > 40) ir(dx < 0 ? 1 : -1);
   };
 
+  /**
+   * Clic fuera de la FOTO cierra. El contenido del diálogo ocupa la pantalla
+   * entera, así que "fuera" no es fuera del diálogo: es fuera del rectángulo
+   * que la imagen pinta de verdad dentro de su caja (`object-contain` deja
+   * franjas transparentes que siguen siendo la <img>). Se calcula con el
+   * tamaño natural de la imagen.
+   */
+  const clicFuera = (e: React.MouseEvent<HTMLDivElement>) => {
+    const caja = e.currentTarget.querySelector("img");
+    if (!caja) return onClose();
+    const r = caja.getBoundingClientRect();
+    const nw = caja.naturalWidth || 1;
+    const nh = caja.naturalHeight || 1;
+    const escala = Math.min(r.width / nw, r.height / nh);
+    const w = nw * escala;
+    const h = nh * escala;
+    const x0 = r.left + (r.width - w) / 2;
+    const y0 = r.top + (r.height - h) / 2;
+    const dentro = e.clientX >= x0 && e.clientX <= x0 + w && e.clientY >= y0 && e.clientY <= y0 + h;
+    if (!dentro) onClose();
+  };
+
   const img = images[index];
   if (!img) return null;
 
@@ -69,7 +91,7 @@ export function Lightbox({
 
         <div className="relative flex h-full w-full flex-col" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {/* Barra superior: contador y cerrar */}
-          <div className="flex items-center justify-between px-4 py-3 text-white sm:px-6">
+          <div className="flex items-center justify-between px-4 py-3 text-white sm:px-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <span className="text-[13px] tabular-nums opacity-80">{index + 1} / {total}</span>
             <button type="button" onClick={onClose} aria-label="Cerrar"
               className="flex size-10 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20">
@@ -77,8 +99,8 @@ export function Lightbox({
             </button>
           </div>
 
-          {/* La foto, con todo el espacio que quede */}
-          <div className="relative min-h-0 flex-1 px-2 pb-4 sm:px-16">
+          {/* La foto, con todo el espacio que quede. Clic fuera de ella, cierra. */}
+          <div className="relative min-h-0 flex-1 px-2 pb-4 sm:px-16" onClick={clicFuera}>
             <Image
               key={img.url}
               src={img.url}
@@ -103,7 +125,7 @@ export function Lightbox({
               </button>
 
               {/* Miniaturas abajo, para saltar directo */}
-              <div className="flex justify-center gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="flex justify-center gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                 {images.map((m, i) => (
                   <button key={m.url} type="button" onClick={() => onIndex(i)} aria-label={`Foto ${i + 1}`}
                     aria-current={i === index}
