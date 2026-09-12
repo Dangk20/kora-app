@@ -143,6 +143,13 @@ export function CheckoutView({
   };
 
   // Cupón: solo el CÓDIGO viaja al servidor; el descuento lo calcula él.
+  // La casilla de datos es lo único obligatorio que no es un campo de texto,
+  // y el botón está en otra columna. Con `required` a secas, el navegador
+  // mostraba un globo que en móvil dura un instante, y la primera persona
+  // que probó la tienda creyó que "el botón no funciona" (12 sep 2026). El
+  // botón se apaga hasta que se acepta, y dice por qué.
+  const [aceptaDatos, setAceptaDatos] = useState(false);
+  const casillaDatosRef = useRef<HTMLInputElement>(null);
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -702,7 +709,8 @@ export function CheckoutView({
                   ~30 px, por debajo del mínimo táctil, y fallar el toque en la
                   única casilla obligatoria del checkout es perder la venta. */}
               <label className="flex items-start gap-2.5 py-2 text-[12.5px] text-[#4a4f58]">
-                <input type="checkbox" name="acceptsData" required
+                <input type="checkbox" name="acceptsData" required ref={casillaDatosRef}
+                  checked={aceptaDatos} onChange={(e) => setAceptaDatos(e.target.checked)}
                   className="mt-0.5 size-[18px] shrink-0 accent-kora-coral" />
                 <span>
                   Autorizo el tratamiento de mis datos personales para gestionar
@@ -962,12 +970,29 @@ export function CheckoutView({
 
           <button
             type="submit"
-            disabled={submitting}
-            className="bg-kora-gradient mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90 disabled:opacity-60"
+            disabled={submitting || !aceptaDatos}
+            aria-describedby={!aceptaDatos ? "falta-autorizacion" : undefined}
+            className="bg-kora-gradient mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:grayscale-[35%]"
           >
             {submitting && <Loader2 className="size-4 animate-spin" />}
             {submitting ? "Creando pedido…" : "Confirmar y enviar por WhatsApp"}
           </button>
+
+          {/* Un botón apagado sin explicación es un botón "que no funciona".
+              Esto dice qué falta y lleva hasta la casilla. */}
+          {!aceptaDatos && !submitting && (
+            <button
+              type="button"
+              id="falta-autorizacion"
+              onClick={() => {
+                casillaDatosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                casillaDatosRef.current?.focus();
+              }}
+              className="mt-2.5 w-full text-center text-[12.5px] font-semibold text-kora-coral underline-offset-2 hover:underline"
+            >
+              Para continuar, acepta el tratamiento de tus datos
+            </button>
+          )}
 
           {error && !error.field && (
             <p className="mt-3 text-center text-[12.5px] font-semibold text-destructive">
