@@ -12,6 +12,9 @@ import { useCart } from "@/modules/cart/cart-context";
 import { ProductGuarantees } from "@/modules/storefront/product-guarantees";
 import { useOwnsBottomBar } from "@/modules/storefront/mobile/bars-context";
 
+/** Cada cuánto pasa sola la galería. Lo bastante lento para mirar la foto. */
+const INTERVALO_GALERIA_MS = 4000;
+
 /**
  * Bloque principal de la ficha: galería + selección de variante.
  * Al cambiar de variante, el precio se actualiza al de esa variante
@@ -31,6 +34,19 @@ export function ProductDetail({
     product.variants.find((v) => v.onlineUnits > 0)?.id ?? product.variants[0]?.id,
   );
   const [imageIndex, setImageIndex] = useState(0);
+  // Las fotos rotan solas hasta que el comprador elige una: en ese momento
+  // se para y se queda con la suya (petición de Daniel, 12 sep 2026). Con
+  // "reducir movimiento" activado en el sistema, no rotan.
+  const [eligioFoto, setEligioFoto] = useState(false);
+  useEffect(() => {
+    if (eligioFoto || product.images.length < 2) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(
+      () => setImageIndex((i) => (i + 1) % product.images.length),
+      INTERVALO_GALERIA_MS,
+    );
+    return () => clearInterval(id);
+  }, [eligioFoto, product.images.length]);
   const [qty, setQty] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -108,15 +124,24 @@ export function ProductDetail({
           style={{ background: image ? "#f7f4f0" : product.category.color }}
         >
           {image ? (
-            <Image
-              src={image.url}
-              alt={image.alt ?? product.name}
-              fill
-              sizes="480px"
-              priority
-              className="object-contain"
-              unoptimized
-            />
+            // Todas apiladas y solo cambia la opacidad: así el paso de una a
+            // otra es un fundido y no un salto. Cambiar el `src` de una sola
+            // etiqueta hace que el navegador pinte la nueva de golpe.
+            product.images.map((img, i) => (
+              <Image
+                key={img.url}
+                src={img.url}
+                alt={i === imageIndex ? (img.alt ?? product.name) : ""}
+                fill
+                sizes="480px"
+                priority={i === 0}
+                aria-hidden={i !== imageIndex}
+                className={`object-contain transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                  i === imageIndex ? "opacity-100" : "opacity-0"
+                }`}
+                unoptimized
+              />
+            ))
           ) : (
             <CategoryTile
               color="transparent"
@@ -133,7 +158,10 @@ export function ProductDetail({
               <button
                 key={img.url}
                 type="button"
-                onClick={() => setImageIndex(i)}
+                onClick={() => {
+                  setImageIndex(i);
+                  setEligioFoto(true);
+                }}
                 aria-label={`Ver imagen ${i + 1}`}
                 aria-current={i === imageIndex}
                 className={`relative h-[86px] overflow-hidden rounded-xl border-2 bg-[#f7f4f0] ${

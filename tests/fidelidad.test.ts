@@ -174,3 +174,17 @@ describe("el banner principal mide lo que Vitrina le pide al cliente", () => {
     expect(vitrina).toContain("1200 × 800");
   });
 });
+
+describe("la galería de la ficha rota sola y se funde", () => {
+  it("apila las fotos y anima la opacidad; se para al elegir una", async () => {
+    // Medido en el navegador el 12 sep 2026: opacidades intermedias
+    // 0.89/0.11 → 0.47/0.53 → 0.18/0.82 entre foto y foto. Cambiar el `src`
+    // de una sola etiqueta las pintaría de golpe.
+    const { readFileSync } = await import("node:fs");
+    const ficha = readFileSync("src/app/(tienda)/producto/[slug]/product-detail.tsx", "utf8");
+    expect(ficha).toContain("product.images.map((img, i) => (");
+    expect(ficha).toContain("transition-opacity duration-700");
+    expect(ficha).toContain("setEligioFoto(true)");
+    expect(ficha).toContain("prefers-reduced-motion: reduce");
+  });
+});
