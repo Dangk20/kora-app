@@ -102,12 +102,17 @@ export function StoreHomeLayout({
       <section className={`${CONTAINER} pt-4 pb-8 sm:pt-6 sm:pb-10`}>
         <div className="rounded-2xl bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:rounded-3xl sm:p-[18px]">
           <div className="grid gap-4 lg:grid-cols-[1.4fr_0.85fr_1fr]">
-            {/* El principal es cuadrado y marca la altura de la fila; el
-                lateral y las categorías se estiran a esa misma altura. */}
+            {/* El principal es HORIZONTAL 3:2 y marca la altura de la fila;
+                el lateral y las categorías se estiran a esa misma altura.
+                3:2 y no cuadrado: es lo que Vitrina le pide al cliente
+                ("1200 × 800") y lo que mide el prototipo (≈540 × 384). Con
+                el espacio cuadrado, un banner de 1200 × 800 perdía los lados
+                —el logo y el titular— sin que nada avisara. Lo vio Daniel
+                con el primer banner real, el 12 sep 2026. */}
             <Region id="banner:hero_principal" editControl={editControl}>
               <BannerSlot
                 banners={banners.get("hero_principal")}
-                className="aspect-square w-full"
+                className="aspect-[3/2] w-full"
                 placeholderLabel="Banner principal — cárgalo desde Vitrina"
               />
             </Region>

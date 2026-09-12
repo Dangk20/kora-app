@@ -154,3 +154,17 @@ describe("el movimiento de la tarjeta al pasar el cursor", () => {
     expect(tarjeta).toContain("motion-reduce:transition-none");
   });
 });
+
+describe("el banner principal mide lo que Vitrina le pide al cliente", () => {
+  it("es horizontal 3:2, como el '1200 × 800' que se le pidió", async () => {
+    // Con el espacio cuadrado, un banner de 1200 × 800 perdía el logo y el
+    // titular por los lados sin que nada avisara (12 sep 2026).
+    const { readFileSync } = await import("node:fs");
+    const maqueta = readFileSync("src/modules/storefront/home-layout.tsx", "utf8");
+    const bloque = maqueta.slice(maqueta.indexOf('id="banner:hero_principal"'), maqueta.indexOf('id="banner:hero_lateral"'));
+    expect(bloque).toContain("aspect-[3/2]");
+    expect(bloque).not.toContain("aspect-square");
+    const vitrina = readFileSync("src/modules/showcase/sections.ts", "utf8");
+    expect(vitrina).toContain("1200 × 800");
+  });
+});
