@@ -76,9 +76,10 @@ pnpm catalog:import <xlsx> --fotos <carpeta> [--simular]  # el Excel DEL CLIENTE
                     # las referencias CON fotos (decisión 12 sep). Mismo runImport del panel. Referencia = producto.
 pnpm photos:import <carpeta> [--simular] # una carpeta por referencia → fotos del producto. IDEMPOTENTE
                     # por huella SHA-256 del original (ProductImage.sourceHash): correrlo N veces
-                    # no duplica. En el servidor corre DENTRO del worker (tiene tsx; la app no):
-                    #   docker cp fotos/ kora-staging-worker:/tmp/fotos && docker exec kora-staging-worker \
-                    #     node_modules/.bin/tsx scripts/import-photos.ts /tmp/fotos
+                    # no duplica. En el servidor, NUNCA con `docker exec` en el worker (256 MB:
+                    # un segundo tsx ahí muere con 137 sin decir nada). Se usa el envoltorio, que
+                    # levanta un contenedor desechable de la imagen del worker con /datos montado:
+                    #   ~/kora/deploy/kora-tsx.sh staging scripts/import-photos.ts /datos/fotos
 pnpm legal:export          # las tres páginas legales en Markdown, en .legal/, para aprobación del cliente
 # Los correos de desarrollo se escriben en .emails/ (ignorado por git)
 ```
