@@ -248,9 +248,19 @@ export async function sendTestEmail(campaignId: string, to: string): Promise<Act
     unsubscribeUrl: unsubscribeUrl("prueba"),
   });
 
-  return r.ok
-    ? { ok: true, message: `Correo de prueba enviado a ${to.trim()}.` }
-    : { ok: false, error: `No se pudo enviar la prueba: ${r.error}` };
+  if (!r.ok) return { ok: false, error: `No se pudo enviar la prueba: ${r.error}` };
+  // Decir la verdad sobre por dónde salió. En un entorno sin proveedor —o a
+  // una dirección fuera de la lista permitida— el correo se ESCRIBE, no se
+  // envía, y "enviado" haría esperar en una bandeja algo que nunca va a llegar.
+  if (r.providerId.startsWith("file:")) {
+    return {
+      ok: true,
+      message:
+        `Este entorno no envía correo a ${to.trim()}: quedó escrito en el servidor (${r.providerId.slice(5)}). ` +
+        "Para que llegue de verdad hace falta el proveedor y que la dirección esté en la lista permitida.",
+    };
+  }
+  return { ok: true, message: `Correo de prueba enviado a ${to.trim()}. Revisa también la carpeta de spam.` };
 }
 
 export async function scheduleCampaign(id: string, when: Date): Promise<ActionResult> {

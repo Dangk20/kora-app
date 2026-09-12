@@ -152,9 +152,37 @@ export function Builder({
     else if (i === paso + 1) void continuar();
   };
 
+  // Las mismas acciones arriba y abajo: en el paso de diseño la columna
+  // izquierda es larga, y obligar a bajar hasta el pie para seguir es
+  // justo lo que no hace "llevar de la mano".
+  const acciones = (
+    <div className="flex items-center gap-2">
+      {paso > 0 && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setPaso(paso - 1)}>
+          <ArrowLeft className="size-4" /> Atrás
+        </Button>
+      )}
+      {paso >= 1 && (
+        <Button type="button" variant="outline" size="sm" disabled={guardando}
+          onClick={async () => {
+            if (!validarPaso2()) return;
+            const id = await guardar();
+            if (id && !campaign) router.replace(`/admin/campanas/editor?id=${id}&paso=2`);
+          }}>
+          <Save className="size-4" /> {guardando ? "Guardando…" : "Guardar borrador"}
+        </Button>
+      )}
+      {paso < 2 && (
+        <Button type="button" variant="brand" size="sm" disabled={guardando} onClick={() => void continuar()}>
+          {paso === 1 ? (guardando ? "Guardando…" : "Guardar y revisar") : "Continuar"} <ArrowRight className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PasosCabecera paso={paso} onIr={ir} />
+      <PasosCabecera paso={paso} onIr={ir} acciones={acciones} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {paso === 0 && (
@@ -180,42 +208,19 @@ export function Builder({
         )}
       </div>
 
-      {/* ── Pie: atrás / guardar / continuar ── */}
-      <div className="flex items-center justify-between gap-3 border-t border-[#eee9e2] bg-white px-6 py-3">
-        <div>
-          {paso > 0 && (
-            <Button type="button" variant="outline" onClick={() => setPaso(paso - 1)}>
-              <ArrowLeft className="size-4" /> Atrás
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {paso >= 1 && (
-            <Button type="button" variant="outline" disabled={guardando}
-              onClick={async () => {
-                if (!validarPaso2()) return;
-                const id = await guardar();
-                if (id && !campaign) router.replace(`/admin/campanas/editor?id=${id}&paso=2`);
-              }}>
-              <Save className="size-4" /> {guardando ? "Guardando…" : "Guardar borrador"}
-            </Button>
-          )}
-          {paso < 2 && (
-            <Button type="button" variant="brand" disabled={guardando} onClick={() => void continuar()}>
-              {paso === 1 ? (guardando ? "Guardando…" : "Guardar y revisar") : "Continuar"} <ArrowRight className="size-4" />
-            </Button>
-          )}
-        </div>
+      {/* ── Pie: las mismas acciones que arriba ── */}
+      <div className="flex items-center justify-end border-t border-[#eee9e2] bg-white px-6 py-3">
+        {acciones}
       </div>
     </div>
   );
 }
 
 /** La barra de pasos. Siempre visible: saber dónde se está evita abandonar. */
-function PasosCabecera({ paso, onIr }: { paso: number; onIr: (i: number) => void }) {
+function PasosCabecera({ paso, onIr, acciones }: { paso: number; onIr: (i: number) => void; acciones: React.ReactNode }) {
   return (
-    <div className="border-b border-[#f0ece6] bg-[#faf8f5] px-6 py-3">
-      <div className="mx-auto flex max-w-[900px] items-stretch gap-2">
+    <div className="flex items-center gap-6 border-b border-[#f0ece6] bg-[#faf8f5] px-6 py-3">
+      <div className="flex min-w-0 flex-1 items-stretch gap-2">
         {PASOS.map((p, i) => {
           const hecho = i < paso;
           const actual = i === paso;
@@ -247,6 +252,7 @@ function PasosCabecera({ paso, onIr }: { paso: number; onIr: (i: number) => void
           );
         })}
       </div>
+      <div className="shrink-0">{acciones}</div>
     </div>
   );
 }
