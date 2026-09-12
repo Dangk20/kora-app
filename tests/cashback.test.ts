@@ -565,3 +565,23 @@ describe("pendiente", () => {
     expect(await saldo(c.id)).toEqual({ cop: 0, usd: 0 });
   });
 });
+
+describe("generado y usado en total (pedido del cliente, 12 sep 2026)", () => {
+  it("suma lo acreditado y lo consumido por moneda, sin contar lo vencido como usado", async () => {
+    const { cashbackTotals } = await import("@/modules/cashback/balance");
+    const c = await cliente();
+    await db.cashbackMovement.createMany({
+      data: [
+        { customerId: c.id, currency: "COP", type: "EARN", delta: 3000, note: PREFIJO },
+        { customerId: c.id, currency: "COP", type: "EARN", delta: 2000, note: PREFIJO },
+        { customerId: c.id, currency: "COP", type: "REDEEM", delta: -1500, note: PREFIJO },
+        { customerId: c.id, currency: "COP", type: "EXPIRE", delta: -500, note: PREFIJO },
+        { customerId: c.id, currency: "USD", type: "EARN", delta: 1.5, note: PREFIJO },
+      ],
+    });
+    const t = await cashbackTotals(c.id);
+    expect(t.earned).toEqual({ cop: 5000, usd: 1.5 });
+    // Lo vencido no es "usado": es lo que se perdió, y el historial ya lo dice.
+    expect(t.used).toEqual({ cop: 1500, usd: 0 });
+  });
+});

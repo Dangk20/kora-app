@@ -92,9 +92,39 @@ export async function cashbackHistory(customerId: string, limit = 50): Promise<M
   }));
 }
 
+/**
+ * Lo generado y lo usado EN TOTAL, por moneda. Las dos cifras que el cliente
+ * pidió ver sueltas (12 sep 2026): hoy estaban en el historial, sin sumar, y
+ * el comprador tendría que sumarlas a mano. Salen del libro, nada nuevo se
+ * guarda. Un ajuste positivo cuenta como generado y uno negativo como usado:
+ * es lo que el comprador vio entrar y salir.
+ */
+export type CashbackTotals = { earned: CashbackBalance; used: CashbackBalance };
+
+export async function cashbackTotals(customerId: string): Promise<CashbackTotals> {
+  const filas = await db.cashbackMovement.groupBy({
+    by: ["currency", "type"],
+    where: { customerId },
+    _sum: { delta: true },
+  });
+  const earned = { cop: 0, usd: 0 };
+  const used = { cop: 0, usd: 0 };
+  for (const f of filas) {
+    const v = aNumero(f._sum.delta ?? 0);
+    const bolsa = f.currency === "COP" ? "cop" : "usd";
+    if (f.type === "EARN" || (f.type === "ADJUST" && v > 0)) earned[bolsa] += v;
+    // REDEEM y ADJUST negativo son lo que salió por decisión del comprador o
+    // del negocio. EXPIRE no es "usado": es lo que se perdió, y ya se ve en
+    // el historial como tal.
+    if (f.type === "REDEEM" || (f.type === "ADJUST" && v < 0)) used[bolsa] += Math.abs(v);
+  }
+  return { earned, used };
+}
+
 export type CashbackSummary = {
   available: CashbackBalance;
   pending: CashbackBalance;
+  totals: CashbackTotals;
   /** Próximo vencimiento por moneda; null si esa bolsa está vacía. */
   nextExpiry: { cop: Date | null; usd: Date | null };
   history: MovementView[];
@@ -111,14 +141,15 @@ export async function cashbackSummary(
   customerId: string,
   now: Date = new Date(),
 ): Promise<CashbackSummary> {
-  const [available, pending, cop, usd, history] = await Promise.all([
+  const [available, pending, totals, cop, usd, history] = await Promise.all([
     cashbackBalance(customerId),
     pendingCashback(customerId, now),
+    cashbackTotals(customerId),
     nextExpiry(customerId, "COP", now),
     nextExpiry(customerId, "USD", now),
     cashbackHistory(customerId, 12),
   ]);
-  return { available, pending, nextExpiry: { cop, usd }, history };
+  return { available, pending, totals, nextExpiry: { cop, usd }, history };
 }
 
 /**

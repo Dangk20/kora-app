@@ -18,7 +18,7 @@ export const datosPersonales: LegalDocumentFactory = (m) => ({
   title: "Política de tratamiento de datos personales",
   summary:
     "Quién trata tus datos, para qué, y qué puedes exigir en cualquier momento.",
-  updatedAt: "2026-08-07",
+  updatedAt: "2026-09-12",
   sections: [
     {
       heading: "Responsable del tratamiento",
@@ -70,7 +70,10 @@ export const datosPersonales: LegalDocumentFactory = (m) => ({
             "Contactarte por WhatsApp para confirmar el pedido, coordinar el pago y acordar la entrega.",
             "Enviarte por correo electrónico el comprobante de cada cambio de estado de tu pedido: recibido, confirmado, en preparación, despachado, entregado, cancelado o vencido.",
             "Calcular y acreditar tu saldo de Kora Cashback, y avisarte de su vencimiento.",
-            "Atender tus solicitudes de cambio, garantía o retracto.",
+            "Gestionar tus envíos: tu nombre, teléfono y dirección van a la transportadora para que pueda entregarte.",
+            "Atender tus solicitudes de cambio, garantía, retracto y reclamación, y brindarte servicio al cliente.",
+            "Presentar reclamos ante la compañía logística cuando un producto llega dañado o incompleto, con la evidencia que nos envíes.",
+            "Proteger las transacciones y prevenir fraude: por ejemplo, limitar intentos de acceso a tu cuenta.",
             "Cumplir obligaciones legales, contables y tributarias.",
           ],
         },

@@ -32,15 +32,19 @@ export function CashbackPanel({ resumen }: { resumen: CashbackSummary }) {
         saldo: resumen.available.cop,
         pendiente: resumen.pending.cop,
         vence: resumen.nextExpiry.cop,
+        generado: resumen.totals.earned.cop,
+        usado: resumen.totals.used.cop,
       },
       {
         currency: "USD" as const,
         saldo: resumen.available.usd,
         pendiente: resumen.pending.usd,
         vence: resumen.nextExpiry.usd,
+        generado: resumen.totals.earned.usd,
+        usado: resumen.totals.used.usd,
       },
     ]
-  ).filter((b) => b.saldo > 0 || b.pendiente > 0);
+  ).filter((b) => b.saldo > 0 || b.pendiente > 0 || b.generado > 0);
 
   return (
     <section className="rounded-[18px] border border-[#ffd9c7] bg-[linear-gradient(120deg,#FFF4EF,#fff)] p-6">
@@ -79,6 +83,19 @@ export function CashbackPanel({ resumen }: { resumen: CashbackSummary }) {
                   Lo próximo vence el {fecha(b.vence)}.
                 </p>
               )}
+
+              {/* Las dos cifras sueltas que pidió el cliente: generado y usado
+                  en total. Salen del libro; el historial de abajo es el detalle. */}
+              <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-[#ffe8dc] pt-3 text-[12.5px]">
+                <div>
+                  <dt className="text-muted-foreground">Generado en total</dt>
+                  <dd className="font-semibold text-kora-black">{formatearCashback(b.generado, b.currency)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Usado en total</dt>
+                  <dd className="font-semibold text-kora-black">{formatearCashback(b.usado, b.currency)}</dd>
+                </div>
+              </dl>
             </div>
           ))}
         </div>
