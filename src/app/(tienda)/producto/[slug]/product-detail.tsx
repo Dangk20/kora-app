@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Lightbox } from "./lightbox";
 import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
 import { formatMoney, resolvePrice, type Currency } from "@/modules/pricing";
 import { PriceTag } from "@/modules/storefront/price-tag";
@@ -38,6 +39,7 @@ export function ProductDetail({
   // se para y se queda con la suya (petición de Daniel, 12 sep 2026). Con
   // "reducir movimiento" activado en el sistema, no rotan.
   const [eligioFoto, setEligioFoto] = useState(false);
+  const [visor, setVisor] = useState(false);
   useEffect(() => {
     if (eligioFoto || product.images.length < 2) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -119,8 +121,15 @@ export function ProductDetail({
     <div className="-mx-4 grid gap-6 bg-white p-4 sm:mx-0 sm:gap-10 sm:rounded-3xl sm:p-8 sm:shadow-[0_6px_28px_rgba(0,0,0,0.05)] lg:grid-cols-[480px_1fr]">
       {/* Galería */}
       <div>
+        {/* Tocar la foto abre el visor a tamaño completo, en móvil y en
+            escritorio. Abrirlo cuenta como elegir: la rotación se para. */}
         <div
-          className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] sm:aspect-auto sm:h-[430px] sm:rounded-[18px]"
+          role={image ? "button" : undefined}
+          tabIndex={image ? 0 : undefined}
+          aria-label={image ? "Ver la foto en grande" : undefined}
+          onClick={() => { if (image) { setEligioFoto(true); setVisor(true); } }}
+          onKeyDown={(e) => { if (image && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setEligioFoto(true); setVisor(true); } }}
+          className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] sm:aspect-auto sm:h-[430px] sm:rounded-[18px] ${image ? "cursor-zoom-in" : ""}`}
           style={{ background: image ? "#f7f4f0" : product.category.color }}
         >
           {image ? (
@@ -151,6 +160,15 @@ export function ProductDetail({
             />
           )}
         </div>
+
+        <Lightbox
+          images={product.images}
+          index={imageIndex}
+          open={visor}
+          onIndex={setImageIndex}
+          onClose={() => setVisor(false)}
+          nombre={product.name}
+        />
 
         {product.images.length > 1 && (
           <div className="mt-3.5 grid grid-cols-4 gap-3">
