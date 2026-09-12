@@ -19,6 +19,7 @@ import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
 import { createOrder } from "@/modules/orders/checkout-actions";
 import { formatMoney } from "@/modules/pricing";
+import { variantDetails } from "@/modules/orders/message";
 import {
   CIUDADES_SUGERIDAS,
   DEPARTAMENTOS_CO,
@@ -791,6 +792,15 @@ export function CheckoutView({
                   <p className="truncate text-[13px] font-semibold text-kora-black">
                     {l.productName}
                   </p>
+                  {/* Lo que eligió —talla, color— va aquí, no solo en el
+                      carrito: el resumen del checkout es lo último que ve
+                      antes de mandar el pedido, y una talla equivocada se
+                      descubría en la conversación de WhatsApp. */}
+                  {variantDetails(l.variantName).length > 0 && (
+                    <p className="truncate text-[11.5px] font-medium text-[#4a4f58]">
+                      {variantDetails(l.variantName).join(" · ")}
+                    </p>
+                  )}
                   <p className="text-[11.5px] text-[#8a8f98]">
                     {l.qtyAvailable} × {formatMoney(l.unitPrice, currency)}
                   </p>
