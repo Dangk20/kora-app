@@ -12,9 +12,18 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { emailDriver } from "@/modules/email";
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  imageKey,
+  sniffImageType,
+  storage,
+} from "@/modules/storage";
+import { optimizarImagenParaCorreo } from "@/modules/storage/optimize";
 import { checkQuota, emailUsage } from "@/modules/email/usage";
 import { unsubscribeUrl } from "@/modules/consent/token";
 import { SEGMENTO_VACIO, countAudience, type Segment } from "./audience";
+import { deriveLegacyFields, parseBlocks } from "./blocks";
 import { renderCampaignFor, validateContent, type CampaignContent } from "./content";
 import { startCampaign } from "./send";
 import { isCancellable, isDeletable, isEditable } from "./status";
@@ -38,6 +47,18 @@ function revalidar(id?: string) {
 }
 
 function leerContenido(f: FormData): CampaignContent {
+  // Con bloques, los campos fijos se DERIVAN: no se leen del formulario.
+  const bloques = parseBlocks(seguro(String(f.get("blocks") ?? "")));
+  if (bloques) {
+    const d = deriveLegacyFields(bloques);
+    return {
+      name: String(f.get("name") ?? "").trim(),
+      subject: String(f.get("subject") ?? "").trim(),
+      preheader: String(f.get("preheader") ?? "").trim() || null,
+      blocks: bloques,
+      ...d,
+    };
+  }
   return {
     name: String(f.get("name") ?? "").trim(),
     subject: String(f.get("subject") ?? "").trim(),
@@ -52,6 +73,15 @@ function leerContenido(f: FormData): CampaignContent {
       .map((s) => s.trim())
       .filter(Boolean),
   };
+}
+
+function seguro(json: string): unknown {
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
 }
 
 function leerSegmento(f: FormData): Segment {
@@ -90,7 +120,11 @@ export async function saveCampaign(_prev: ActionResult | null, f: FormData): Pro
     }
     await db.campaign.update({
       where: { id },
-      data: { ...contenido, segment: segmento as unknown as object },
+      data: {
+        ...contenido,
+        blocks: contenido.blocks ? (contenido.blocks as unknown as object) : undefined,
+        segment: segmento as unknown as object,
+      },
     });
     revalidar(id);
     return { ok: true, id };
@@ -99,6 +133,7 @@ export async function saveCampaign(_prev: ActionResult | null, f: FormData): Pro
   const creada = await db.campaign.create({
     data: {
       ...contenido,
+      blocks: contenido.blocks ? (contenido.blocks as unknown as object) : undefined,
       segment: segmento as unknown as object,
       createdById: session.user.id,
     },
@@ -122,6 +157,64 @@ export async function estimateAudience(segment: Segment): Promise<number> {
  * exactamente el mismo render que el envío: probar algo distinto de lo que sale
  * no prueba nada.
  */
+/**
+ * La vista previa del constructor, SIN guardar. Es el mismo `renderCampaignFor`
+ * del envío: lo que el operador ve es lo que recibe el destinatario. Devuelve
+ * el HTML para un iframe; si el contenido está a medias, igual dibuja lo que
+ * hay — la vista previa no valida, muestra.
+ */
+export async function previewCampaign(input: {
+  subject: string;
+  preheader: string;
+  blocks: unknown;
+  segment: Segment;
+}): Promise<{ html: string; missing: string[] }> {
+  await requirePermission("marketing:view");
+  assertMarketingUnlocked();
+  const bloques = parseBlocks(input.blocks) ?? [];
+  const d = deriveLegacyFields(bloques);
+  const r = await renderCampaignFor({
+    content: {
+      name: "",
+      subject: input.subject || "(sin asunto)",
+      preheader: input.preheader || null,
+      blocks: bloques,
+      ...d,
+    },
+    segment: input.segment,
+    recipient: null,
+  });
+  return { html: r.html, missing: r.missing };
+}
+
+/**
+ * Sube la imagen de un bloque. Devuelve la clave de almacenamiento y la
+ * dirección pública, que es lo que el constructor necesita para la vista
+ * previa. Se guarda en JPEG, no en WebP: ver `optimizarImagenParaCorreo`.
+ */
+export async function uploadCampaignImage(
+  formData: FormData,
+): Promise<{ ok: true; imageKey: string; url: string } | { ok: false; error: string }> {
+  await requirePermission("marketing:create");
+  assertMarketingUnlocked();
+
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige una imagen." };
+  if (file.size > MAX_IMAGE_BYTES) return { ok: false, error: "La imagen supera 5 MB." };
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const realType = sniffImageType(buffer);
+  if (!realType || !ALLOWED_IMAGE_TYPES[realType]) {
+    return { ok: false, error: "El archivo no es una imagen JPG, PNG, WebP o AVIF." };
+  }
+
+  const optimizada = await optimizarImagenParaCorreo(buffer);
+  const driver = storage();
+  const key = imageKey("campanas", optimizada.contentType);
+  await driver.put(key, optimizada.buffer, optimizada.contentType);
+  return { ok: true, imageKey: key, url: driver.urlFor(key) };
+}
+
 export async function sendTestEmail(campaignId: string, to: string): Promise<ActionResult> {
   await requirePermission("marketing:create");
   assertMarketingUnlocked();
@@ -135,6 +228,7 @@ export async function sendTestEmail(campaignId: string, to: string): Promise<Act
       name: c.name,
       subject: c.subject,
       preheader: c.preheader,
+      blocks: parseBlocks(c.blocks),
       title: c.title,
       body: c.body,
       imageKey: c.imageKey,
@@ -259,6 +353,7 @@ export async function duplicateCampaign(id: string): Promise<ActionResult> {
       ctaLabel: c.ctaLabel,
       ctaUrl: c.ctaUrl,
       productIds: c.productIds,
+      blocks: c.blocks ?? undefined,
       segment: c.segment ?? (SEGMENTO_VACIO as unknown as object),
       createdById: session.user.id,
     },

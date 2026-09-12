@@ -30,18 +30,18 @@ function Barra({ label, usado, limite }: { label: string; usado: number; limite:
  */
 export function ConsumoDelPlan({ usage }: { usage: EmailUsage }) {
   return (
-    <div className="mb-5 rounded-[12px] border border-[#eee9e2] bg-white px-5 py-4">
-      <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-kora-black">
-        <Gauge className="size-4 text-kora-coral" />
-        Consumo del plan de correo
-        <span className="ml-auto text-[11.5px] font-normal text-muted-foreground">
-          Incluye los correos de pedidos · corte a medianoche UTC
-        </span>
+    <section className="rounded-[14px] border border-[#eee9e2] bg-white p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-[15px] font-bold text-kora-black">
+          <Gauge className="size-4 text-kora-coral" />
+          Consumo del plan de correo
+        </h2>
+        <span className="text-[11.5px] text-muted-foreground">Incluye pedidos · corte medianoche UTC</span>
       </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
         <Barra label="Hoy" usado={usage.today} limite={usage.limits.daily} />
         <Barra label="Este mes" usado={usage.month} limite={usage.limits.monthly} />
       </div>
-    </div>
+    </section>
   );
 }

@@ -3,17 +3,21 @@
 
 import type { Currency } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { renderCampaign, type TemplateProduct } from "@/modules/email/template";
+import { renderCampaign, type TemplateBlock, type TemplateProduct } from "@/modules/email/template";
 import { storeUrl } from "@/modules/email/driver";
 import { resolvePrice, toNumber } from "@/modules/pricing";
 import { storage } from "@/modules/storage";
 import { unsubscribeUrl } from "@/modules/consent/token";
 import { MAX_ASUNTO, MAX_PREHEADER, MAX_PRODUCTOS, type Segment } from "./types";
 
+import { validateBlocks, type Block } from "./blocks";
+
 export { MAX_ASUNTO, MAX_PREHEADER, MAX_PRODUCTOS } from "./types";
 
 export type CampaignContent = {
   name: string;
+  /** Con bloques, los campos fijos de abajo son DERIVADOS (ver blocks.ts). */
+  blocks?: Block[] | null;
   subject: string;
   preheader: string | null;
   title: string;
@@ -34,6 +38,12 @@ export function validateContent(c: CampaignContent): ContentProblem[] {
     p.push({ field: "subject", message: `El asunto no puede pasar de ${MAX_ASUNTO} caracteres.` });
   if (c.preheader && c.preheader.length > MAX_PREHEADER)
     p.push({ field: "preheader", message: `El preheader no puede pasar de ${MAX_PREHEADER} caracteres.` });
+  if (c.blocks) {
+    // Con bloques, lo que se valida son los bloques: título y texto ya no son
+    // obligatorios por separado — el correo tiene que tener ALGO.
+    for (const b of validateBlocks(c.blocks)) p.push({ field: "blocks", message: b.message });
+    return p;
+  }
   if (!c.title.trim()) p.push({ field: "title", message: "El título es obligatorio." });
   if (!c.body.trim()) p.push({ field: "body", message: "El texto es obligatorio." });
   if (c.productIds.length > MAX_PRODUCTOS)
@@ -136,7 +146,46 @@ export async function renderCampaignFor(args: {
   const currency = audienceCurrency(args.segment);
   const { products, missing } = await resolveProducts(args.content.productIds, currency, base);
 
+  // Bloques: se resuelven productos e imágenes ANTES de dibujar. La plantilla
+  // no sabe de catálogo ni de almacenamiento.
+  let blocks: TemplateBlock[] | null = null;
+  const faltantes = [...missing];
+  if (args.content.blocks) {
+    blocks = [];
+    for (const b of args.content.blocks) {
+      switch (b.type) {
+        case "title":
+          if (b.text.trim()) blocks.push({ type: "title", text: b.text.trim() });
+          break;
+        case "text":
+          if (b.text.trim()) blocks.push({ type: "text", text: b.text.trim() });
+          break;
+        case "image":
+          if (b.imageKey) {
+            blocks.push({ type: "image", url: storage().urlFor(b.imageKey), alt: b.alt, linkUrl: b.linkUrl.trim() || null });
+          }
+          break;
+        case "button":
+          if (b.label.trim() && b.url.trim()) blocks.push({ type: "button", label: b.label.trim(), url: b.url.trim() });
+          break;
+        case "products": {
+          const r = await resolveProducts(b.productIds, currency, base);
+          faltantes.push(...r.missing);
+          if (r.products.length > 0) blocks.push({ type: "products", products: r.products });
+          break;
+        }
+        case "divider":
+          blocks.push({ type: "divider" });
+          break;
+        case "spacer":
+          blocks.push({ type: "spacer", height: b.height });
+          break;
+      }
+    }
+  }
+
   const { html, text } = renderCampaign({
+    blocks,
     subject: args.content.subject,
     preheader: args.content.preheader,
     title: args.content.title,
@@ -153,5 +202,5 @@ export async function renderCampaignFor(args: {
     storeBase: base,
   });
 
-  return { html, text, missing };
+  return { html, text, missing: faltantes };
 }

@@ -24,6 +24,17 @@ export async function subscriberCount(): Promise<number> {
   });
 }
 
+/** Suscritos hoy y cuántos entraron en los últimos 30 días. Para la tarjeta del panel. */
+export async function subscriberStats(now = new Date()): Promise<{ total: number; nuevos30: number }> {
+  const hace30 = new Date(now.getTime() - 30 * 24 * 3600_000);
+  const base = { acceptsMarketing: true, emailUsable: true, email: { not: null } } as const;
+  const [total, nuevos30] = await Promise.all([
+    db.customer.count({ where: base }),
+    db.customer.count({ where: { ...base, createdAt: { gte: hace30 } } }),
+  ]);
+  return { total, nuevos30 };
+}
+
 export async function subscriptionState(customerId: string): Promise<SubscriptionState> {
   const c = await db.customer.findUnique({
     where: { id: customerId },

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import type { Segment } from "@/modules/campaigns/audience";
+import { parseBlocks } from "@/modules/campaigns/blocks";
 import { renderCampaignFor } from "@/modules/campaigns/content";
 
 export async function GET(
@@ -42,6 +43,7 @@ export async function GET(
       ctaLabel: c.ctaLabel,
       ctaUrl: c.ctaUrl,
       productIds: c.productIds,
+      blocks: parseBlocks(c.blocks),
     },
     segment: c.segment as unknown as Segment,
     recipient: null,

@@ -812,6 +812,14 @@ model Campaign {
   ctaUrl     String?
   productIds String[] // 0–6 destacados, resueltos al renderizar
 
+  /// El contenido por bloques (desde el 12 sep 2026). Lista ordenada de
+  /// título, texto, imagen, botón, productos, separador y espacio; ver
+  /// `campaigns/blocks.ts`. Los campos fijos de arriba se conservan: los leen
+  /// las campañas anteriores y se DERIVAN de los bloques al guardar, para que
+  /// nada que los lea se rompa. Nulo = campaña anterior a los bloques, que se
+  /// convierte al abrirla.
+  blocks Json?
+
   // ── Audiencia ──
   segment Json // filtros combinables; se recalculan si la campaña está programada
 

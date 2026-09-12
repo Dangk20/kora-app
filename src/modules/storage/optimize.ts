@@ -84,3 +84,29 @@ export async function optimizarImagen(
     bytesOriginales: entrada.length,
   };
 }
+
+/**
+ * Imagen para un CORREO: JPEG, no WebP.
+ *
+ * WebP es la salida única de `optimizarImagen` y en la tienda es lo correcto.
+ * En un correo no: Outlook de escritorio en Windows no lo dibuja —muestra el
+ * hueco— y una campaña con la imagen principal en blanco para una parte de la
+ * lista no da ningún error. El JPEG lo abren todos los clientes de correo que
+ * existen. El ancho es el de la tarjeta del correo (600 px) a doble densidad.
+ */
+export async function optimizarImagenParaCorreo(entrada: Buffer): Promise<ImagenOptimizada> {
+  const pipeline = sharp(entrada, { failOn: "error" })
+    .rotate()
+    .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" }) // un PNG con transparencia se ve negro en algunos clientes
+    .jpeg({ quality: 82, mozjpeg: true });
+
+  const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+  return {
+    buffer: data,
+    contentType: "image/jpeg",
+    ancho: info.width,
+    alto: info.height,
+    bytesOriginales: entrada.length,
+  };
+}

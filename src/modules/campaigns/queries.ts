@@ -125,7 +125,7 @@ export type ProviderMetrics = {
  * del mismo comprador son una apertura. Es lo que el operador entiende por
  * "cuántos abrieron".
  */
-async function providerMetrics(campaignId: string): Promise<ProviderMetrics> {
+export async function providerMetrics(campaignId: string): Promise<ProviderMetrics> {
   const filas = await db.$queryRaw<{ type: string; n: bigint }[]>`
     SELECT e.type, COUNT(DISTINCT r.id) AS n
     FROM campaign_recipients r
@@ -141,4 +141,44 @@ async function providerMetrics(campaignId: string): Promise<ProviderMetrics> {
     bounced: por[EVENT_TYPES.bounced] ?? 0,
     complained: por[EVENT_TYPES.complained] ?? 0,
   };
+}
+
+
+export type RecentCampaign = {
+  id: string;
+  name: string;
+  sentAt: Date | null;
+  sentCount: number;
+  /** null = el proveedor no reporta (sin webhook). */
+  openRate: number | null;
+  clickRate: number | null;
+};
+
+/**
+ * Las últimas campañas enviadas, con sus tasas cuando el proveedor las
+ * reporta. Tasa = destinatarios distintos con el evento / entregados; sin
+ * entregados todavía, null — no cero.
+ */
+export async function recentCampaigns(limit = 3): Promise<RecentCampaign[]> {
+  const filas = await db.campaign.findMany({
+    where: { status: { in: ["SENT", "SENDING"] } },
+    orderBy: { sentAt: "desc" },
+    take: limit,
+    select: { id: true, name: true, sentAt: true, sentCount: true },
+  });
+  const hayWebhook = webhookSecret() !== null;
+  const out: RecentCampaign[] = [];
+  for (const c of filas) {
+    let openRate: number | null = null;
+    let clickRate: number | null = null;
+    if (hayWebhook) {
+      const m = await providerMetrics(c.id);
+      if (m.delivered > 0) {
+        openRate = Math.round((m.opened / m.delivered) * 100);
+        clickRate = Math.round((m.clicked / m.delivered) * 100);
+      }
+    }
+    out.push({ ...c, openRate, clickRate });
+  }
+  return out;
 }

@@ -1,16 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Mail, Plus, Users } from "lucide-react";
+import { ArrowRight, Mail, Plus, Sparkles, UserPlus, Users } from "lucide-react";
 import { emailUsage } from "@/modules/email/usage";
 import { ConsumoDelPlan } from "./consumo";
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import { listCampaigns } from "@/modules/campaigns/queries";
+import { listCampaigns, recentCampaigns } from "@/modules/campaigns/queries";
 import { STATUS_LABEL } from "@/modules/campaigns/status";
-import { subscriberCount } from "@/modules/consent/subscription";
+import { subscriberStats } from "@/modules/consent/subscription";
 import { emailProviderConfigured } from "@/modules/email/config";
+import { webhookSecret } from "@/modules/email/webhook";
 import type { CampaignStatus } from "@/generated/prisma/enums";
-import { CampaignForm } from "./campaign-form";
 import { RowActions } from "./row-actions";
 
 const CHIPS: { key: CampaignStatus | "ALL"; label: string }[] = [
@@ -36,40 +35,24 @@ const fecha = (d: Date | null) =>
 export default async function CampanasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; nueva?: string; editar?: string }>;
+  searchParams: Promise<{ estado?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.permissions.includes("marketing:view")) redirect("/admin");
   const puedeCrear = session.user.permissions.includes("marketing:create");
   const puedeEnviar = session.user.permissions.includes("marketing:send");
 
-  const { estado = "ALL", nueva, editar } = await searchParams;
+  const { estado = "ALL" } = await searchParams;
   const campañas = await listCampaigns();
   const filtradas = estado === "ALL" ? campañas : campañas.filter((c) => c.status === estado);
 
-  const [suscritos, usage, categorias, productos] = await Promise.all([
-    subscriberCount(),
+  const [contactos, usage, ultimas] = await Promise.all([
+    subscriberStats(),
     emailUsage(),
-    db.category.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    db.product.findMany({
-      where: { active: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      take: 200,
-    }),
+    recentCampaigns(3),
   ]);
-
-  const editando = editar
-    ? await db.campaign.findUnique({ where: { id: editar } })
-    : null;
-
-  const href = (extra: Record<string, string>) => {
-    const p = new URLSearchParams();
-    if (estado !== "ALL") p.set("estado", estado);
-    for (const [k, v] of Object.entries(extra)) p.set(k, v);
-    const q = p.toString();
-    return `/admin/campanas${q ? `?${q}` : ""}`;
-  };
+  const hayProveedor = emailProviderConfigured();
+  const hayMetricas = webhookSecret() !== null;
 
   return (
     <>
@@ -78,15 +61,11 @@ export default async function CampanasPage({
           <h1 className="text-[26px] font-extrabold tracking-tight text-kora-black">
             Email marketing
           </h1>
-          <p className="mt-1 flex items-center gap-1.5 text-[13.5px] text-muted-foreground">
-            <Users className="size-4" />
-            <strong className="text-kora-black">{suscritos}</strong> suscrito
-            {suscritos === 1 ? "" : "s"} pueden recibir campañas
-          </p>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">Campañas a tu base de clientes</p>
         </div>
         {puedeCrear && (
           <Link
-            href={href({ nueva: "1" })}
+            href="/admin/campanas/editor"
             className="bg-kora-gradient flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white"
           >
             <Plus className="size-4" /> Crear campaña
@@ -94,24 +73,83 @@ export default async function CampanasPage({
         )}
       </div>
 
-      {/* Con proveedor, lo que importa es cuánto cupo queda. */}
-      {emailProviderConfigured() && <ConsumoDelPlan usage={usage} />}
-
       {/* Sin proveedor no sale ni un correo. Decirlo arriba y con el motivo
           evita que el operador prepare una campaña creyendo que se enviará. */}
-      {!emailProviderConfigured() && (
+      {!hayProveedor && (
         <div className="mb-5 rounded-[12px] border border-[#ffd9c7] bg-[#FFF4EF] px-5 py-4">
           <p className="text-[13.5px] font-semibold text-kora-black">
-            El envío de correo todavía no está activo
+            En este entorno el correo no sale a internet
           </p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-            Falta configurar el proveedor y publicar los registros de correo del dominio
-            (SPF, DKIM y DMARC). Puedes preparar campañas y ver la vista previa; los envíos
-            quedan guardados en el servidor en vez de salir. Las métricas de apertura y clic
-            tampoco están disponibles hasta entonces.
+            No hay proveedor de envío configurado aquí: los correos se escriben en el servidor en
+            vez de salir. Puedes preparar campañas y ver la vista previa igual. Las métricas de
+            apertura y clic tampoco están disponibles hasta entonces.
           </p>
         </div>
       )}
+
+      {/* ── Tarjetas: el estado del módulo de un vistazo ── */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <Tarjeta titulo="Tus contactos" accion={{ href: "/admin/clientes", label: "Ir a clientes" }}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Cifra valor={contactos.total} label="Suscritos que pueden recibir campañas" icono={<Users className="size-5" />} />
+            <Cifra valor={contactos.nuevos30} label="Nuevos en los últimos 30 días" icono={<UserPlus className="size-5" />} tono="verde" />
+          </div>
+        </Tarjeta>
+
+        {hayProveedor ? (
+          <ConsumoDelPlan usage={usage} />
+        ) : (
+          <Tarjeta titulo="Consumo del plan de correo">
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              Se mide donde hay proveedor configurado. Aquí los correos van a disco y no consumen nada.
+            </p>
+          </Tarjeta>
+        )}
+
+        <Tarjeta titulo="Tus últimas campañas" accion={puedeCrear ? { href: "/admin/campanas/editor", label: "Crear campaña" } : undefined}>
+          {ultimas.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">Todavía no has enviado ninguna.</p>
+          ) : (
+            <ul className="divide-y divide-[#f0ece6]">
+              {ultimas.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <Link href={`/admin/campanas/${c.id}`} className="block truncate text-[14px] font-semibold text-kora-black hover:text-kora-coral">
+                      {c.name}
+                    </Link>
+                    <p className="text-[12px] text-muted-foreground">
+                      {c.sentAt ? fecha(c.sentAt) : "enviando"} · {c.sentCount} enviado{c.sentCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-5 text-center">
+                    <Tasa label="Apertura" valor={c.openRate} disponible={hayMetricas} />
+                    <Tasa label="Clic" valor={c.clickRate} disponible={hayMetricas} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Tarjeta>
+
+        <div className="flex items-center gap-5 rounded-[14px] border border-[#eee9e2] bg-white p-6">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-[14px] bg-[#FFE9DD] text-kora-coral">
+            <Sparkles className="size-7" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-kora-black">Compón el correo como lo vas a ver</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Bloques de título, texto, imagen, botón y productos, con la vista previa del correo
+              actualizándose mientras escribes.
+            </p>
+            {puedeCrear && (
+              <Link href="/admin/campanas/editor" className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-kora-coral">
+                Abrir el constructor <ArrowRight className="size-4" />
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         {CHIPS.map((c) => (
@@ -192,9 +230,10 @@ export default async function CampanasPage({
                     <RowActions
                       id={c.id}
                       status={c.status}
-                      editHref={href({ editar: c.id })}
+                      editHref={`/admin/campanas/editor?id=${c.id}`}
                       puedeCrear={puedeCrear}
                       puedeEnviar={puedeEnviar}
+                      recipients={c.recipients}
                     />
                   </td>
                 </tr>
@@ -204,29 +243,55 @@ export default async function CampanasPage({
         )}
       </div>
 
-      {(nueva || editando) && puedeCrear && (
-        <CampaignForm
-          campaign={
-            editando
-              ? {
-                  id: editando.id,
-                  name: editando.name,
-                  subject: editando.subject,
-                  preheader: editando.preheader ?? "",
-                  title: editando.title,
-                  body: editando.body,
-                  ctaLabel: editando.ctaLabel ?? "",
-                  ctaUrl: editando.ctaUrl ?? "",
-                  productIds: editando.productIds,
-                  segment: editando.segment as never,
-                }
-              : null
-          }
-          categorias={categorias}
-          productos={productos}
-          backTo={href({})}
-        />
-      )}
     </>
+  );
+}
+
+
+function Tarjeta({ titulo, accion, children }: {
+  titulo: string;
+  accion?: { href: string; label: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[14px] border border-[#eee9e2] bg-white p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-bold text-kora-black">{titulo}</h2>
+        {accion && (
+          <Link href={accion.href} className="text-[13px] font-semibold text-kora-coral hover:underline">
+            {accion.label}
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Cifra({ valor, label, icono, tono = "neutro" }: {
+  valor: number; label: string; icono: React.ReactNode; tono?: "neutro" | "verde";
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-[12px] border border-[#eee9e2] p-4">
+      <div>
+        <div className="text-[24px] leading-none font-extrabold text-kora-black tabular-nums">{valor.toLocaleString("es-CO")}</div>
+        <div className="mt-1.5 text-[12.5px] leading-snug text-muted-foreground">{label}</div>
+      </div>
+      <span className={`flex size-10 shrink-0 items-center justify-center rounded-[10px] ${tono === "verde" ? "bg-[#e8f6ec] text-[#1f7a3d]" : "bg-[#f5f3f0] text-[#6b6f78]"}`}>
+        {icono}
+      </span>
+    </div>
+  );
+}
+
+/** Una tasa que no se conoce se dice, no se pone en cero. */
+function Tasa({ label, valor, disponible }: { label: string; valor: number | null; disponible: boolean }) {
+  return (
+    <div>
+      <div className="text-[11px] tracking-wide text-muted-foreground uppercase">{label}</div>
+      <div className="text-[17px] font-extrabold text-kora-black tabular-nums" title={!disponible ? "El proveedor no reporta métricas en este entorno" : undefined}>
+        {valor === null ? <span className="text-[13px] font-semibold text-[#b3b8c0]">{disponible ? "—" : "n/d"}</span> : `${valor} %`}
+      </div>
+    </div>
   );
 }

@@ -33,8 +33,28 @@ export type TemplateProduct = {
   price: { amount: number; currency: Currency; strikethrough: number | null } | null;
 };
 
+/**
+ * Un bloque de campaña YA RESUELTO: productos con precio y URL, imagen con su
+ * dirección pública. La resolución la hace `campaigns/content.ts`; aquí solo se
+ * dibuja. Ver `campaigns/blocks.ts` para la forma que edita el operador.
+ */
+export type TemplateBlock =
+  | { type: "title"; text: string }
+  | { type: "text"; text: string }
+  | { type: "image"; url: string; alt: string; linkUrl: string | null }
+  | { type: "button"; label: string; url: string }
+  | { type: "products"; products: TemplateProduct[] }
+  | { type: "divider" }
+  | { type: "spacer"; height: number };
+
 export type TemplateInput = {
   subject: string;
+  /**
+   * Con bloques, el cuerpo del correo es la lista y `title`/`body`/`ctaLabel`/
+   * `products` se ignoran. Sin bloques, se dibuja como siempre — es el camino
+   * de los correos transaccionales y de las campañas anteriores.
+   */
+  blocks?: TemplateBlock[] | null;
   preheader?: string | null;
   title: string;
   body: string;
@@ -270,6 +290,45 @@ function lineaDeTiempo(t: { steps: string[]; current: number } | null | undefine
     </table>`;
 }
 
+function botonHtml(label: string, url: string): string {
+  return `<table role="presentation" class="kora-boton" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+           <tr><td style="border-radius:999px;background:${NARANJA};">
+             <!-- El !important del color no sobra: es lo único que evita que
+                  el modo oscuro de Gmail invierta el blanco y deje el texto
+                  ilegible sobre el naranja. Pasó el 28 ago 2026. -->
+             <a href="${url}" style="display:inline-block;padding:13px 30px;font-size:15px;font-weight:bold;color:#ffffff !important;text-decoration:none;border-radius:999px;">${escapeHtml(
+               label,
+             )}</a>
+           </td></tr>
+         </table>`;
+}
+
+/** Los bloques, uno detrás de otro. Mismos estilos que el camino de campos fijos. */
+function bloquesHtml(blocks: TemplateBlock[]): string {
+  return blocks
+    .map((b) => {
+      switch (b.type) {
+        case "title":
+          return `<h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(b.text)}</h1>`;
+        case "text":
+          return parrafos(b.text);
+        case "image": {
+          const img = `<img src="${b.url}" width="548" alt="${escapeHtml(b.alt)}" style="display:block;width:100%;max-width:548px;height:auto;border:0;border-radius:12px;" />`;
+          return `<div style="margin:0 0 18px;">${b.linkUrl ? `<a href="${b.linkUrl}">${img}</a>` : img}</div>`;
+        }
+        case "button":
+          return botonHtml(b.label, b.url);
+        case "products":
+          return parrillaProductos(b.products);
+        case "divider":
+          return `<hr class="kora-borde" style="border:0;border-top:1px solid #eee9e2;margin:20px 0;" />`;
+        case "spacer":
+          return `<div style="height:${b.height}px;line-height:${b.height}px;font-size:1px;">&nbsp;</div>`;
+      }
+    })
+    .join("\n");
+}
+
 export function renderCampaignHtml(input: TemplateInput): string {
   const base = input.storeBase ?? storeUrl();
   const saludo = input.recipientName
@@ -278,21 +337,25 @@ export function renderCampaignHtml(input: TemplateInput): string {
       )} 👋</p>`
     : "";
 
-  const cta =
-    input.ctaLabel && input.ctaUrl
-      ? `<table role="presentation" class="kora-boton" cellpadding="0" cellspacing="0" style="margin:22px 0;">
-           <tr><td style="border-radius:999px;background:${NARANJA};">
-             <!-- El !important del color no sobra: es lo único que evita que
-                  el modo oscuro de Gmail invierta el blanco y deje el texto
-                  ilegible sobre el naranja. Pasó el 28 ago 2026. -->
-             <a href="${input.ctaUrl}" style="display:inline-block;padding:13px 30px;font-size:15px;font-weight:bold;color:#ffffff !important;text-decoration:none;border-radius:999px;">${escapeHtml(
-               input.ctaLabel,
-             )}</a>
-           </td></tr>
-         </table>`
-      : "";
+  const cta = input.ctaLabel && input.ctaUrl ? botonHtml(input.ctaLabel, input.ctaUrl) : "";
 
-  const banner = input.imageUrl
+  // Con bloques, el cuerpo es la lista. La cabecera, el saludo y el pie legal
+  // NO son bloques: son lo que la ley y la marca exigen, y el operador no los
+  // puede quitar ni mover.
+  const cuerpo = input.blocks
+    ? bloquesHtml(input.blocks)
+    : `<h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
+        input.title,
+      )}</h1>
+      ${parrafos(input.body)}
+      ${bloqueCodigo(input.code)}
+      ${lineaDeTiempo(input.timeline)}
+      ${input.footer ? parrafos(input.footer) : ""}
+      ${cta}
+      ${tablaPedido(input.order)}
+      ${parrillaProductos(input.products)}`;
+
+  const banner = !input.blocks && input.imageUrl
     ? `<img src="${input.imageUrl}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;" />`
     : "";
 
@@ -346,16 +409,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
 
     <tr><td style="padding:26px;font-family:Arial,Helvetica,sans-serif;">
       ${saludo}
-      <h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
-        input.title,
-      )}</h1>
-      ${parrafos(input.body)}
-      ${bloqueCodigo(input.code)}
-      ${lineaDeTiempo(input.timeline)}
-      ${input.footer ? parrafos(input.footer) : ""}
-      ${cta}
-      ${tablaPedido(input.order)}
-      ${parrillaProductos(input.products)}
+      ${cuerpo}
     </td></tr>
 
     <!-- Pie legal: obligatorio en Colombia (Ley 1581) y en EE.UU. (CAN-SPAM),
@@ -386,8 +440,26 @@ export function renderCampaignText(input: TemplateInput): string {
   const lineas: string[] = [];
 
   if (input.recipientName) lineas.push(`Hola, ${input.recipientName.split(" ")[0]}`, "");
-  lineas.push(input.title.toUpperCase(), "");
-  lineas.push(input.body.trim(), "");
+
+  if (input.blocks) {
+    for (const b of input.blocks) {
+      if (b.type === "title") lineas.push(b.text.trim().toUpperCase(), "");
+      else if (b.type === "text") lineas.push(b.text.trim(), "");
+      else if (b.type === "button") lineas.push(`${b.label}: ${b.url}`, "");
+      else if (b.type === "divider") lineas.push("—", "");
+      else if (b.type === "products" && b.products.length > 0) {
+        lineas.push("Productos:");
+        for (const p of b.products) {
+          const precio = p.price ? ` — ${money(p.price.amount, p.price.currency)}` : "";
+          lineas.push(`· ${p.name}${precio}`, `  ${p.url}`);
+        }
+        lineas.push("");
+      }
+    }
+  } else {
+    lineas.push(input.title.toUpperCase(), "");
+    lineas.push(input.body.trim(), "");
+  }
 
   // El código y el estado también aquí, y no como adorno: quien lee sin
   // imágenes ni estilos —o con un lector de pantalla— viene exactamente a por
@@ -406,9 +478,9 @@ export function renderCampaignText(input: TemplateInput): string {
 
   if (input.footer) lineas.push(input.footer.trim(), "");
 
-  if (input.ctaLabel && input.ctaUrl) lineas.push(`${input.ctaLabel}: ${input.ctaUrl}`, "");
+  if (!input.blocks && input.ctaLabel && input.ctaUrl) lineas.push(`${input.ctaLabel}: ${input.ctaUrl}`, "");
 
-  if (input.products.length > 0) {
+  if (!input.blocks && input.products.length > 0) {
     lineas.push("Productos destacados:");
     for (const p of input.products) {
       const precio = p.price ? ` — ${money(p.price.amount, p.price.currency)}` : "";

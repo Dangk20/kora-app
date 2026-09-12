@@ -14,6 +14,7 @@
 
 import { db } from "@/lib/db";
 import { audienceMembers, type Segment } from "./audience";
+import { parseBlocks } from "./blocks";
 import { renderCampaignFor, type CampaignContent } from "./content";
 
 export type StartResult =
@@ -44,6 +45,7 @@ export async function startCampaign(campaignId: string): Promise<StartResult> {
     name: campaign.name,
     subject: campaign.subject,
     preheader: campaign.preheader,
+    blocks: parseBlocks(campaign.blocks),
     title: campaign.title,
     body: campaign.body,
     imageKey: campaign.imageKey,
