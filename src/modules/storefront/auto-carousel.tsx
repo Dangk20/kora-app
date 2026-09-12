@@ -11,7 +11,10 @@
 // tarjeta siguiente se ve a medias, que es lo que le dice al pulgar que hay
 // más (diseño móvil §02). Repartir `perView` columnas en 390 px daría
 // tarjetas de 80 px donde no cabe ni el precio; y las flechas y los puntos se
-// ocultan, porque en táctil se arrastra.
+// ocultan, porque en táctil se arrastra. También rota solo, pero de UNA
+// tarjeta en una —no de página en página, que con peek dejaría la segunda
+// tarjeta partida por la izquierda— y se detiene en cuanto el dedo toca la
+// tira, para no pelear con quien está deslizando; retoma a los 10 s.
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -43,6 +46,17 @@ export function AutoCarousel({
   const [page, setPage] = useState(0);
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+  // En móvil se avanza por tarjeta; este es el índice de la que va primera.
+  const cardRef = useRef(0);
+  const reanudar = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const esMovil = () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+
+  const tocar = () => {
+    setPaused(true);
+    if (reanudar.current) clearTimeout(reanudar.current);
+    reanudar.current = setTimeout(() => setPaused(false), 10_000);
+  };
 
   const goTo = useCallback((next: number) => {
     setPage(next);
@@ -53,19 +67,28 @@ export function AutoCarousel({
   }, []);
 
   useEffect(() => {
-    if (pages < 2 || paused) return;
+    const hayQueRotar = esMovil() ? items.length > Math.ceil(perViewMobile) : pages > 1;
+    if (!hayQueRotar || paused) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = setInterval(() => {
+      const track = trackRef.current;
+      if (!track) return;
+      if (esMovil()) {
+        // Una tarjeta cada vez; al final, vuelve a la primera.
+        const ultimaVisible = items.length - Math.ceil(perViewMobile);
+        cardRef.current = cardRef.current >= ultimaVisible ? 0 : cardRef.current + 1;
+        const hijo = track.children[cardRef.current] as HTMLElement | undefined;
+        if (hijo) track.scrollTo({ left: hijo.offsetLeft - track.offsetLeft, behavior: "smooth" });
+        return;
+      }
       setPage((current) => {
         const next = (current + 1) % pages;
-        const track = trackRef.current;
-        if (track) {
-          track.scrollTo({ left: track.clientWidth * next, behavior: "smooth" });
-        }
+        track.scrollTo({ left: track.clientWidth * next, behavior: "smooth" });
         return next;
       });
     }, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [pages, paused]);
+  }, [pages, paused, items.length, perViewMobile]);
 
   const arrowCls =
     tone === "dark"
@@ -82,6 +105,7 @@ export function AutoCarousel({
       className="relative min-w-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onTouchStart={tocar}
     >
       <div
         ref={trackRef}

@@ -130,12 +130,14 @@ export function CompactProductRow({
             tarjeta asomando— igual que el resto de carruseles en móvil. En
             escritorio, en la columna lateral, la pila vertical sigue siendo
             lo correcto. */}
-        <div className="-mx-2.5 flex snap-x gap-2 overflow-x-auto px-2.5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
-          {cards.map((c, i) => (
-            <div key={products[i].id} className="w-[68%] shrink-0 snap-start rounded-[14px] border border-[#f0ece6]">
-              {c}
-            </div>
-          ))}
+        <div className="lg:hidden">
+          <AutoCarousel perView={1} perViewMobile={1.45} gapRem={0.5}>
+            {cards.map((c, i) => (
+              <div key={products[i].id} className="rounded-[14px] border border-[#f0ece6]">
+                {c}
+              </div>
+            ))}
+          </AutoCarousel>
         </div>
         <div className="hidden space-y-1 lg:block">{cards}</div>
       </>
