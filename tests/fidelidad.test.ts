@@ -164,6 +164,12 @@ describe("el banner principal mide lo que Vitrina le pide al cliente", () => {
     const bloque = maqueta.slice(maqueta.indexOf('id="banner:hero_principal"'), maqueta.indexOf('id="banner:hero_lateral"'));
     expect(bloque).toContain("aspect-[3/2]");
     expect(bloque).not.toContain("aspect-square");
+    // Y el lateral sale 7:9 (700 × 900) a la misma altura: las columnas
+    // están calculadas para eso, no a ojo.
+    expect(maqueta).toContain("lg:grid-cols-[1.4fr_0.726fr_1.124fr]");
+    const desde = maqueta.indexOf('id="banner:hero_lateral"');
+    const lateral = maqueta.slice(desde, maqueta.indexOf("</Region>", desde));
+    expect(lateral).toContain("aspect-[7/9]");
     const vitrina = readFileSync("src/modules/showcase/sections.ts", "utf8");
     expect(vitrina).toContain("1200 × 800");
   });

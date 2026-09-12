@@ -101,14 +101,17 @@ export function StoreHomeLayout({
       {/* HERO: banner principal + banner lateral + Top Categorías */}
       <section className={`${CONTAINER} pt-4 pb-8 sm:pt-6 sm:pb-10`}>
         <div className="rounded-2xl bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] sm:rounded-3xl sm:p-[18px]">
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.85fr_1fr]">
-            {/* El principal es HORIZONTAL 3:2 y marca la altura de la fila;
-                el lateral y las categorías se estiran a esa misma altura.
-                3:2 y no cuadrado: es lo que Vitrina le pide al cliente
-                ("1200 × 800") y lo que mide el prototipo (≈540 × 384). Con
-                el espacio cuadrado, un banner de 1200 × 800 perdía los lados
-                —el logo y el titular— sin que nada avisara. Lo vio Daniel
-                con el primer banner real, el 12 sep 2026. */}
+          {/* Las columnas están calculadas para que los DOS banners tengan
+              exactamente la proporción que Vitrina le pide al cliente: el
+              principal 3:2 (1200 × 800) y el lateral 7:9 (700 × 900), a la
+              misma altura. Con 1.4fr para el principal, el lateral tiene que
+              medir 1.4 × (7/9) ÷ (3/2) = 0.726fr; Top Categorías toma lo que
+              sobra. Antes (1.4 / 0.85 / 1, con el principal cuadrado) los dos
+              banners reales de Adidas perdían el logo y el titular por los
+              lados sin que nada avisara. Lo vio Daniel el 12 sep 2026. */}
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.726fr_1.124fr]">
+            {/* El principal marca la altura de la fila; el lateral y las
+                categorías se estiran a esa misma altura. */}
             <Region id="banner:hero_principal" editControl={editControl}>
               <BannerSlot
                 banners={banners.get("hero_principal")}
@@ -119,11 +122,13 @@ export function StoreHomeLayout({
             <Region id="banner:hero_lateral" editControl={editControl} className="h-full">
               <BannerSlot
                 banners={banners.get("hero_lateral")}
-                // En móvil manda la proporción 4:5 del diseño. `h-full` solo
-                // desde `sm`: con la proporción puesta y sin altura de padre
-                // definida, `h-full` deja la altura sin resolver y el banner
-                // se reacomoda cuando cargan las imágenes.
-                className="aspect-[4/5] w-full sm:aspect-auto sm:h-full sm:min-h-[280px]"
+                // En móvil, la proporción 7:9 del arte que se le pide al
+                // cliente. `h-full` solo desde `sm`: con la proporción puesta
+                // y sin altura de padre definida, `h-full` deja la altura sin
+                // resolver y el banner se reacomoda cuando cargan las imágenes.
+                // Desde `lg` la altura la da el principal, y las columnas
+                // están calculadas para que salga 7:9 igual.
+                className="aspect-[7/9] w-full sm:aspect-auto sm:h-full sm:min-h-[280px]"
                 placeholderLabel="Banner lateral — cárgalo desde Vitrina"
               />
             </Region>
