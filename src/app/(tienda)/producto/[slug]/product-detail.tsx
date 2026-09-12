@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Lightbox } from "./lightbox";
+import { tallaUnica } from "@/modules/storefront/talla";
 import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
 import { formatMoney, resolvePrice, type Currency } from "@/modules/pricing";
 import { PriceTag } from "@/modules/storefront/price-tag";
@@ -217,6 +218,19 @@ export function ProductDetail({
         <div className="mt-5">{price && <PriceTag price={price} size="detail" />}</div>
 
         <div className="my-6 h-px bg-[#efe9e1]" />
+
+        {/* Una sola variante con nombre (pieza única, "Talla M"): no hay nada
+            que elegir, pero la talla es lo primero que un comprador de ropa
+            quiere saber. Se enseña como dato. */}
+        {tallaUnica(product) && (
+          <div className="mb-6 flex items-center gap-3">
+            <span className="text-[12.5px] font-semibold text-[#6b6f78]">Talla</span>
+            <span className="rounded-[11px] border-[1.6px] border-kora-black bg-kora-black px-[18px] py-2 text-[13.5px] font-semibold text-white">
+              {tallaUnica(product)!.replace(/^Talla\s+/i, "")}
+            </span>
+            <span className="text-[12px] text-[#9aa0ab]">Pieza única</span>
+          </div>
+        )}
 
         {product.variants.length > 1 && (
           <div className="mb-6">

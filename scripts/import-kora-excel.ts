@@ -45,6 +45,7 @@ import ExcelJS from "exceljs";
 import { db } from "../src/lib/db";
 import type { ColumnKey } from "../src/modules/catalog/import/columns";
 import { runImport } from "../src/modules/catalog/import/import";
+import { ensureVariantOption } from "../src/modules/catalog/import/options";
 import type { RawRow } from "../src/modules/catalog/import/parse";
 
 type Fila = { row: number; v: Record<string, unknown> };
@@ -242,6 +243,19 @@ async function main() {
     process.exit(1);
   }
   console.log("\n✔ Importado:", JSON.stringify(r.summary));
+
+  // La talla como OPCIÓN (Talla → M), no solo como nombre de la variante:
+  // así el panel la enseña con el grupo activado y la ficha puede mostrarla.
+  let opciones = 0;
+  for (const fila of raw) {
+    const talla = String(fila.values.variante ?? "").replace(/^Talla\s+/i, "").trim();
+    if (!talla) continue;
+    const v = await db.variant.findFirst({ where: { sku: String(fila.values.sku) }, select: { id: true } });
+    if (!v) continue;
+    const res = await db.$transaction((tx) => ensureVariantOption(tx, v.id, "Talla", talla));
+    if (res.created) opciones += 1;
+  }
+  console.log(`✔ Tallas como opción: ${opciones} enlazadas (el resto ya estaban).`);
   await db.$disconnect();
 }
 

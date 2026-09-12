@@ -9,6 +9,7 @@ import { resolvePrice, type Currency } from "@/modules/pricing";
 import { CategoryTile, inkFor } from "@/modules/catalog/tiles";
 import { availableUnits, productAmounts, type StoreProduct } from "./queries";
 import { PriceTag } from "./price-tag";
+import { tallaUnica } from "./talla";
 
 /**
  * Tarjeta de producto: toda ella es el enlace a la ficha.
@@ -214,6 +215,12 @@ export function ProductCard({
         <p className="mb-2 line-clamp-2 h-9 text-[13.5px] leading-[1.32] text-kora-black">
           {product.name}
         </p>
+        {/* Pieza única con talla: se dice en la tarjeta. En un catálogo de
+            piezas de una sola talla el comprador elige mirando, y "Talla M"
+            aquí le ahorra abrir cinco fichas para descartar cuatro. */}
+        {tallaUnica(product) && (
+          <p className="mb-2 -mt-1 text-[11.5px] font-semibold text-[#6b6f78]">{tallaUnica(product)}</p>
+        )}
 
         <div className="mt-auto">
           <div className="space-y-1">
@@ -256,3 +263,4 @@ export function CategoryCircle({
     </Link>
   );
 }
+
