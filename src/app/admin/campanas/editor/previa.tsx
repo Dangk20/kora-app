@@ -20,11 +20,17 @@ export function Previa({ html, alto = "calc(100vh - 260px)" }: { html: string; a
   const [ancho, setAncho] = useState<"escritorio" | "movil">("escritorio");
   const [modo, setModo] = useState<"claro" | "oscuro">("claro");
 
+  // Los enlaces del correo abren en OTRA pestaña. Sin esto, un clic en un
+  // producto navega el propio iframe a la ficha —y la tienda no se deja meter
+  // en un marco ajeno—, así que la vista previa se convertía en una carita
+  // triste. Le pasó a Daniel el 12 sep. Un enlace en la vista previa sirve
+  // para comprobar a dónde lleva el botón, y eso se hace fuera.
   const doc = !html
     ? "<html><body style='font-family:sans-serif;color:#8a8f98;padding:40px;text-align:center'>Añade un bloque para ver el correo.</body></html>"
-    : modo === "claro"
-      ? html.replace(OSCURO, "@media not all")
-      : html.replace(OSCURO, "@media all");
+    : (modo === "claro" ? html.replace(OSCURO, "@media not all") : html.replace(OSCURO, "@media all")).replace(
+        "<head>",
+        '<head><base target="_blank">',
+      );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -41,6 +47,10 @@ export function Previa({ html, alto = "calc(100vh - 260px)" }: { html: string; a
       <div className="flex min-h-0 flex-1 justify-center overflow-auto">
         <iframe
           title="Vista previa del correo"
+          // Sin scripts ni mismo origen: el correo no los necesita. Con
+          // ventanas emergentes fuera del sandbox, para que `target=_blank`
+          // abra la pestaña de verdad.
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
           srcDoc={doc}
           style={{ width: ancho === "escritorio" ? 640 : 390, height: alto }}
           className="shrink-0 rounded-[14px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-[width]"
