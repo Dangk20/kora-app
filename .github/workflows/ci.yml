@@ -274,8 +274,10 @@ jobs:
         run: |
           for i in $(seq 1 20); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 https://test.korashopp.com/ || true)
-            # 401 es correcto: el entorno de pruebas exige autenticación.
-            if [ "$code" = "401" ]; then echo "✅ pruebas responde ($code)"; exit 0; fi
+            # 401 cuando pruebas tiene contraseña; 200 cuando se abre a
+            # probadores externos (12 sep 2026). Cualquiera de los dos es
+            # "responde"; lo que NO es, es 502/503/000.
+            if [ "$code" = "401" ] || [ "$code" = "200" ]; then echo "✅ pruebas responde ($code)"; exit 0; fi
             sleep 6
           done
           echo "❌ pruebas no respondió tras el despliegue"; exit 1
