@@ -163,11 +163,14 @@ export function Builder({
         </Button>
       )}
       {paso >= 1 && (
+        // "Guardar borrador" es guardar Y SALIR al módulo, como cerrar el
+        // alta de producto: para seguir trabajando está "Continuar". Guardar
+        // y quedarse aquí dejaba al operador sin saber si ya podía irse.
         <Button type="button" variant="outline" size="sm" disabled={guardando}
           onClick={async () => {
             if (!validarPaso2()) return;
             const id = await guardar();
-            if (id && !campaign) router.replace(`/admin/campanas/editor?id=${id}&paso=2`);
+            if (id) router.push("/admin/campanas");
           }}>
           <Save className="size-4" /> {guardando ? "Guardando…" : "Guardar borrador"}
         </Button>
