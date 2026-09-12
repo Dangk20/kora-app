@@ -18,12 +18,12 @@ export const metadata = { title: "Constructor de campaña · KORA" };
 export default async function EditorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string }>;
+  searchParams: Promise<{ id?: string; paso?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.permissions.includes("marketing:create")) redirect("/admin/campanas");
 
-  const { id } = await searchParams;
+  const { id, paso } = await searchParams;
   const campaign = id ? await db.campaign.findUnique({ where: { id } }) : null;
   if (id && !campaign) notFound();
   if (campaign && !isEditable(campaign.status)) redirect(`/admin/campanas/${campaign.id}`);
@@ -74,6 +74,7 @@ export default async function EditorPage({
             : null
         }
         initialBlocks={bloques}
+        initialStep={Math.max(0, (Number(paso) || 1) - 1)}
         productNames={Object.fromEntries(productos.map((p) => [p.id, p.name]))}
         imageUrls={imagenes}
         categorias={categorias}

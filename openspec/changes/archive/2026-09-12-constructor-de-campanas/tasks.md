@@ -22,3 +22,10 @@
 
 - [x] 4.1 Pruebas: conversión de campos fijos a bloques, validación, render de bloques, derivados
 - [x] 4.2 typecheck, lint, pruebas del módulo
+
+## 5. Refinamiento tras la primera prueba de Daniel (12 sep)
+
+- [x] 5.1 Los bloques se arrastran: de la paleta al lienzo y dentro del lienzo para reordenar, con zonas de caída visibles; las flechas siguen para quien no arrastra
+- [x] 5.2 El constructor es un flujo por pasos como el alta de producto: 1) la campaña y a quién va, 2) el diseño con el correo a la vista, 3) revisar, probar y enviar o programar
+- [x] 5.3 Vista previa en claro y en oscuro desde el mismo HTML: el iframe hereda el modo del sistema, y con macOS en oscuro el operador creía que el correo "salía negro"
+- [x] 5.4 El modal de envío es un componente compartido entre el listado y el paso 3
