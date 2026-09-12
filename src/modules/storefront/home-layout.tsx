@@ -213,12 +213,17 @@ export function StoreHomeLayout({
       {show(destacados) && destacados && (
         <section className={`${CONTAINER} pb-14`}>
           <div className="grid items-start gap-5 lg:grid-cols-[288px_1fr]">
-            <div className="space-y-4">
+            {/* `min-w-0` en la columna y en la región: la tira horizontal de
+                Mejor valorados tiene ancho propio, y sin esto ensancha la
+                celda y la portada entera se desplaza de lado en móvil
+                (572 px en una pantalla de 416: medido). Misma trampa que
+                los banners. */}
+            <div className="min-w-0 space-y-4">
               {show(mejorValorados) && mejorValorados && (
                 <Region
                   id="mejor_valorados"
                   editControl={editControl}
-                  className="rounded-[18px] bg-white p-[22px] shadow-[0_4px_18px_rgba(0,0,0,0.04)]"
+                  className="min-w-0 rounded-[18px] bg-white p-[22px] shadow-[0_4px_18px_rgba(0,0,0,0.04)]"
                 >
                   <h3 className="mb-3 text-[17px] font-bold text-kora-black">
                     {mejorValorados.title}

@@ -121,7 +121,26 @@ export function CompactProductRow({
         );
   });
 
-  if (!carousel) return <div className="space-y-1">{cards}</div>;
+  if (!carousel) {
+    return (
+      <>
+        {/* En móvil la lista vertical era un muro: ocho filas de alto que
+            saturaban el desplazamiento de la portada (lo vio Daniel a 416 px,
+            12 sep 2026). Pasa a una tira horizontal con peek —la siguiente
+            tarjeta asomando— igual que el resto de carruseles en móvil. En
+            escritorio, en la columna lateral, la pila vertical sigue siendo
+            lo correcto. */}
+        <div className="-mx-2.5 flex snap-x gap-2 overflow-x-auto px-2.5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+          {cards.map((c, i) => (
+            <div key={products[i].id} className="w-[68%] shrink-0 snap-start rounded-[14px] border border-[#f0ece6]">
+              {c}
+            </div>
+          ))}
+        </div>
+        <div className="hidden space-y-1 lg:block">{cards}</div>
+      </>
+    );
+  }
 
   return (
     <AutoCarousel perView={columns} gapRem={0.75}>
