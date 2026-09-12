@@ -26,6 +26,35 @@ export function emailProviderConfigured(env: NodeJS.ProcessEnv = process.env): b
   return missingEmailVars(env).length === 0;
 }
 
+/**
+ * Destinatarios a los que el proveedor SÍ entrega fuera de producción.
+ *
+ * La base de pruebas tiene direcciones de personas reales —quien prueba un
+ * pedido escribe la suya—, así que darle el proveedor a pruebas sin más haría
+ * que una campaña de demostración le llegara a alguien de verdad. Con la lista,
+ * a estas direcciones el correo sale de verdad y a cualquier otra va a disco.
+ *
+ * Se compara en minúsculas y sin espacios: es como el resto del módulo
+ * normaliza una dirección antes de reservarla.
+ */
+export const ALLOWLIST_VAR = "KORA_EMAIL_ALLOWLIST";
+
+export function emailAllowlist(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  return new Set(
+    (env[ALLOWLIST_VAR] ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export class EmailAllowlistError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailAllowlistError";
+  }
+}
+
 export class EmailConfigError extends Error {
   readonly missing: readonly EmailVar[];
 
@@ -59,11 +88,35 @@ export function requiereProveedor(env: NodeJS.ProcessEnv = process.env): boolean
 
 /** Lanza si el entorno exige proveedor y falta configuración. */
 export function assertEmailConfigured(env = process.env): void {
+  const lista = emailAllowlist(env);
+
+  if (requiereProveedor(env)) {
+    const missing = missingEmailVars(env);
+    if (missing.length > 0) throw new EmailConfigError(missing);
+    // Una lista olvidada en producción dejaría a los compradores sin sus
+    // correos SIN NINGÚN ERROR: irían a disco dentro del contenedor. La
+    // configuración ambigua se rechaza, nunca se interpreta.
+    if (lista.size > 0) {
+      throw new EmailAllowlistError(
+        `${ALLOWLIST_VAR} está definida y este entorno es PRODUCCIÓN. ` +
+          "La lista de destinatarios permitidos solo existe para pruebas: aquí todo comprador " +
+          "tiene que recibir sus correos. Quítala.",
+      );
+    }
+    return;
+  }
+
   // En desarrollo —y en pruebas— el driver de disco funciona sin configurar
   // nada: exigirlo haría imposible trabajar sin una cuenta de proveedor.
-  if (!requiereProveedor(env)) return;
-  const missing = missingEmailVars(env);
-  if (missing.length > 0) throw new EmailConfigError(missing);
+  // Pero si ALGUIEN puso el proveedor aquí, tiene que decir a quién se le
+  // puede escribir: es justo la fuga que se quiere impedir.
+  if (emailProviderConfigured(env) && lista.size === 0) {
+    throw new EmailAllowlistError(
+      `Hay proveedor de correo configurado y este entorno NO es producción, pero falta ${ALLOWLIST_VAR}. ` +
+        "Sin ella, cualquier correo de pruebas saldría a direcciones reales. " +
+        "Pon las direcciones permitidas separadas por comas, o quita RESEND_API_KEY.",
+    );
+  }
 }
 
 /**

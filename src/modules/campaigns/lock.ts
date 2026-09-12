@@ -1,10 +1,12 @@
 // Candado del módulo de Email marketing.
 //
-// **Por qué existe.** El módulo está construido entero, pero no puede hacer su
-// trabajo: `korashopp.com` no tiene SPF, DKIM ni DMARC, y no hay cuenta de
-// proveedor de envío (insumos del cliente, pendientes desde el 31 jul). Un
-// módulo que se ve terminado y que al pulsar "Enviar" no envía es peor que un
-// módulo que no está: el operador cree que la campaña salió.
+// **Por qué existe.** El módulo está construido entero. Hasta el 28 ago 2026
+// no podía hacer su trabajo (sin proveedor ni registros DNS); desde entonces el
+// envío funciona y lo que falta es una DECISIÓN del negocio: el plan del
+// proveedor (el gratuito limita envíos por día y por mes) y asumir que el
+// dominio no recibe respuestas. Un módulo que se ve terminado y que al pulsar
+// "Enviar" no envía es peor que un módulo que no está: el operador cree que la
+// campaña salió.
 //
 // **Por qué es una decisión explícita y no una deducción.** Se podría abrir
 // solo con mirar si hay proveedor configurado, pero eso ataría "listo para el
@@ -25,8 +27,9 @@
  * es quien tiene que traer estos dos insumos.
  */
 export const MARKETING_LOCK_REASON =
-  "Falta la cuenta del proveedor de envío y publicar SPF, DKIM y DMARC en el dominio. " +
-  "Hasta entonces una campaña no llegaría a la bandeja de entrada.";
+  "El envío funciona, pero abrir las campañas es una decisión del negocio: el plan gratuito " +
+  "del proveedor limita los envíos por día y por mes, y como korashopp.com todavía no recibe " +
+  "correo, quien responda a una campaña no obtendrá respuesta. Se abre cuando se decida el plan.";
 
 /**
  * El entorno como lo necesita este archivo: un mapa de cadenas.

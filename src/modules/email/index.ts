@@ -6,18 +6,44 @@
 // disco. La guarda de arranque (`config.ts`) impide que "sin él" ocurra en
 // producción.
 
-import { emailProviderConfigured } from "./config";
+import { esProduccion } from "@/lib/environment";
+import { emailAllowlist, emailProviderConfigured } from "./config";
 import { createFileDriver } from "./file-driver";
 import { createResendDriver } from "./resend-driver";
-import type { EmailDriver } from "./driver";
+import type { EmailDriver, EmailMessage, SendResult } from "./driver";
 
 let cache: EmailDriver | null = null;
 
+/**
+ * Fuera de producción, el proveedor solo entrega a la lista permitida; el
+ * resto va a disco. Es un driver aparte, y no una condición dentro del de
+ * Resend, para que los dos drivers existentes no cambien y la regla viva en
+ * un solo sitio que se prueba solo.
+ */
+export function createAllowlistDriver(
+  permitidos: Set<string>,
+  real: EmailDriver,
+  disco: EmailDriver,
+): EmailDriver {
+  return {
+    name: `allowlist(${real.name}|${disco.name})`,
+    send(msg: EmailMessage): Promise<SendResult> {
+      const destino = msg.to.trim().toLowerCase();
+      return permitidos.has(destino) ? real.send(msg) : disco.send(msg);
+    },
+  };
+}
+
 export function emailDriver(env = process.env): EmailDriver {
   if (cache) return cache;
-  cache = emailProviderConfigured(env)
-    ? createResendDriver(env.RESEND_API_KEY!.trim(), env.EMAIL_FROM!.trim())
-    : createFileDriver();
+  if (!emailProviderConfigured(env)) {
+    cache = createFileDriver();
+    return cache;
+  }
+  const real = createResendDriver(env.RESEND_API_KEY!.trim(), env.EMAIL_FROM!.trim());
+  // En producción la guarda de arranque ya impidió que exista una lista; aquí
+  // no se vuelve a decidir. Fuera de producción, la guarda exigió que la haya.
+  cache = esProduccion(env) ? real : createAllowlistDriver(emailAllowlist(env), real, createFileDriver());
   return cache;
 }
 

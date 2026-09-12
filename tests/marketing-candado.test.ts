@@ -39,8 +39,12 @@ describe("cuándo está abierto", () => {
     try {
       assertMarketingUnlocked({});
     } catch (e) {
-      expect((e as Error).message).toMatch(/SPF/);
-      expect((e as Error).message).toMatch(/proveedor/i);
+      // El motivo cambió el 12 sep 2026: el proveedor y el DNS ya están; lo
+      // que falta es una decisión del negocio. El mensaje tiene que decir ESO
+      // y no seguir culpando a algo resuelto.
+      expect((e as Error).message).toMatch(/decisión/);
+      expect((e as Error).message).toMatch(/plan/i);
+      expect((e as Error).message).not.toMatch(/SPF|DKIM|DMARC/);
     }
     expect(() => assertMarketingUnlocked({ KORA_MARKETING_ENABLED: "1" })).not.toThrow();
   });

@@ -267,22 +267,26 @@ export function ProductDetail({
             comprar ahora. "Comprar ahora" lleva al checkout; el pedido se
             envía por WhatsApp al final del formulario (PED_HU001/002). */}
         <div ref={botonesRef} className="space-y-2.5">
-          <button
-            type="button"
-            onClick={addToCart}
-            disabled={soldOut}
-            className="flex w-full items-center justify-center gap-2.5 rounded-full border-[1.8px] border-kora-black bg-white px-6 py-4 text-[15px] font-bold text-kora-black transition-colors hover:bg-kora-black hover:text-white disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-white disabled:hover:text-kora-black"
-          >
-            {justAdded ? (
-              <>
-                <Check className="size-[18px]" /> Agregado al carrito
-              </>
-            ) : (
-              <>
-                <ShoppingCart className="size-[18px]" /> Agregar al carrito
-              </>
-            )}
-          </button>
+          {/* Sin cupo, "Agregar al carrito" no se atenúa: se quita. Dos botones
+              apagados uno sobre otro son dos veces la misma mala noticia, y el
+              único que dice POR QUÉ es el segundo. */}
+          {!soldOut && (
+            <button
+              type="button"
+              onClick={addToCart}
+              className="flex w-full items-center justify-center gap-2.5 rounded-full border-[1.8px] border-kora-black bg-white px-6 py-4 text-[15px] font-bold text-kora-black transition-colors hover:bg-kora-black hover:text-white"
+            >
+              {justAdded ? (
+                <>
+                  <Check className="size-[18px]" /> Agregado al carrito
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="size-[18px]" /> Agregar al carrito
+                </>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={buyNow}
@@ -292,8 +296,14 @@ export function ProductDetail({
             {soldOut ? motivoNoDisponible : "Comprar ahora"}
           </button>
         </div>
+        {/* La explicación del flujo solo tiene sentido cuando hay flujo. Bajo un
+            botón que dice "Agotado", prometer WhatsApp lo contradice. */}
         <p className="mt-2.5 text-center text-[11.5px] text-[#8a8f98]">
-          Completas tus datos y finalizas el pedido por WhatsApp.
+          {!soldOut
+            ? "Completas tus datos y finalizas el pedido por WhatsApp."
+            : agotado
+              ? "Escríbenos por WhatsApp si quieres saber cuándo vuelve."
+              : "Cambia la moneda arriba para ver si está disponible en pesos."}
         </p>
 
         {/* Las mismas tres del home, desde una sola lista: lo que no puede
@@ -322,15 +332,16 @@ export function ProductDetail({
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={addToCart}
-            disabled={soldOut}
-            aria-label="Agregar al carrito"
-            className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.8px] border-kora-black bg-white text-kora-black disabled:opacity-40"
-          >
-            {justAdded ? <Check className="size-5" /> : <ShoppingCart className="size-5" />}
-          </button>
+          {!soldOut && (
+            <button
+              type="button"
+              onClick={addToCart}
+              aria-label="Agregar al carrito"
+              className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.8px] border-kora-black bg-white text-kora-black"
+            >
+              {justAdded ? <Check className="size-5" /> : <ShoppingCart className="size-5" />}
+            </button>
+          )}
           <button
             type="button"
             onClick={buyNow}
