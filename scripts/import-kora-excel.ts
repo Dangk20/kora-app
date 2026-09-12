@@ -1,6 +1,6 @@
 // Importa el inventario del cliente desde SU Excel, no desde nuestra plantilla.
 //
-//   pnpm catalog:import <archivo.xlsx> [--hoja "KHR - KORA HOMBRE ROPA"] [--actor admin@kora.local] [--simular]
+//   pnpm catalog:import <archivo.xlsx> --fotos <carpeta> [--hoja "…"] [--actor admin@kora.local] [--simular]
 //
 // El archivo "INVENTARIO - PRODUCTOS KORASHOPP.COM.xlsx" (12 sep 2026) tiene
 // una hoja por línea (KHR hombre, KMR mujer, KNR niña) con SUS columnas:
@@ -32,8 +32,15 @@
 //     vender.
 //   · Una talla que Excel convirtió en FECHA ("10-12" → 2026-12-10) se reporta
 //     y el producto entra sin talla: adivinarla sería peor.
+//   · SOLO ENTRAN LAS REFERENCIAS CON FOTOS (decisión de Daniel, 12 sep): un
+//     producto sin foto en la tienda es una tarjeta vacía. `--fotos` apunta a
+//     la carpeta del Drive; una referencia sin carpeta, o con la carpeta
+//     vacía, se omite y se reporta. Cuando lleguen sus fotos, se vuelve a
+//     correr y entra.
 
 import "dotenv/config";
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import ExcelJS from "exceljs";
 import { db } from "../src/lib/db";
 import type { ColumnKey } from "../src/modules/catalog/import/columns";
@@ -110,6 +117,17 @@ function col(v: Record<string, unknown>, ...nombres: string[]): unknown {
   return undefined;
 }
 
+/** Referencias que tienen al menos una foto en la carpeta del Drive. */
+function referenciasConFotos(raiz: string): Set<string> {
+  const out = new Set<string>();
+  for (const e of readdirSync(raiz, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue;
+    const fotos = readdirSync(join(raiz, e.name)).filter((f) => /\.(jpe?g|png|webp|avif)$/i.test(f) && statSync(join(raiz, e.name, f)).size > 0);
+    if (fotos.length > 0) out.add(normalizarReferencia(e.name));
+  }
+  return out;
+}
+
 function normalizarReferencia(r: string): string {
   return r.toUpperCase().replace(/\s*-\s*/g, "-").replace(/\s+/g, "");
 }
@@ -127,10 +145,13 @@ async function main() {
   const hoja = args.includes("--hoja") ? args[args.indexOf("--hoja") + 1] : null;
   const actorEmail = args.includes("--actor") ? args[args.indexOf("--actor") + 1] : "admin@kora.local";
   const simular = args.includes("--simular");
-  if (!archivo) {
-    console.error('Uso: pnpm catalog:import <archivo.xlsx> [--hoja "nombre"] [--actor correo] [--simular]');
+  const carpetaFotos = args.includes("--fotos") ? args[args.indexOf("--fotos") + 1] : null;
+  if (!archivo || !carpetaFotos) {
+    console.error('Uso: pnpm catalog:import <archivo.xlsx> --fotos <carpeta> [--hoja "nombre"] [--actor correo] [--simular]');
     process.exit(1);
   }
+  const conFotos = referenciasConFotos(carpetaFotos);
+  let omitidasSinFotos = 0;
 
   const actor = await db.user.findUnique({ where: { email: actorEmail } });
   if (!actor) { console.error(`No existe el usuario ${actorEmail}.`); process.exit(1); }
@@ -163,6 +184,7 @@ async function main() {
       const estado = texto(col(f.v, "estado")).toLowerCase();
 
       if (!nombre && cop === undefined) { omitidasIncompletas += 1; continue; }
+      if (!conFotos.has(ref)) { omitidasSinFotos += 1; avisos.push(`${ref} (fila ${f.row}): sin fotos en el Drive — no se crea hasta que las tenga.`); continue; }
       if (estado === "inactivo") { avisos.push(`${ref} (fila ${f.row}): Estado "Inactivo" — omitida.`); continue; }
 
       const marca = texto(col(f.v, "marca"));
@@ -201,7 +223,7 @@ async function main() {
     }
   }
 
-  console.log(`\nFilas a importar: ${raw.length} · incompletas omitidas: ${omitidasIncompletas}`);
+  console.log(`\nFilas a importar: ${raw.length} · incompletas omitidas: ${omitidasIncompletas} · sin fotos omitidas: ${omitidasSinFotos}`);
   for (const a of avisos) console.log(`  ⚠ ${a}`);
 
   if (simular) {

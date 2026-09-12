@@ -17,10 +17,11 @@
 // optimización a WebP, `storage().put`, tope de fotos por producto. No hay un
 // segundo camino para meter imágenes.
 //
-// Orden: por nombre de archivo. Los nombres del cliente son identificadores
-// de iPhone (UUID), así que ese orden no significa nada — la primera foto de
-// KHR-0001 es la espalda de la camiseta. Hay que pedirle que ponga "01-" a la
-// principal; hasta entonces, se reordena en el panel.
+// Orden: el archivo llamado "Principal" (con la extensión que sea, sin
+// distinguir mayúsculas) va PRIMERO —es lo que acordó el cliente el 12 sep—
+// y el resto por nombre. Si la principal llega en una pasada posterior a las
+// demás, se mueve a la posición 0 igual: la portada del producto no depende
+// del orden en que se corrió esto.
 
 import "dotenv/config";
 import { createHash } from "node:crypto";
@@ -64,9 +65,11 @@ async function main() {
     });
     if (!variante) { totales.sinProducto += 1; avisos.push(`${ref}: no hay producto con ese SKU — importa primero el Excel.`); continue; }
 
+    const esPrincipal = (f: string) => /^principal\./i.test(f);
     const archivos = (await readdir(join(raiz, e.name)))
       .filter((f) => !f.startsWith(".") && /\.(jpe?g|png|webp|avif)$/i.test(f))
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => Number(esPrincipal(b)) - Number(esPrincipal(a)) || a.localeCompare(b));
+    let huellaPrincipal: string | null = null;
     if (archivos.length === 0) { totales.vacias += 1; avisos.push(`${ref}: carpeta sin fotos.`); continue; }
 
     const existentes = await db.productImage.findMany({
@@ -83,6 +86,7 @@ async function main() {
       if (tam > MAX_IMAGE_BYTES) { totales.saltadas += 1; avisos.push(`${ref}/${f}: pesa ${(tam / 1e6).toFixed(1)} MB (> 5 MB) — saltada.`); continue; }
       const bytes = await readFile(ruta);
       const huella = createHash("sha256").update(bytes).digest("hex");
+      if (esPrincipal(f)) huellaPrincipal = huella;
       if (huellas.has(huella)) { totales.yaEstaban += 1; continue; }
 
       const tipo = sniffImageType(bytes);
@@ -101,7 +105,23 @@ async function main() {
       cuenta += 1;
       totales.subidas += 1;
     }
-    process.stdout.write(`  ${ref}: ${archivos.length} archivo(s) → ${cuenta} foto(s) en "${variante.product.name}"\n`);
+    // La principal a la posición 0, aunque haya entrado después que las demás.
+    if (huellaPrincipal && !simular) {
+      const principal = await db.productImage.findFirst({
+        where: { productId: variante.productId, sourceHash: huellaPrincipal },
+        select: { id: true, position: true },
+      });
+      if (principal && principal.position !== 0) {
+        await db.$transaction([
+          db.productImage.updateMany({
+            where: { productId: variante.productId, position: { lt: principal.position } },
+            data: { position: { increment: 1 } },
+          }),
+          db.productImage.update({ where: { id: principal.id }, data: { position: 0 } }),
+        ]);
+      }
+    }
+    process.stdout.write(`  ${ref}: ${archivos.length} archivo(s) → ${cuenta} foto(s) en "${variante.product.name}"${huellaPrincipal ? " · principal ✓" : " · SIN principal"}\n`);
   }
 
   console.log(`\n${simular ? "(simulación) " : ""}Carpetas: ${totales.carpetas} · subidas: ${totales.subidas} · ya estaban: ${totales.yaEstaban} · saltadas: ${totales.saltadas} · sin producto: ${totales.sinProducto} · vacías: ${totales.vacias}`);
