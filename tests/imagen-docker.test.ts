@@ -72,3 +72,26 @@ describe("los archivos de compose son YAML válido", () => {
     }
   });
 });
+
+describe("el worker tiene salida a internet", () => {
+  // El 13 sep 2026 ningún correo de pedido llegó en pruebas: el worker —que es
+  // quien envía— estaba SOLO en la red `interna` (`internal: true`, sin
+  // internet), así que `api.resend.com` era inalcanzable, cada envío moría con
+  // `fetch failed` y el evento quedaba muerto tras 5 intentos. En local nunca
+  // se nota: el correo de desarrollo se escribe a disco y no necesita salir.
+  it("staging y prod conectan el worker a una red con egreso", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["deploy/docker-compose.staging.yml", "deploy/docker-compose.prod.yml"]) {
+      const texto = readFileSync(f, "utf8");
+      const worker = texto.slice(texto.indexOf("\n  worker:\n"), texto.indexOf("\n  migrate:\n"));
+      const redes = [...worker.matchAll(/^      - ([a-z]+)\s*$/gm)]
+        .map((m) => m[1])
+        .filter((r) => /^\s*networks:/m.test(worker) && ["interna", "salida", "frontera"].includes(r));
+      expect(redes, `${f}: el worker necesita una red con salida a internet`).toContain("salida");
+      // Y `salida` NO puede ser interna, o no sirve de nada.
+      const declaracion = texto.slice(texto.indexOf("\n  salida:\n"));
+      const bloque = declaracion.split(/\n  [a-z]+:\n/)[0];
+      expect(bloque, `${f}: la red salida no puede ser internal`).not.toMatch(/internal:\s*true/);
+    }
+  });
+});

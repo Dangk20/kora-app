@@ -146,6 +146,13 @@ services:
       - correos:/emails
     networks:
       - interna
+      # ⚠️ `salida` ES OBLIGATORIA: el worker es quien ENVÍA los correos y
+      # `interna` no tiene internet. Sin esta red, cada correo muere con
+      # `fetch failed` tras 5 intentos y el evento queda muerto en la bandeja:
+      # nadie recibe confirmación ni cambios de estado, y la tienda responde
+      # 200. Pasó en pruebas el 13 sep 2026: en local nunca se notó porque el
+      # correo de desarrollo se escribe a disco y no necesita salir.
+      - salida
 
   # Contenedor efímero: aplica migraciones y termina. Se ejecuta como PASO PREVIO
   # del despliegue, nunca al arrancar la aplicación — si falla, el despliegue se
@@ -179,6 +186,11 @@ networks:
   interna:
     name: kora-staging-interna
     internal: true
+  # Solo para el worker: egreso a internet (Resend) sin exponerlo a nadie.
+  # No va en `frontera` a propósito: esa es la red del borde (Caddy) y el
+  # worker no atiende peticiones de nadie.
+  salida:
+    name: kora-staging-salida
   frontera:
     external: true
     name: kora-edge-staging

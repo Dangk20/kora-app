@@ -18,7 +18,11 @@ Dos entornos sobre **una sola máquina**. Este directorio contiene todo lo neces
                         │       │
         kora-staging-interna    kora-prod-interna   ← sin salida a internet
            postgres · redis     postgres · redis    ← sin puertos publicados
+             worker ──────────── worker ──────────→ kora-*-salida: SOLO egreso
+                                                    (el worker envía el correo)
 ```
+
+El worker vive en **dos redes**: `interna` (base, caché) y `salida` (egreso a internet, nadie más dentro). Sin la segunda, cada correo muere con `fetch failed` y el evento queda muerto en la bandeja — pasó el 13 sep 2026 en pruebas y en local no se nota porque el correo de desarrollo se escribe a disco. `tests/imagen-docker.test.ts` lo fija.
 
 | | Dominio | Estado |
 |---|---|---|
