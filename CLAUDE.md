@@ -69,6 +69,8 @@ pnpm outbox:status  # si algo "no pasó", mirar aquí antes que en el código
 pnpm geo:check <ip>        # qué origen y qué moneda decidiría esa IP (la detección
                     # falla EN SILENCIO: sin esto solo se nota porque todo el mundo ve pesos)
 pnpm geo:update     # regenera la tabla IP → país. A mano, nunca en el build ni al arrancar
+pnpm geo:places     # regenera los 1.122 municipios de Colombia (DIVIPOLA, DANE) · geo:places:us, los
+                    # ~32.000 lugares de EE.UU. (Gazetteer, Census). Ciudad = desplegable CERRADO en los dos.
 pnpm staff:email <correo>  # a dónde llegan los avisos de pedido nuevo
 pnpm emails:preview        # escribe un ejemplo de cada correo del pedido en .emails/
 pnpm invoice:preview [n]   # el comprobante de pedido en .invoices/ (sin número: uno de ejemplo)

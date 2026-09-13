@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DEPARTAMENTOS_CO, US_STATES } from "@/modules/orders/geo";
+import { SelectorDivisionCiudad } from "../_components/selector-ciudad";
 import type { Address } from "@/modules/customers/addresses";
 import {
   eliminarDireccion,
@@ -84,18 +84,14 @@ function Formulario({
 }) {
   const [state, action] = useActionState(guardarDireccion, null);
   const [pais, setPais] = useState(direccion?.country ?? "CO");
+  const [division, setDivision] = useState(direccion?.state ?? "");
+  const [ciudad, setCiudad] = useState(direccion?.city ?? "");
 
   useEffect(() => {
     if (state?.ok) onCerrar();
     // `onCerrar` cambia en cada render del padre; solo interesa el resultado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-
-  // Los dos catálogos tienen formas distintas —departamentos son cadenas,
-  // estados son {code, name}—, igual que en el checkout. Se aplanan aquí para
-  // que el <select> sea uno solo.
-  const estados =
-    pais === "US" ? US_STATES.map((e) => e.name) : [...DEPARTAMENTOS_CO];
 
   return (
     <form action={action} className="grid gap-3">
@@ -109,7 +105,7 @@ function Formulario({
           id="country"
           name="country"
           value={pais}
-          onChange={(e) => setPais(e.target.value)}
+          onChange={(e) => { setPais(e.target.value); setDivision(""); setCiudad(""); }}
           className="h-10 rounded-xl border-[1.6px] border-[#e2ddd6] px-3 text-[14px] text-kora-black outline-none focus:border-kora-coral"
         >
           <option value="CO">Colombia</option>
@@ -119,26 +115,19 @@ function Formulario({
 
       <Campo id="label" label="Nombre para reconocerla (Casa, Oficina…)" defaultValue={direccion?.label} />
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="state" className="text-[12.5px]">
-          {pais === "US" ? "Estado" : "Departamento"}
-        </Label>
-        <select
-          id="state"
-          name="state"
-          defaultValue={direccion?.state ?? ""}
-          className="h-10 rounded-xl border-[1.6px] border-[#e2ddd6] px-3 text-[14px] text-kora-black outline-none focus:border-kora-coral"
-        >
-          <option value="">Selecciona…</option>
-          {estados.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* El MISMO selector encadenado del checkout: departamento/estado →
+          ciudad. Elegir una dirección allá y crearla aquí es la misma
+          experiencia. */}
+      <SelectorDivisionCiudad
+        country={pais === "US" ? "US" : "CO"}
+        state={division}
+        onState={setDivision}
+        city={ciudad}
+        onCity={setCiudad}
+        inputCls="h-10 w-full rounded-xl border-[1.6px] border-[#e2ddd6] px-3 text-[14px] text-kora-black outline-none focus:border-kora-coral"
+        labelCls="mb-1.5 block text-[12.5px] font-medium"
+      />
 
-      <Campo id="city" label="Ciudad / Municipio" defaultValue={direccion?.city} requerido />
       <Campo id="address" label="Dirección" defaultValue={direccion?.address} requerido />
       <Campo id="address2" label="Apartamento, torre, conjunto (opcional)" defaultValue={direccion?.address2} />
 

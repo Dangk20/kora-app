@@ -27,6 +27,7 @@ import { ORDER_TTL_MS } from "./status";
 import { whatsappNumberFor } from "./settings";
 import { computeAccrual } from "@/modules/cashback/accrual";
 import { formatMoney } from "@/modules/pricing";
+import { ciudadCanonica } from "@/modules/geo/places";
 import { toE164 } from "@/modules/customers/phone";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { resolveOrderCustomer } from "./customer-link";
@@ -200,8 +201,23 @@ export async function createOrder(
     if (data.phone.replace(/\D/g, "").replace(/^57/, "").length !== 10) {
       return { ok: false, error: "El celular debe tener 10 dígitos", field: "phone" };
     }
-  } else if (!/^\d{5}(-\d{4})?$/.test(data.zip ?? "")) {
-    return { ok: false, error: "ZIP inválido (##### o #####-####)", field: "zip" };
+    // La ciudad tiene que ser un municipio del departamento elegido. El
+    // navegador ya lo impide con el desplegable cerrado; esto es para quien
+    // no pasa por él. Una dirección "Medellín, Huila" es un paquete perdido.
+    const canonica = ciudadCanonica("CO", data.state, data.city);
+    if (!canonica) {
+      return { ok: false, error: "Elige un municipio del departamento seleccionado", field: "city" };
+    }
+    data.city = canonica; // "NEIVA" se guarda como "Neiva"
+  } else {
+    if (!/^\d{5}(-\d{4})?$/.test(data.zip ?? "")) {
+      return { ok: false, error: "ZIP inválido (##### o #####-####)", field: "zip" };
+    }
+    const canonica = ciudadCanonica("US", data.state, data.city);
+    if (!canonica) {
+      return { ok: false, error: "Choose a city in the selected state", field: "city" };
+    }
+    data.city = canonica;
   }
 
   // Idempotencia: si este token ya creó un pedido, se devuelve el mismo.

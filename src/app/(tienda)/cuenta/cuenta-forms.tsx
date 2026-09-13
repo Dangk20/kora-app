@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { PasswordField } from "./password-field";
 import { LogOut, Pencil } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -218,14 +219,8 @@ export function PasswordForm() {
   return (
     <Tarjeta titulo="Contraseña" accion="Cambiar" editando onAlternar={() => setEditando(false)}>
       <form action={action} className="grid gap-3">
-        <Campo
-          id="actual"
-          label="Contraseña actual"
-          type="password"
-          autoComplete="current-password"
-        />
-        <Campo id="nueva" label="Contraseña nueva" type="password" autoComplete="new-password" />
-        <p className="text-[11.5px] text-muted-foreground">Mínimo {MIN_PASSWORD} caracteres.</p>
+        <PasswordField id="actual" label="Contraseña actual" autoComplete="current-password" inputClassName="pr-11" labelClassName="text-[12.5px]" />
+        <PasswordField id="nueva" label="Contraseña nueva" autoComplete="new-password" inputClassName="pr-11" labelClassName="text-[12.5px]" hint={`Mínimo ${MIN_PASSWORD} caracteres.`} />
         <Aviso
           state={state}
           exito="Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos."

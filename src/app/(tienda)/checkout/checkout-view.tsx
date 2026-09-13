@@ -20,13 +20,9 @@ import type { ResolvedCart } from "@/modules/cart/resolve";
 import { createOrder } from "@/modules/orders/checkout-actions";
 import { formatMoney } from "@/modules/pricing";
 import { variantDetails } from "@/modules/orders/message";
-import {
-  CIUDADES_SUGERIDAS,
-  DEPARTAMENTOS_CO,
-  DOCUMENT_TYPES,
-  PAYMENT_METHODS,
-  US_STATES,
-} from "@/modules/orders/geo";
+import { SelectorDivisionCiudad } from "../_components/selector-ciudad";
+import { ciudadCanonica } from "@/modules/geo/places";
+import { DOCUMENT_TYPES, PAYMENT_METHODS } from "@/modules/orders/geo";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import type { Address } from "@/modules/customers/addresses";
 import { OrderBridge } from "./order-bridge";
@@ -98,6 +94,7 @@ export function CheckoutView({
     inicial ? (inicial.country === "US" ? "US" : "CO") : initialCountry,
   );
   const [state, setState] = useState(inicial?.state ?? "");
+  const [city, setCity] = useState(inicial?.city ?? "");
   const [direccionId, setDireccionId] = useState<string | null>(inicial?.id ?? null);
   const elegida = direcciones.find((d) => d.id === direccionId) ?? null;
 
@@ -115,7 +112,12 @@ export function CheckoutView({
     (!d.address?.trim() ||
       !d.city?.trim() ||
       !d.state?.trim() ||
-      (d.country === "US" ? !d.zip?.trim() : !d.neighborhood?.trim()));
+      (d.country === "US" ? !d.zip?.trim() : !d.neighborhood?.trim()) ||
+      // Una dirección guardada antes del catálogo cerrado puede traer una
+      // ciudad que no es del departamento ("Amazonas / Bogotá"): se enseñan
+      // los campos para corregirla, en vez de mandar un pedido que el
+      // servidor va a rechazar señalando un campo invisible.
+      !ciudadCanonica(d.country === "US" ? "US" : "CO", d.state ?? "", d.city ?? ""));
 
   // Con una dirección elegida y completa, la tarjeta ya la enseña: repetir los
   // campos debajo es ruido, y encima invita a editar en el checkout algo que
@@ -136,10 +138,12 @@ export function CheckoutView({
     const d = direcciones.find((x) => x.id === id);
     if (!d) {
       setState("");
+      setCity("");
       return;
     }
     setCountry(d.country === "US" ? "US" : "CO");
     setState(d.state ?? "");
+    setCity(d.city ?? "");
   };
 
   // Cupón: solo el CÓDIGO viaja al servidor; el descuento lo calcula él.
@@ -404,6 +408,7 @@ export function CheckoutView({
                   onChange={(e) => {
                     setCountry(e.target.value as Country);
                     setState("");
+                    setCity("");
                   }}
                   className="min-h-11 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-black outline-none focus:border-kora-coral"
                 >
@@ -583,39 +588,19 @@ export function CheckoutView({
             // por clase seguiría enviándose, y como arriba ya van los campos
             // ocultos con la dirección elegida, cada dato viajaría dos veces.
             <div key={direccionId ?? "nueva"} className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelCls} htmlFor="state">
-                  {isCO ? "Departamento" : "State"}
-                </label>
-                <select id="state" name="state" required value={state}
-                  onChange={(e) => setState(e.target.value)} className={inputCls}>
-                  <option value="">{isCO ? "Selecciona…" : "Select…"}</option>
-                  {isCO
-                    ? DEPARTAMENTOS_CO.map((d) => <option key={d} value={d}>{d}</option>)
-                    : US_STATES.map((s) => (
-                        <option key={s.code} value={s.name}>{s.name}</option>
-                      ))}
-                </select>
-                {fieldError("state")}
-              </div>
-
-              <div>
-                <label className={labelCls} htmlFor="city">
-                  {isCO ? "Ciudad / Municipio" : "City"}
-                </label>
-                <input id="city" name="city" required className={inputCls}
-                  defaultValue={elegida?.city ?? ""}
-                  list={isCO ? "ciudades" : undefined}
-                  placeholder={isCO ? "Ej. Bogotá" : "Ex. Miami"} />
-                {isCO && (
-                  <datalist id="ciudades">
-                    {(CIUDADES_SUGERIDAS[state] ?? []).map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                )}
-                {fieldError("city")}
-              </div>
+              {/* Departamento/estado → ciudad, encadenados. En Colombia la
+                  ciudad es un desplegable cerrado (DANE completo). */}
+              <SelectorDivisionCiudad
+                country={country}
+                state={state}
+                onState={setState}
+                city={city}
+                onCity={setCity}
+                inputCls={inputCls}
+                labelCls={labelCls}
+                errorState={fieldError("state")}
+                errorCity={fieldError("city")}
+              />
 
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="address">

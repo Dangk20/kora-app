@@ -7,6 +7,7 @@
 // entienda por qué el código "no sirve".
 
 import { useActionState, useState } from "react";
+import { PasswordField } from "../password-field";
 import Link from "next/link";
 import { confirmarCodigo, pedirCodigo, type FormState } from "../actions";
 
@@ -100,19 +101,13 @@ export function RecuperarForm() {
         />
       </div>
 
-      <div>
-        <label className={label} htmlFor="password">
-          Tu contraseña nueva
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="new-password"
-          className={input}
-        />
-      </div>
+      <PasswordField
+        id="password"
+        label="Tu contraseña nueva"
+        autoComplete="new-password"
+        inputClassName={`${input} pr-11`}
+        labelClassName={label}
+      />
 
       {cambio?.error ? (
         <p

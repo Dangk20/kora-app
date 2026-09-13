@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
+import { PasswordField } from "./password-field";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,46 +19,6 @@ function Enviar({ texto, enviando }: { texto: string; enviando: string }) {
   );
 }
 
-function Password({
-  id,
-  name,
-  label,
-  autoComplete,
-  hint,
-}: {
-  id: string;
-  name: string;
-  label: string;
-  autoComplete: string;
-  hint?: string;
-}) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          name={name}
-          type={visible ? "text" : "password"}
-          autoComplete={autoComplete}
-          required
-          className="h-11 rounded-xl pr-11"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-          className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
-        >
-          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-        </button>
-      </div>
-      {/* El mínimo se dice ANTES de enviar, no después de que lo rechacen. */}
-      {hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
 
 function Error({ mensaje }: { mensaje?: string }) {
   if (!mensaje) return null;
@@ -98,7 +58,7 @@ export function EntrarForm({
         />
       </div>
 
-      <Password id="password" name="password" label="Contraseña" autoComplete="current-password" />
+      <PasswordField id="password" name="password" label="Contraseña" autoComplete="current-password" />
 
       <Enviar texto="Entrar" enviando="Entrando…" />
 
@@ -157,7 +117,7 @@ export function CrearForm({
         </p>
       </div>
 
-      <Password
+      <PasswordField
         id="password"
         name="password"
         label="Contraseña"

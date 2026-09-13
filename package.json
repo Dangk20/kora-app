@@ -32,6 +32,8 @@
     "outbox:worker": "tsx scripts/outbox-worker.ts",
     "outbox:status": "tsx scripts/outbox-status.ts",
     "jobs:status": "tsx scripts/jobs-status.ts",
+    "geo:places": "tsx scripts/update-places.ts",
+    "geo:places:us": "tsx scripts/update-places-us.ts",
     "geo:update": "tsx scripts/update-geo.ts",
     "geo:check": "tsx scripts/check-geo.ts"
   },
