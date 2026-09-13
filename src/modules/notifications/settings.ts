@@ -47,18 +47,38 @@ export async function setStaffEmail(email: string): Promise<void> {
  * algún administrador, y sin esto esa persona recibiría el mismo aviso dos
  * veces — exactamente lo que el sistema de reservas existe para impedir.
  */
-export async function orderNoticeRecipients(): Promise<string[]> {
+export type OrderNoticeRecipient = { email: string; name: string | null };
+
+/**
+ * Los destinatarios CON su nombre, para saludar a cada uno por el suyo.
+ *
+ * El correo fijo del negocio no es una cuenta y no tiene nombre: su aviso va
+ * sin línea de saludo. Los administradores se saludan por el nombre de su
+ * cuenta —nunca por el del comprador, que es lo que pasaba cuando el correo se
+ * armaba una sola vez para todos (13 sep 2026)—. Si una misma dirección está
+ * en las dos listas, gana la que trae nombre.
+ */
+export async function orderNoticeRecipientsDetailed(): Promise<OrderNoticeRecipient[]> {
   const [fijo, admins] = await Promise.all([
     staffEmail(),
     db.user.findMany({
       where: { active: true, role: { name: "admin" } },
-      select: { email: true },
+      select: { email: true, name: true },
     }),
   ]);
 
-  const todos = [fijo, ...admins.map((u) => u.email)]
-    .filter((e): e is string => Boolean(e?.trim()))
-    .map((e) => e.trim().toLowerCase());
+  const porCorreo = new Map<string, OrderNoticeRecipient>();
+  if (fijo) porCorreo.set(fijo, { email: fijo, name: null });
+  for (const u of admins) {
+    const email = u.email.trim().toLowerCase();
+    if (!email) continue;
+    const name = u.name?.trim() || null;
+    const previo = porCorreo.get(email);
+    porCorreo.set(email, { email, name: name ?? previo?.name ?? null });
+  }
+  return [...porCorreo.values()];
+}
 
-  return [...new Set(todos)];
+export async function orderNoticeRecipients(): Promise<string[]> {
+  return (await orderNoticeRecipientsDetailed()).map((r) => r.email);
 }

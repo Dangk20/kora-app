@@ -88,12 +88,12 @@ async function pedido(
 
 /** Un driver de mentira: no toca disco y se puede hacer fallar a voluntad. */
 function driverFalso(opts: { falla?: boolean } = {}) {
-  const enviados: { to: string; subject: string; unsubscribeUrl?: string }[] = [];
+  const enviados: { to: string; subject: string; unsubscribeUrl?: string; html: string }[] = [];
   vi.spyOn(emailModule, "emailDriver").mockReturnValue({
     name: "falso",
     async send(msg) {
       if (opts.falla) return { ok: false, error: "proveedor caído", permanent: false };
-      enviados.push({ to: msg.to, subject: msg.subject, unsubscribeUrl: msg.unsubscribeUrl });
+      enviados.push({ to: msg.to, subject: msg.subject, unsubscribeUrl: msg.unsubscribeUrl, html: msg.html });
       return { ok: true, providerId: `fake-${enviados.length}` };
     },
   });
@@ -168,6 +168,59 @@ describe("LAS DOS LISTAS SON DISTINTAS", () => {
     // Un invitado que compró sin quedar registrado igual necesita su
     // comprobante.
     expect(await canSendTransactional("desconocido@test.local")).toMatchObject({ ok: true });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe("el aviso al operador saluda a quien lo recibe", () => {
+  // El 13 sep 2026 el aviso "Entró un pedido" llegó al correo del negocio con
+  // "Hola, Daniel 👋" — Daniel era el COMPRADOR. El saludo se calculaba una vez
+  // con el nombre del comprador y se mandaba igual a todos los administradores.
+  it("con nombre de cuenta, saluda por ese nombre y NO por el del comprador", async () => {
+    const c = await cliente();
+    const p = await pedido(c.id);
+    const ctx = (await orderEmailContext(p.id))!;
+    const { html } = renderOrderEmail("STAFF_NEW_ORDER", ctx, { recipientName: "Marcela Ríos" });
+    expect(html).toContain("Hola, Marcela");
+    expect(html).not.toContain(`Hola, ${ctx.buyerName!.split(" ")[0]}`);
+    // El comprador sigue nombrado en el cuerpo: es el dato del aviso.
+    expect(html).toContain(ctx.buyerName!);
+  });
+
+  it("el correo fijo del negocio (sin cuenta) va sin línea de saludo", async () => {
+    const c = await cliente();
+    const p = await pedido(c.id);
+    const ctx = (await orderEmailContext(p.id))!;
+    const { html } = renderOrderEmail("STAFF_NEW_ORDER", ctx, { recipientName: null });
+    expect(html).not.toContain("Hola,");
+  });
+
+  it("los del comprador siguen saludándolo a él", async () => {
+    const c = await cliente();
+    const p = await pedido(c.id);
+    const ctx = (await orderEmailContext(p.id))!;
+    const { html } = renderOrderEmail("BUYER_CREATED", ctx);
+    expect(html).toContain(`Hola, ${ctx.buyerName!.split(" ")[0]}`);
+  });
+
+  it("el manejador renderiza por destinatario con el nombre de cada cuenta", async () => {
+    const enviados = driverFalso();
+    await setStaffEmail("negocio@ejemplo.com");
+    const role = await db.role.findUniqueOrThrow({ where: { name: "admin" } });
+    const correo = `saludo-${Date.now()}@ejemplo.com`;
+    await db.user.create({ data: { email: correo, name: "Camilo Vega", passwordHash: "x", roleId: role.id, active: true } });
+    const c = await cliente();
+    const p = await pedido(c.id);
+    await orderCreatedStaffEmail.handle({
+      id: `ev-${Date.now()}`, type: "order.created", payload: { orderId: p.id },
+      attempts: 0, processedAt: null, lastError: null, createdAt: new Date(),
+    } as DomainEventRecord);
+
+    const aCamilo = enviados.find((e) => e.to === correo);
+    const alNegocio = enviados.find((e) => e.to === "negocio@ejemplo.com");
+    expect(aCamilo?.html).toContain("Hola, Camilo");
+    expect(alNegocio?.html).not.toContain("Hola,");
+    await db.user.delete({ where: { email: correo } });
   });
 });
 

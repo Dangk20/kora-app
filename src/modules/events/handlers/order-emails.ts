@@ -16,7 +16,7 @@ import { comprobanteAdjunto } from "@/modules/invoicing/attachment";
 import { orderEmailContext } from "@/modules/notifications/order-data";
 import { renderOrderEmail } from "@/modules/notifications/render";
 import { sendOrderEmail } from "@/modules/notifications/send";
-import { orderNoticeRecipients } from "@/modules/notifications/settings";
+import { orderNoticeRecipientsDetailed } from "@/modules/notifications/settings";
 import type { DomainEventRecord, EventHandler } from "../types";
 
 function orderIdDe(event: DomainEventRecord): string {
@@ -130,7 +130,7 @@ export const orderCreatedStaffEmail: EventHandler = {
   name: "order-created-staff-email",
   async handle(event) {
     const orderId = orderIdDe(event);
-    const destinos = await orderNoticeRecipients();
+    const destinos = await orderNoticeRecipientsDetailed();
 
     if (destinos.length === 0) {
       // Sin nadie a quien avisar no se falla —el pedido no tiene la culpa— pero
@@ -142,7 +142,6 @@ export const orderCreatedStaffEmail: EventHandler = {
 
     const ctx = await orderEmailContext(orderId);
     if (!ctx) throw new Error(`El pedido ${orderId} no existe (evento ${event.id})`);
-    const email = renderOrderEmail("STAFF_NEW_ORDER", ctx);
 
     // Se recorren TODOS antes de decidir si el manejador falla. Cortar en el
     // primer error dejaría sin aviso a los que vienen después por culpa de una
@@ -151,7 +150,10 @@ export const orderCreatedStaffEmail: EventHandler = {
     // recibe de nuevo al reintentar.
     const fallos: string[] = [];
 
-    for (const to of destinos) {
+    for (const { email: to, name } of destinos) {
+      // Se renderiza POR destinatario: el saludo lleva el nombre de la cuenta
+      // que lo recibe, no el del comprador (que ya va en el cuerpo).
+      const email = renderOrderEmail("STAFF_NEW_ORDER", ctx, { recipientName: name });
       const r = await sendOrderEmail({
         orderId,
         type: "STAFF_NEW_ORDER",

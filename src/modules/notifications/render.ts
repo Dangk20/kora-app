@@ -65,6 +65,10 @@ function lineaDeTiempo(type: OrderEmailType) {
 
 function base(
   data: OrderEmailData,
+  // A quién se saluda. Por omisión, al comprador; el aviso al operador pasa el
+  // nombre de la cuenta que lo recibe (o `null`: sin saludo, como el correo
+  // fijo del negocio, que no es una persona).
+  saludo: { recipientName?: string | null },
   parts: {
     subject: string;
     title: string;
@@ -84,7 +88,7 @@ function base(
     products: [],
     // Vacío A PROPÓSITO: un comprobante no ofrece darse de baja.
     unsubscribeUrl: "",
-    recipientName: data.buyerName,
+    recipientName: saludo.recipientName === undefined ? data.buyerName : saludo.recipientName,
     ctaLabel: parts.cta?.label ?? null,
     ctaUrl: parts.cta?.url ?? null,
     order: { ...data.order, notes: parts.notes ?? [] },
@@ -94,7 +98,11 @@ function base(
   return { subject: parts.subject, html, text };
 }
 
-export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): RenderedEmail {
+export function renderOrderEmail(
+  type: OrderEmailType,
+  data: OrderEmailData,
+  opts: { recipientName?: string | null } = {},
+): RenderedEmail {
   const c = data.order.currency;
   // El recorrido lo decide el TIPO de correo, no cada plantilla: así añadir un
   // estado no puede dejar a unos correos con línea y a otros sin ella.
@@ -102,7 +110,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
 
   switch (type) {
     case "BUYER_CREATED":
-      return base(data, {
+      return base(data, {}, {
         subject: `Recibimos tu pedido ${data.orderNumber}`,
         preheader: "Continúa por WhatsApp para confirmar tu pago.",
         title: "Ya tenemos tu pedido",
@@ -135,7 +143,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
               : "."),
         );
       }
-      return base(data, {
+      return base(data, {}, {
         timeline: linea,
         subject: `Confirmamos el pago de tu pedido ${data.orderNumber}`,
         preheader: "Ya lo estamos preparando.",
@@ -149,7 +157,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
     }
 
     case "BUYER_PREPARING":
-      return base(data, {
+      return base(data, {}, {
         timeline: linea,
         subject: `Estamos preparando tu pedido ${data.orderNumber}`,
         preheader: "Ya lo estamos armando.",
@@ -161,7 +169,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
       });
 
     case "BUYER_SHIPPED":
-      return base(data, {
+      return base(data, {}, {
         timeline: linea,
         subject: `Tu pedido ${data.orderNumber} va en camino`,
         preheader: "Ya salió hacia tu dirección.",
@@ -188,7 +196,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
         "Si necesitas cambiar el producto, tienes 30 días calendario desde tu compra: debe " +
           "estar nuevo, con sus etiquetas y su empaque original.",
       );
-      return base(data, {
+      return base(data, {}, {
         timeline: linea,
         subject: `Tu pedido ${data.orderNumber} fue entregado`,
         preheader: "Gracias por comprar en KORA.",
@@ -210,7 +218,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
           `Devolvimos ${formatMoney(data.cashbackRefunded, c)} de Kora Cashback a tu saldo.`,
         );
       }
-      return base(data, {
+      return base(data, {}, {
         subject: `Tu pedido ${data.orderNumber} fue cancelado`,
         preheader: expirado ? "Puedes volver a armarlo cuando quieras." : "Cualquier duda, escríbenos.",
         title: expirado ? "Tu pedido expiró" : "Tu pedido fue cancelado",
@@ -236,7 +244,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
       const restante = data.hoursLeft ?? 1;
       const cuanto = restante <= 1 ? "menos de una hora" : `${restante} horas`;
 
-      return base(data, {
+      return base(data, {}, {
         subject: `Tu pedido ${data.orderNumber} está por vencer`,
         preheader: "Todavía puedes confirmarlo por WhatsApp.",
         title: "Tu pedido sigue esperándote",
@@ -252,7 +260,7 @@ export function renderOrderEmail(type: OrderEmailType, data: OrderEmailData): Re
     }
 
     case "STAFF_NEW_ORDER":
-      return base(data, {
+      return base(data, { recipientName: opts.recipientName ?? null }, {
         // El operador tiene la vigencia entera antes de que el pedido expire:
         // el asunto dice lo que necesita para decidir si atiende ahora.
         subject: `Pedido nuevo ${data.orderNumber} · ${formatMoney(data.order.total, c)} ${c}`,
