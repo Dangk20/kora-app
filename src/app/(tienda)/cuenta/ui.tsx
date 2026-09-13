@@ -1,3 +1,4 @@
+import { BadgeCheck, ClipboardCheck, Home, Package, Truck, type LucideIcon } from "lucide-react";
 import type { Currency, OrderStatus } from "@/generated/prisma/enums";
 
 export function money(valor: number, moneda: Currency): string {
@@ -60,11 +61,15 @@ export function fraseDeEstado(
   }
 }
 
-/** Los pasos del recorrido de un pedido, en orden. Cancelado no es un paso: es una salida. */
-export const PASOS_PEDIDO: { status: OrderStatus; label: string }[] = [
-  { status: "PENDING", label: "Recibido" },
-  { status: "CONFIRMED", label: "Confirmado" },
-  { status: "PREPARING", label: "En preparación" },
-  { status: "SHIPPED", label: "Enviado" },
-  { status: "DELIVERED", label: "Entregado" },
+/**
+ * Los pasos del recorrido de un pedido, en orden, cada uno con su icono: en
+ * la línea de tiempo un punto dice "hubo algo aquí"; el icono dice QUÉ.
+ * Cancelado no es un paso: es una salida.
+ */
+export const PASOS_PEDIDO: { status: OrderStatus; label: string; Icono: LucideIcon }[] = [
+  { status: "PENDING", label: "Recibido", Icono: ClipboardCheck },
+  { status: "CONFIRMED", label: "Confirmado", Icono: BadgeCheck },
+  { status: "PREPARING", label: "En preparación", Icono: Package },
+  { status: "SHIPPED", label: "Enviado", Icono: Truck },
+  { status: "DELIVERED", label: "Entregado", Icono: Home },
 ];

@@ -83,32 +83,60 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
             {/* La línea de tiempo: horizontal en móvil, vertical con fechas en escritorio. */}
             {!cancelado && (
               <>
+                {/* Móvil: barra horizontal. Cada paso lleva su icono; el actual,
+                    más grande y con halo. La etiqueta del paso actual va debajo
+                    de la barra porque cinco etiquetas no caben en 390 px. */}
                 <ol className="mt-6 flex items-center sm:hidden" aria-label="Progreso del pedido">
                   {PASOS_PEDIDO.map((p, i) => {
                     const hecho = i <= pasoActual;
+                    const actual = i === pasoActual;
                     return (
                       <li key={p.status} className="flex flex-1 items-center last:flex-none">
                         <span
-                          className={`size-3.5 shrink-0 rounded-full ${i === pasoActual ? "size-5 bg-kora-black ring-4 ring-[#f0ece6]" : hecho ? "bg-kora-black" : "bg-[#d9d4cc]"}`}
                           aria-label={p.label}
-                        />
+                          aria-current={actual ? "step" : undefined}
+                          className={`flex shrink-0 items-center justify-center rounded-full ${
+                            actual
+                              ? "size-10 bg-kora-black text-white ring-4 ring-[#f0ece6]"
+                              : hecho
+                                ? "size-7 bg-kora-black text-white"
+                                : "size-7 border-2 border-[#d9d4cc] bg-white text-[#b3b8c0]"
+                          }`}
+                        >
+                          <p.Icono className={actual ? "size-[18px]" : "size-3.5"} />
+                        </span>
                         {i < PASOS_PEDIDO.length - 1 && <span className={`h-[3px] flex-1 ${i < pasoActual ? "bg-kora-black" : "bg-[#e6e1da]"}`} />}
                       </li>
                     );
                   })}
                 </ol>
+                <p className="mt-2 text-[12px] text-muted-foreground sm:hidden">
+                  {PASOS_PEDIDO[pasoActual]?.label}
+                  {pasoActual < PASOS_PEDIDO.length - 1 && ` · siguiente: ${PASOS_PEDIDO[pasoActual + 1].label.toLowerCase()}`}
+                </p>
                 <ol className="mt-6 hidden sm:block">
                   {PASOS_PEDIDO.map((p, i) => {
                     const hecho = i <= pasoActual;
                     const actual = i === pasoActual;
                     const cuando = pedido.estadoEn[p.status] ?? (p.status === "PENDING" ? pedido.createdAt : null);
                     return (
-                      <li key={p.status} className="relative flex gap-4 pb-5 last:pb-0">
+                      <li key={p.status} className="relative flex gap-4 pb-6 last:pb-0">
                         {i < PASOS_PEDIDO.length - 1 && (
-                          <span className={`absolute top-4 left-[7px] h-full w-[2px] ${i < pasoActual ? "bg-kora-black" : "bg-[#e6e1da]"}`} aria-hidden />
+                          <span className={`absolute top-9 left-[17px] h-[calc(100%-1.25rem)] w-[2px] ${i < pasoActual ? "bg-kora-black" : "bg-[#d9d4cc]"}`} aria-hidden />
                         )}
-                        <span className={`relative z-10 mt-0.5 size-4 shrink-0 rounded-full border-[3px] ${actual ? "border-kora-black bg-white ring-4 ring-[#f0ece6]" : hecho ? "border-kora-black bg-kora-black" : "border-[#d9d4cc] bg-white"}`} />
-                        <div>
+                        <span
+                          aria-current={actual ? "step" : undefined}
+                          className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ${
+                            actual
+                              ? "bg-kora-black text-white ring-4 ring-[#f0ece6]"
+                              : hecho
+                                ? "bg-kora-black text-white"
+                                : "border-2 border-[#d9d4cc] bg-white text-[#b3b8c0]"
+                          }`}
+                        >
+                          <p.Icono className="size-4" />
+                        </span>
+                        <div className="pt-1.5">
                           <p className={`text-[14px] font-semibold ${hecho ? "text-kora-black" : "text-[#b3b8c0]"}`}>{p.label}</p>
                           {hecho && cuando && <p className="text-[12px] text-muted-foreground">{fechaHora(cuando)}</p>}
                         </div>
