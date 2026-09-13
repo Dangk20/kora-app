@@ -9,11 +9,10 @@
 // Escritorio conserva su barra lateral: son dos diseños, no uno degradado.
 
 import Link from "next/link";
+import { PedidoCard } from "./pedido-card";
 import type { CashbackSummary } from "@/modules/cashback/balance";
 import { formatearCashback } from "@/modules/cashback/money";
 import type { BuyerOrderRow } from "@/modules/buyer/orders";
-import { formatOrderNumber } from "@/modules/orders/message";
-import { EstadoPedido, money } from "./ui";
 import { bolsasVisibles } from "./bolsas";
 
 /** Dos iniciales, como el diseño ("Laura Martinez" → "LM"). */
@@ -120,33 +119,7 @@ export function CuentaMovil({
         ) : (
           <ul className="space-y-2.5">
             {pedidos.map((p) => (
-              <li key={p.id}>
-                <Link href={`/cuenta/pedidos/${p.number}`} className="block rounded-[14px] bg-white p-3.5">
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <span className="text-[13.5px] font-extrabold text-kora-black">
-                      {formatOrderNumber(p.number, p.createdAt)}
-                    </span>
-                    <EstadoPedido status={p.status} />
-                  </div>
-                  <p className="mb-2 text-[12px] text-[#8a8f98]">
-                    {new Intl.DateTimeFormat("es-CO", { dateStyle: "long" }).format(p.createdAt)} ·{" "}
-                    {p.items} artículo{p.items === 1 ? "" : "s"}
-                  </p>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[15px] font-extrabold text-kora-black">
-                      {money(p.total, p.currency)}
-                    </span>
-                    {/* Misma regla que en escritorio: "Generó" solo si está
-                        en el libro; lo demás va en futuro y como estimación. */}
-                    {p.cashbackEstado !== "ninguno" && p.cashback > 0 && (
-                      <span className="text-[12px] text-[#8a8f98]">
-                        {p.cashbackEstado === "acreditado" ? "Generó " : "Generará ~"}
-                        {money(p.cashback, p.currency)}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </li>
+              <li key={p.id}><PedidoCard p={p} /></li>
             ))}
           </ul>
         )}

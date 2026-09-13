@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { cashbackSummary } from "@/modules/cashback/balance";
 import { requireBuyer } from "@/modules/buyer/guard";
 import { buyerOrders } from "@/modules/buyer/orders";
-import { formatOrderNumber } from "@/modules/orders/message";
+import { PedidoCard } from "./pedido-card";
 import { CashbackPanel } from "./cashback-panel";
 import { DatosForm, PasswordForm, SalirButton } from "./cuenta-forms";
 import { CuentaSidebar } from "./sidebar";
@@ -11,7 +11,6 @@ import { CuentaMovil } from "./cuenta-movil";
 import { seccionDe } from "./secciones";
 import { Direcciones } from "./direcciones";
 import { listAddresses } from "@/modules/customers/addresses";
-import { EstadoPedido, money } from "./ui";
 
 export const metadata = { title: "Mi cuenta · KORA" };
 
@@ -92,50 +91,9 @@ export default async function CuentaPage({
                   </Link>
                 </p>
               ) : (
-                <ul className="grid gap-2.5">
+                <ul className="grid gap-3">
                   {pedidos.map((p) => (
-                    <li key={p.id}>
-                      <Link
-                        href={`/cuenta/pedidos/${p.number}`}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#eee9e2] bg-white px-5 py-4 hover:border-[#ddd6cd]"
-                      >
-                        <div>
-                          <div className="text-[15px] font-bold text-kora-black">
-                            {/* El código humano, NO el autoincremento. El pedido
-                                se confirma y se paga por WhatsApp: este número
-                                es como el operador lo encuentra, y "Pedido 2"
-                                no lo encuentra nadie. */}
-                            {formatOrderNumber(p.number, p.createdAt)}
-                            <span className="ml-2 text-[12.5px] font-normal text-muted-foreground">
-                              {p.items} artículo{p.items === 1 ? "" : "s"}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                            {new Intl.DateTimeFormat("es-CO", { dateStyle: "long" }).format(
-                              p.createdAt,
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-[15px] font-bold text-kora-black">
-                            {money(p.total, p.currency)}
-                          </div>
-                          {/* "Generó" SOLO si está en el libro. La estimación
-                              va en futuro: prometer en pasado un dinero que el
-                              saldo no tiene manda al comprador a buscarlo. */}
-                          {p.cashbackEstado !== "ninguno" && p.cashback > 0 && (
-                            <div className="text-[12px] text-muted-foreground">
-                              {p.cashbackEstado === "acreditado"
-                                ? `Generó ${money(p.cashback, p.currency)} de cashback`
-                                : `Generará ~${money(p.cashback, p.currency)} de cashback`}
-                            </div>
-                          )}
-                        </div>
-
-                        <EstadoPedido status={p.status} />
-                      </Link>
-                    </li>
+                    <li key={p.id}><PedidoCard p={p} /></li>
                   ))}
                 </ul>
               )}

@@ -55,3 +55,14 @@ describe("páginas que pueden no encontrar su contenido", () => {
     expect(existsSync(join(process.cwd(), "src/app/not-found.tsx"))).toBe(true);
   });
 });
+
+describe("la cuenta del comprador no se desplaza de lado en móvil", () => {
+  it("la rejilla del detalle del pedido lleva min-w-0", async () => {
+    // Sin él, la fila de un producto estira la columna y la página mide 410
+    // px en una pantalla de 390 (13 sep 2026). Misma trampa que los banners.
+    const { readFileSync } = await import("node:fs");
+    const s = readFileSync("src/app/(tienda)/cuenta/pedidos/[numero]/page.tsx", "utf8");
+    expect(s).toContain("grid min-w-0");
+    expect(s).toContain("lg:grid-cols-[minmax(0,1fr)_340px]");
+  });
+});

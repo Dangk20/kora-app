@@ -9,6 +9,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import type { Currency, OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { storage } from "@/modules/storage";
 import { computeAccrual } from "@/modules/cashback/accrual";
 import { aNumero } from "@/modules/cashback/money";
 
@@ -27,6 +28,10 @@ export type BuyerOrderRow = {
    */
   cashbackEstado: "acreditado" | "estimado" | "ninguno";
   items: number;
+  /** Lo que se compró, con foto: la tarjeta de la lista lo enseña. */
+  lineas: { productName: string; variantName: string; qty: number; imageUrl: string | null }[];
+  /** Cuándo entró en su estado actual — "Entregado el 27 de agosto". */
+  statusAt: Date;
 };
 
 /** Un pedido pendiente sigue vivo mientras no venza su vigencia (ORDER_TTL_HOURS). */
@@ -74,6 +79,8 @@ export async function buyerOrders(customerId: string, now = new Date()): Promise
     include: {
       _count: { select: { items: true } },
       cashbackMovements: { where: { type: "EARN" }, select: { delta: true } },
+      items: { include: { variant: { select: { product: { select: { images: IMAGEN_PORTADA } } } } } },
+      statusHistory: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
     },
   });
 
@@ -81,6 +88,13 @@ export async function buyerOrders(customerId: string, now = new Date()): Promise
     const acreditado = o.cashbackMovements[0];
     const total = aNumero(o.total);
     return {
+      lineas: o.items.map((i) => ({
+        productName: i.productName,
+        variantName: i.variantName,
+        qty: i.qty,
+        imageUrl: portada(i.variant.product.images),
+      })),
+      statusAt: o.statusHistory[0]?.createdAt ?? o.createdAt,
       id: o.id,
       number: o.number,
       createdAt: o.createdAt,
@@ -137,12 +151,22 @@ export async function orderDetailById(orderId: string) {
  * dos lo escribieran por su cuenta, una podría dejar de traer los movimientos
  * de cashback y la pantalla enseñaría una estimación donde hay un dato real.
  */
+/** La primera foto del producto, ya resuelta a su dirección pública. */
+const IMAGEN_PORTADA = { orderBy: { position: "asc" as const }, take: 1, select: { url: true } };
+function portada(imgs: { url: string }[]): string | null {
+  return imgs[0] ? storage().urlFor(imgs[0].url) : null;
+}
+
 const DETALLE_INCLUDE = {
-  items: true,
+  items: { include: { variant: { select: { product: { select: { slug: true, images: IMAGEN_PORTADA } } } } } },
   cashbackMovements: {
     where: { type: "EARN" as const },
     select: { delta: true, expiresAt: true },
   },
+  // El recorrido del pedido, para la línea de tiempo: cada cambio de estado
+  // con su fecha real. Las notas del sistema ("outbox procesado") se quedan
+  // fuera: el comprador quiere saber cuándo se confirmó, no qué hizo el worker.
+  statusHistory: { orderBy: { createdAt: "asc" as const }, select: { from: true, to: true, createdAt: true } },
 } satisfies Prisma.OrderInclude;
 
 type PedidoConDetalle = Prisma.OrderGetPayload<{ include: typeof DETALLE_INCLUDE }>;
@@ -168,7 +192,12 @@ function detalleDelPedido(o: PedidoConDetalle) {
     contactName: o.contactName,
     contactPhone: o.contactPhone,
     shipAddress: o.shipAddress,
+    shipAddress2: o.shipAddress2,
+    shipNeighborhood: o.shipNeighborhood,
     shipCity: o.shipCity,
+    shipState: o.shipState,
+    shipCountry: o.shipCountry,
+    shipNotes: o.shipNotes,
     cashback: acreditado ? aNumero(acreditado.delta) : computeAccrual({ total, currency: o.currency }),
     cashbackAcreditado: Boolean(acreditado),
     cashbackEstado: estadoCashback(o, Boolean(acreditado)),
@@ -180,6 +209,12 @@ function detalleDelPedido(o: PedidoConDetalle) {
       qty: i.qty,
       unitPrice: aNumero(i.unitPrice),
       total: aNumero(i.total),
+      imageUrl: portada(i.variant.product.images),
+      slug: i.variant.product.slug,
     })),
+    /** Cuándo entró el pedido en cada estado, por estado. Solo transiciones reales. */
+    estadoEn: Object.fromEntries(
+      o.statusHistory.filter((h) => h.from !== h.to).map((h) => [h.to, h.createdAt]),
+    ) as Partial<Record<OrderStatus, Date>>,
   };
 }
