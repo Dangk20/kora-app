@@ -18,7 +18,6 @@ import { comprobarLimite, limpiarIntentos, registrarFallo } from "@/modules/buye
 import { sendResetCode } from "@/modules/buyer/reset-email";
 
 export type FormState = { error?: string; ok?: boolean } | null;
-export { LARGO_MINIMO_ADMIN };
 
 async function origen(): Promise<string> {
   return `panel:${ipDeConfianza(await headers()) ?? "desconocido"}`;

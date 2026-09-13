@@ -4,7 +4,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { RecuperarForm } from "@/app/(tienda)/cuenta/recuperar/recuperar-form";
-import { LARGO_MINIMO_ADMIN, confirmarCodigoPanel, pedirCodigoPanel } from "./actions";
+import { LARGO_MINIMO_ADMIN } from "@/modules/auth/reset";
+import { confirmarCodigoPanel, pedirCodigoPanel } from "./actions";
 
 export const metadata = {
   title: "Recuperar contraseña del panel · KORA",
