@@ -19,6 +19,7 @@
     "cashback:verify": "tsx scripts/verify-cashback.ts",
     "whatsapp:set": "tsx scripts/set-whatsapp.ts",
     "staff:email": "tsx scripts/set-staff-email.ts",
+    "test:reset": "tsx scripts/reset-test-data.ts",
     "emails:preview": "tsx scripts/preview-emails.ts",
     "legal:export": "tsx scripts/legal-export.ts",
     "invoice:preview": "tsx scripts/preview-invoice.ts",
