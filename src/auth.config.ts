@@ -26,6 +26,9 @@ export const authConfig = {
       session.user.id = token.sub!;
       session.user.role = token.role;
       session.user.permissions = token.permissions;
+      // Cuándo se emitió el token: `checkPermission` lo compara con el
+      // último cambio de contraseña para cerrar sesiones abiertas.
+      session.user.issuedAt = token.iat;
       return session;
     },
   },

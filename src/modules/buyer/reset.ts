@@ -57,7 +57,7 @@ export const MENSAJE_CODIGO_INVALIDO =
  * El código en claro. `randomInt` es del generador criptográfico del sistema:
  * `Math.random()` es predecible y aquí lo que se genera es una credencial.
  */
-function generarCodigo(): string {
+export function generarCodigo(): string {
   return String(randomInt(0, 10 ** LARGO_CODIGO)).padStart(LARGO_CODIGO, "0");
 }
 
@@ -70,11 +70,11 @@ function generarCodigo(): string {
  * comprobación legítima tardara, sin añadir nada: el código es aleatorio y de
  * un solo uso, así que no hay diccionario que aplicar.
  */
-function hashCodigo(codigo: string): string {
+export function hashCodigo(codigo: string): string {
   return createHash("sha256").update(codigo).digest("hex");
 }
 
-function igualEnTiempoConstante(a: string, b: string): boolean {
+export function igualEnTiempoConstante(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   if (x.length !== y.length) return false;

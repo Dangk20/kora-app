@@ -22,17 +22,23 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  roleId       String
-  role         Role     @relation(fields: [roleId], references: [id])
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  /// Cuándo cambió por última vez. Un JWT emitido ANTES de esta fecha deja de
+  /// valer: es lo que hace que recuperar la contraseña cierre las sesiones
+  /// abiertas, aunque el token dure 12 h. Sin esto, quien tomó la sesión
+  /// seguiría dentro después de que el dueño la cambiara.
+  passwordChangedAt DateTime?
+  name              String
+  roleId            String
+  role              Role      @relation(fields: [roleId], references: [id])
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   stockMovements  StockMovement[]
+  passwordResets  UserPasswordReset[]
   confirmedOrders Order[]              @relation("OrderConfirmedBy")
   statusChanges   OrderStatusHistory[]
   campaigns       Campaign[]
@@ -698,6 +704,24 @@ model CouponRedemption {
 //
 // Seis dígitos son un millón de combinaciones: sin límite de intentos, un guion
 // las prueba en minutos. Por eso `attempts` no es diagnóstico, es la defensa.
+/// Recuperación de contraseña de un USUARIO del panel. Gemelo de
+/// `PasswordReset` (compradores), aparte a propósito: las dos identidades
+/// no comparten mecanismo por diseño —ver `modules/buyer/README`—, y aquí
+/// el código abre el negocio entero.
+model UserPasswordReset {
+  id        String    @id @default(cuid())
+  codeHash  String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, usedAt])
+  @@map("user_password_resets")
+}
+
 model PasswordReset {
   id String @id @default(cuid())
 

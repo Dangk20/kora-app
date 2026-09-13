@@ -17,13 +17,24 @@ const label = "mb-1.5 block text-[13px] font-semibold";
 const boton =
   "min-h-12 w-full rounded-full bg-kora-gradient px-6 text-[15px] font-semibold text-white disabled:opacity-60";
 
-export function RecuperarForm() {
+export function RecuperarForm({
+  pedir = pedirCodigo,
+  confirmar = confirmarCodigo,
+  volverA = "/cuenta/entrar",
+  minimoPassword,
+}: {
+  /** Las acciones del comprador por defecto; el panel pasa las suyas. */
+  pedir?: (prev: FormState, form: FormData) => Promise<FormState>;
+  confirmar?: (prev: FormState, form: FormData) => Promise<FormState>;
+  volverA?: string;
+  minimoPassword?: number;
+} = {}) {
   const [paso, setPaso] = useState<"pedir" | "confirmar">("pedir");
   const [correo, setCorreo] = useState("");
 
   const [envio, accionPedir, enviando] = useActionState<FormState, FormData>(
     async (prev, form) => {
-      const r = await pedirCodigo(prev, form);
+      const r = await pedir(prev, form);
       // Se pasa al segundo paso SIEMPRE, tenga cuenta el correo o no: si solo
       // avanzara cuando existe, la propia pantalla diría cuáles existen.
       if (r?.ok) {
@@ -36,7 +47,7 @@ export function RecuperarForm() {
   );
 
   const [cambio, accionConfirmar, confirmando] = useActionState<FormState, FormData>(
-    confirmarCodigo,
+    confirmar,
     null,
   );
 
@@ -69,7 +80,7 @@ export function RecuperarForm() {
         </button>
 
         <p className="text-center text-[13px] text-muted-foreground">
-          <Link href="/cuenta/entrar" className="underline">
+          <Link href={volverA} className="underline">
             Volver a entrar
           </Link>
         </p>
@@ -107,6 +118,8 @@ export function RecuperarForm() {
         autoComplete="new-password"
         inputClassName={`${input} pr-11`}
         labelClassName={label}
+        minLength={minimoPassword}
+        hint={minimoPassword ? `Mínimo ${minimoPassword} caracteres.` : undefined}
       />
 
       {cambio?.error ? (

@@ -25,9 +25,9 @@ async function authenticate(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; recuperada?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, recuperada } = await searchParams;
 
   return (
     <main className="flex min-h-screen bg-white">
@@ -54,6 +54,11 @@ export default async function LoginPage({
             <p className="mt-2 mb-8 text-sm text-muted-foreground">
               Ingresa tu correo y contraseña para entrar al panel
             </p>
+            {recuperada && (
+              <p className="mb-4 rounded-[11px] border border-[#cfe6d3] bg-[#EEF7EF] px-4 py-3 text-[13px] text-[#2c6b34]">
+                Contraseña cambiada. Entra con la nueva.
+              </p>
+            )}
             <LoginForm action={authenticate} error={error} />
           </div>
         </div>

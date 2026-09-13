@@ -32,6 +32,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 export async function requirePermission(permission: `${string}:${string}`) {
   const session = await auth();
   if (!session?.user) throw new PermissionError("UNAUTHENTICATED");
-  await checkPermission(session.user.id, permission);
+  await checkPermission(session.user.id, permission, session.user.issuedAt);
   return session;
 }

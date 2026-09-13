@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useFormStatus } from "react-dom";
@@ -72,7 +74,10 @@ export function LoginForm({
       )}
       <SubmitButton />
       <p className="text-center text-xs text-muted-foreground">
-        ¿Olvidaste tu contraseña? Contacta al administrador.
+        ¿Olvidaste tu contraseña?{" "}
+        <Link href="/login/recuperar" className="font-semibold text-kora-black underline underline-offset-2">
+          Recupérala con un código al correo
+        </Link>
       </p>
     </form>
   );

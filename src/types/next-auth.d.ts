@@ -11,6 +11,8 @@ declare module "next-auth" {
       id: string;
       role: string;
       permissions: string[];
+      /** `iat` del JWT, para cerrar sesiones anteriores a un cambio de contraseña. */
+      issuedAt?: number;
     } & DefaultSession["user"];
   }
 }
