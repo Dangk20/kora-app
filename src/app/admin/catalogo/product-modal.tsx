@@ -82,7 +82,13 @@ export function ProductModal({
           <ProductForm
             categories={categories}
             initial={initial}
-            onDone={close}
+            // Un producto RECIÉN creado se abre en edición: las fotos solo se
+            // pueden cargar con el producto ya guardado, y cerrar la ventana
+            // obligaba a buscarlo en la lista y abrirlo con el lápiz —en la
+            // reunión del 13 sep el operador hizo clic en la caja de fotos del
+            // alta y pensó que estaba rota—.
+            onDone={(r) => (r.creado ? router.push(`/admin/catalogo?editar=${r.id}`) : close())}
+            onCancel={close}
             modo="pasos"
           />
         </div>

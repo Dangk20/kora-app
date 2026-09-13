@@ -7,7 +7,7 @@
 // producción.
 
 import { esProduccion } from "@/lib/environment";
-import { emailAllowlist, emailProviderConfigured } from "./config";
+import { emailAllowlist, emailAllowlistTodos, emailProviderConfigured } from "./config";
 import { createFileDriver } from "./file-driver";
 import { createResendDriver } from "./resend-driver";
 import type { EmailDriver, EmailMessage, SendResult } from "./driver";
@@ -79,7 +79,10 @@ export function emailDriver(env = process.env): EmailDriver {
   // En producción la guarda de arranque ya impidió que exista una lista; aquí
   // no se vuelve a decidir. Fuera de producción, la guarda exigió que la haya.
   // Orden: lista → contable → proveedor. Lo que va a disco nunca se cuenta.
-  cache = esProduccion(env) ? real : createAllowlistDriver(emailAllowlist(env), real, createFileDriver());
+  cache =
+    esProduccion(env) || emailAllowlistTodos(env)
+      ? real
+      : createAllowlistDriver(emailAllowlist(env), real, createFileDriver());
   return cache;
 }
 

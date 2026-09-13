@@ -39,6 +39,21 @@ export function emailProviderConfigured(env: NodeJS.ProcessEnv = process.env): b
  */
 export const ALLOWLIST_VAR = "KORA_EMAIL_ALLOWLIST";
 
+/**
+ * `KORA_EMAIL_ALLOWLIST=*` abre el correo de pruebas a CUALQUIER destinatario.
+ *
+ * Existe para las pruebas de aceptación del cliente (13 sep 2026): cada
+ * persona prueba con su propio correo y no se puede ir añadiendo direcciones
+ * una a una. Sigue siendo una decisión en voz alta —sin la variable, el
+ * entorno con proveedor no arranca— y en producción la variable se rechaza
+ * igual que cualquier lista. El tope de consumo del plan sigue aplicando.
+ */
+export const ALLOWLIST_TODOS = "*";
+
+export function emailAllowlistTodos(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env[ALLOWLIST_VAR] ?? "").trim() === ALLOWLIST_TODOS;
+}
+
 export function emailAllowlist(env: NodeJS.ProcessEnv = process.env): Set<string> {
   return new Set(
     (env[ALLOWLIST_VAR] ?? "")

@@ -5,6 +5,7 @@
 // un pedido escribe la suya. Sin esta lista no habría término medio entre
 // "nada sale" y "todo sale" — y el segundo estado es una fuga esperando una
 // campaña de demostración.
+import { emailAllowlistTodos } from "@/modules/email/config";
 import { describe, expect, it } from "vitest";
 import {
   assertEmailConfigured,
@@ -39,6 +40,29 @@ describe("la lista de destinatarios permitidos", () => {
 
   it("vacía si no está definida", () => {
     expect(emailAllowlist({ NODE_ENV: "test" } as NodeJS.ProcessEnv).size).toBe(0);
+  });
+});
+
+describe("el comodín `*` abre pruebas a cualquier destinatario", () => {
+  const proveedor = { RESEND_API_KEY: "re_x", EMAIL_FROM: "KORA <a@b.co>" };
+  // Pruebas de aceptación del cliente (13 sep 2026): cada persona prueba con
+  // su propio correo, y no se puede ir añadiendo direcciones una a una.
+  it("solo el asterisco exacto cuenta como 'todos'", () => {
+    expect(emailAllowlistTodos({ NODE_ENV: "test", KORA_EMAIL_ALLOWLIST: "*" } as NodeJS.ProcessEnv)).toBe(true);
+    expect(emailAllowlistTodos({ NODE_ENV: "test", KORA_EMAIL_ALLOWLIST: " * " } as NodeJS.ProcessEnv)).toBe(true);
+    expect(emailAllowlistTodos({ NODE_ENV: "test", KORA_EMAIL_ALLOWLIST: "*,a@b.co" } as NodeJS.ProcessEnv)).toBe(false);
+    expect(emailAllowlistTodos({ NODE_ENV: "test" } as NodeJS.ProcessEnv)).toBe(false);
+  });
+
+  it("sigue siendo una decisión en voz alta: con proveedor y sin variable, pruebas no arranca", () => {
+    const env = { NODE_ENV: "production", KORA_ENV: "staging", ...proveedor } as NodeJS.ProcessEnv;
+    expect(() => assertEmailConfigured(env)).toThrow(EmailAllowlistError);
+    expect(() => assertEmailConfigured({ ...env, KORA_EMAIL_ALLOWLIST: "*" })).not.toThrow();
+  });
+
+  it("🔒 en PRODUCCIÓN el comodín se rechaza como cualquier lista", () => {
+    const env = { NODE_ENV: "production", KORA_EMAIL_ALLOWLIST: "*", ...proveedor } as NodeJS.ProcessEnv;
+    expect(() => assertEmailConfigured(env)).toThrow(EmailAllowlistError);
   });
 });
 

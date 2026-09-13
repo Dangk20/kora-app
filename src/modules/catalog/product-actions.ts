@@ -9,7 +9,12 @@ import { receiveStock } from "@/modules/inventory/engine";
 import { inProgressFilter } from "@/modules/orders/status";
 import { uniqueSlug } from "./slug";
 
-export type ActionResult = { ok: true } | { ok: false; error: string } | null;
+// `creado` distingue el alta de la edición: al crear, el panel abre el producto
+// en edición para que el operador pueda ponerle fotos sin buscarlo en la lista.
+export type ActionResult =
+  | { ok: true; id: string; creado: boolean }
+  | { ok: false; error: string }
+  | null;
 
 const money = z.coerce.number().min(0, "Precio inválido");
 
@@ -113,6 +118,7 @@ export async function upsertProduct(
     return { ok: false, error: parsed.error.issues[0].message };
   }
   const data = parsed.data;
+  let productId = data.id ?? "";
 
   const skus = data.variants.map((v) => v.sku);
   if (new Set(skus).size !== skus.length) {
@@ -138,6 +144,7 @@ export async function upsertProduct(
               slug: await uniqueSlug(data.name, productSlugExists),
             },
           });
+      productId = product.id;
 
       // ── Grupos de opciones ──────────────────────────────────────────────
       // Se reescriben enteros: el formulario manda la estructura completa, y
@@ -260,7 +267,7 @@ export async function upsertProduct(
   }
 
   revalidatePath("/admin/catalogo");
-  return { ok: true };
+  return { ok: true, id: productId, creado: !data.id };
 }
 
 /**

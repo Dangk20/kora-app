@@ -315,6 +315,7 @@ export function ProductForm({
   categories,
   initial,
   onDone,
+  onCancel,
   /**
    * `"pasos"` = alta guiada en el modal grande. `"panel"` = todo junto en el
    * slide-over, que es para entrar a cambiar UNA cosa.
@@ -327,7 +328,8 @@ export function ProductForm({
 }: {
   categories: CategoryNode[];
   initial?: ProductDraft;
-  onDone: () => void;
+  onDone: (resultado: { id: string; creado: boolean }) => void;
+  onCancel: () => void;
   modo?: "panel" | "pasos";
 }) {
   const porPasos = modo === "pasos";
@@ -428,7 +430,7 @@ export function ProductForm({
   useEffect(() => {
     if (state?.ok) {
       router.refresh();
-      onDone();
+      onDone({ id: state.id, creado: state.creado });
     }
   }, [state, router, onDone]);
 
@@ -811,7 +813,7 @@ export function ProductForm({
       <div className="sticky bottom-0 flex gap-3 border-t border-[#f0ece6] bg-white px-7 py-4">
         <button
           type="button"
-          onClick={porPasos && esAlta && paso > 0 ? () => setPaso(paso - 1) : onDone}
+          onClick={porPasos && esAlta && paso > 0 ? () => setPaso(paso - 1) : onCancel}
           className="flex-1 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white py-3 text-sm font-semibold text-kora-black hover:bg-muted"
         >
           {porPasos && esAlta && paso > 0 ? "Atrás" : "Cancelar"}
