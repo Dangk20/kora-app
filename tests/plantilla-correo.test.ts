@@ -163,3 +163,31 @@ describe("el correo de 'enviado' cuando recibe otra persona", () => {
     expect(html).toContain("hacia la dirección que nos diste");
   });
 });
+
+describe("la tabla del pedido lleva la foto de cada producto", () => {
+  // Daniel, 20 sep 2026: el comprador reconoce lo que compró por la foto. La
+  // ruta del disco es relativa (`/media/…`) y en un correo no resuelve contra
+  // nada: se completa con la tienda, igual que en las campañas.
+  it("con foto, va absoluta; sin foto, un recuadro para que la columna no baile", () => {
+    const { html } = renderOrderEmail("BUYER_CREATED", {
+      ...PEDIDO,
+      order: {
+        ...PEDIDO.order,
+        lines: [
+          { qty: 1, name: "Blusa café", variant: "Única", total: 10_000, imageUrl: "/media/productos/blusa.jpg" },
+          { qty: 1, name: "Sin foto", variant: "Única", total: 5_000, imageUrl: null },
+        ],
+      },
+    });
+    expect(html).toMatch(/<img src="https:\/\/[^"]+\/media\/productos\/blusa\.jpg" width="56"/);
+    expect(html).not.toContain('src="/media/');
+    expect(html).toContain("width:56px;height:56px;border-radius:8px;background:");
+  });
+});
+
+describe("el botón principal va centrado", () => {
+  it("la tabla del botón lleva align=center", () => {
+    const { html } = renderOrderEmail("BUYER_CREATED", PEDIDO);
+    expect(html).toMatch(/<table role="presentation" class="kora-boton" align="center"/);
+  });
+});

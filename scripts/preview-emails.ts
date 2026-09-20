@@ -21,8 +21,8 @@ const EJEMPLO: OrderEmailData = {
     number: "KO-2026-00042",
     currency: "COP",
     lines: [
-      { qty: 2, name: "Camiseta Essential", variant: "Talla M · Negro", total: 158_000 },
-      { qty: 1, name: "Vela aromática", variant: "Única", total: 42_000 },
+      { qty: 2, name: "Camiseta Essential", variant: "Talla M · Negro", total: 158_000, imageUrl: "/media/productos/ejemplo-camiseta.jpg" },
+      { qty: 1, name: "Vela aromática", variant: "Única", total: 42_000, imageUrl: null },
     ],
     subtotal: 200_000,
     discountTotal: 10_000,

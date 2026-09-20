@@ -106,6 +106,8 @@ export type TemplateOrderLine = {
   name: string;
   variant?: string | null;
   total: number;
+  /** La primera foto del producto. Relativa o absoluta: la plantilla la completa. */
+  imageUrl?: string | null;
 };
 
 export type TemplateOrder = {
@@ -305,7 +307,9 @@ function lineaDeTiempo(t: { steps: string[]; current: number } | null | undefine
 }
 
 function botonHtml(label: string, url: string): string {
-  return `<table role="presentation" class="kora-boton" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+  // Centrado (Daniel, 20 sep 2026). `align="center"` y no solo `margin:auto`:
+  // Outlook ignora el margen automático en tablas.
+  return `<table role="presentation" class="kora-boton" align="center" cellpadding="0" cellspacing="0" style="margin:22px auto;">
            <tr><td style="border-radius:999px;background:${NARANJA};">
              <!-- El !important del color no sobra: es lo único que evita que
                   el modo oscuro de Gmail invierta el blanco y deje el texto
@@ -366,7 +370,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
       ${lineaDeTiempo(input.timeline)}
       ${input.footer ? parrafos(input.footer) : ""}
       ${cta}
-      ${tablaPedido(input.order)}
+      ${tablaPedido(input.order, base)}
       ${parrillaProductos(input.products, base)}`;
 
   const banner = !input.blocks && input.imageUrl
@@ -526,13 +530,22 @@ export function renderCampaign(input: TemplateInput): { html: string; text: stri
  * KORA, y un correo que mostrara pesos para una compra en dólares sería un
  * comprobante equivocado en manos del comprador.
  */
-function tablaPedido(order: TemplateOrder | null | undefined): string {
+function tablaPedido(order: TemplateOrder | null | undefined, base: string): string {
   if (!order) return "";
   const c = order.currency;
+
+  // La foto del producto en cada línea (Daniel, 20 sep 2026): el comprador
+  // reconoce lo que compró por la foto antes que por el nombre. Sin foto, un
+  // recuadro del color de fondo para que la columna no baile.
+  const foto = (l: TemplateOrderLine) =>
+    l.imageUrl
+      ? `<img src="${srcAbsoluto(l.imageUrl, base)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:0;" />`
+      : `<div style="width:56px;height:56px;border-radius:8px;background:${BEIGE};"></div>`;
 
   const filas = order.lines
     .map(
       (l) => `<tr>
+        <td width="68" style="padding:9px 12px 9px 0;border-bottom:1px solid #f0ece6;">${foto(l)}</td>
         <td style="padding:9px 0;border-bottom:1px solid #f0ece6;font-size:14px;color:${NEGRO};">
           ${escapeHtml(l.name)}${l.variant ? `<br /><span style="font-size:12px;color:${GRIS};">${escapeHtml(l.variant)}</span>` : ""}
           <span style="font-size:12px;color:${GRIS};"> × ${l.qty}</span>
@@ -543,7 +556,7 @@ function tablaPedido(order: TemplateOrder | null | undefined): string {
     .join("");
 
   const linea = (etiqueta: string, valor: string) =>
-    `<tr><td style="padding:4px 0;font-size:13px;color:${GRIS};">${etiqueta}</td>
+    `<tr><td colspan="2" style="padding:4px 0;font-size:13px;color:${GRIS};">${etiqueta}</td>
          <td align="right" style="padding:4px 0;font-size:13px;color:${NEGRO};white-space:nowrap;">${valor}</td></tr>`;
 
   const descuentos =
@@ -560,12 +573,12 @@ function tablaPedido(order: TemplateOrder | null | undefined): string {
     .join("");
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
-    <tr><td colspan="2" style="padding-bottom:6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:${GRIS};">Pedido ${escapeHtml(order.number)}</td></tr>
+    <tr><td colspan="3" style="padding-bottom:6px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:${GRIS};">Pedido ${escapeHtml(order.number)}</td></tr>
     ${filas}
     ${order.discountTotal > 0 || order.cashbackApplied > 0 ? linea("Subtotal", money(order.subtotal, c)) : ""}
     ${descuentos}
     <tr>
-      <td style="padding:10px 0 0;font-size:15px;font-weight:bold;color:${NEGRO};">Total</td>
+      <td colspan="2" style="padding:10px 0 0;font-size:15px;font-weight:bold;color:${NEGRO};">Total</td>
       <td align="right" style="padding:10px 0 0;font-size:17px;font-weight:bold;color:${NEGRO};white-space:nowrap;">${money(order.total, c)} ${c}</td>
     </tr>
   </table>${notas}`;

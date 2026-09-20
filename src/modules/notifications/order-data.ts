@@ -3,6 +3,7 @@
 
 import { db } from "@/lib/db";
 import { aNumero } from "@/modules/cashback/money";
+import { storage } from "@/modules/storage";
 import { formatOrderNumber, whatsappUrl } from "@/modules/orders/message";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import type { OrderEmailData } from "./render";
@@ -24,7 +25,16 @@ export async function orderEmailContext(orderId: string): Promise<OrderEmailCont
   const o = await db.order.findUnique({
     where: { id: orderId },
     include: {
-      items: true,
+      // La primera foto de cada producto, para la tabla del correo.
+      items: {
+        include: {
+          variant: {
+            select: {
+              product: { select: { images: { orderBy: { position: "asc" }, take: 1, select: { url: true } } } },
+            },
+          },
+        },
+      },
       cashbackMovements: { select: { delta: true, type: true, expiresAt: true } },
     },
   });
@@ -57,6 +67,7 @@ export async function orderEmailContext(orderId: string): Promise<OrderEmailCont
         name: i.productName,
         variant: i.variantName,
         total: aNumero(i.total),
+        imageUrl: i.variant.product.images[0] ? storage().urlFor(i.variant.product.images[0].url) : null,
       })),
       subtotal: aNumero(o.subtotal),
       discountTotal: aNumero(o.discountTotal),
