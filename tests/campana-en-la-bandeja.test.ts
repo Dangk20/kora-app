@@ -112,3 +112,40 @@ describe("la prueba y la campaña no comparten hilo", () => {
     expect(envio).toMatch(/threadKey: `campana:\$\{campaign\.id\}`/);
   });
 });
+
+describe("los bloques de productos seguidos se funden en una parrilla", () => {
+  // Tres bloques de un producto salían como tres parrillas con la mitad vacía
+  // (Daniel, 20 sep 2026). Fundidos, se llenan de a dos, de izquierda a derecha.
+  const producto = (n: string) => ({ name: n, url: `https://test.korashopp.com/producto/${n}`, imageUrl: null, price: null });
+
+  it("fundirProductos junta los consecutivos y respeta los separados por otro bloque", async () => {
+    const { fundirProductos } = await import("@/modules/email/template");
+    const r = fundirProductos([
+      { type: "title", text: "Navidad" },
+      { type: "products", products: [producto("a")] },
+      { type: "products", products: [producto("b")] },
+      { type: "products", products: [producto("c")] },
+      { type: "divider" },
+      { type: "products", products: [producto("d")] },
+    ]);
+    expect(r.map((b) => b.type)).toEqual(["title", "products", "divider", "products"]);
+    expect(r[1]).toMatchObject({ products: [producto("a"), producto("b"), producto("c")] });
+  });
+
+  it("en el correo, tres bloques de uno dan UNA tabla con dos filas", () => {
+    const { html } = renderCampaign({
+      ...BASE,
+      products: [],
+      blocks: [
+        { type: "products", products: [producto("a")] },
+        { type: "products", products: [producto("b")] },
+        { type: "products", products: [producto("c")] },
+      ],
+    });
+    // Una sola parrilla (una tabla con margin:18px 0), con "a" y "b" en la
+    // misma fila y "c" con su celda de relleno.
+    expect(html.match(/<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;">/g)).toHaveLength(1);
+    expect(html.match(/<tr>/g)!.length).toBeGreaterThanOrEqual(2);
+    expect(html.match(/<td style="width:50%;"><\/td>/g)).toHaveLength(1);
+  });
+});

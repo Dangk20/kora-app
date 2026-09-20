@@ -322,8 +322,29 @@ function botonHtml(label: string, url: string): string {
 }
 
 /** Los bloques, uno detrás de otro. Mismos estilos que el camino de campos fijos. */
+/**
+ * Bloques de productos SEGUIDOS se funden en uno solo.
+ *
+ * El operador añade "Productos" tres veces con un producto cada uno (es lo
+ * natural: uno por uno) y sin esto salían tres parrillas de una celda, cada
+ * una con su mitad vacía (Daniel, 20 sep 2026, en móvil). Fundidos, la
+ * parrilla se llena de izquierda a derecha, de a dos, como se espera.
+ */
+export function fundirProductos(blocks: TemplateBlock[]): TemplateBlock[] {
+  const out: TemplateBlock[] = [];
+  for (const b of blocks) {
+    const previo = out[out.length - 1];
+    if (b.type === "products" && previo?.type === "products") {
+      out[out.length - 1] = { type: "products", products: [...previo.products, ...b.products] };
+    } else {
+      out.push(b);
+    }
+  }
+  return out;
+}
+
 function bloquesHtml(blocks: TemplateBlock[], base: string): string {
-  return blocks
+  return fundirProductos(blocks)
     .map((b) => {
       switch (b.type) {
         case "title":
@@ -460,7 +481,7 @@ export function renderCampaignText(input: TemplateInput): string {
   if (input.recipientName) lineas.push(`Hola, ${input.recipientName.split(" ")[0]}`, "");
 
   if (input.blocks) {
-    for (const b of input.blocks) {
+    for (const b of fundirProductos(input.blocks)) {
       if (b.type === "title") lineas.push(b.text.trim().toUpperCase(), "");
       else if (b.type === "text") lineas.push(b.text.trim(), "");
       else if (b.type === "button") lineas.push(`${b.label}: ${b.url}`, "");
