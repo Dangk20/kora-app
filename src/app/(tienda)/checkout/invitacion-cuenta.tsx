@@ -25,6 +25,8 @@
 import { useState, useTransition } from "react";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { crearCuentaDelPedido, entrarDesdePedido } from "./cuenta-actions";
+import { PasswordField } from "../cuenta/password-field";
+import { MIN_PASSWORD } from "@/modules/buyer/password";
 
 const input =
   "w-full min-h-12 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-[15px] py-3 text-base sm:text-sm outline-none focus:border-kora-coral";
@@ -136,38 +138,31 @@ export function InvitacionCuenta({
                 : "Elige tu contraseña. Es lo único que falta."}
             </p>
 
+            {/* El MISMO campo con el ojo que usa el resto de la tienda: uno
+                no sabe si la escribió bien hasta que se la rechazan (Daniel,
+                20 sep 2026, probando en pruebas). */}
             <div className="mt-5 space-y-3">
-              <div>
-                <label className="mb-1.5 block text-[13px] font-semibold" htmlFor="password">
-                  Contraseña
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete={tieneCuenta ? "current-password" : "new-password"}
-                  autoFocus
-                  className={input}
-                />
-              </div>
+              <PasswordField
+                id="password"
+                label="Contraseña"
+                autoComplete={tieneCuenta ? "current-password" : "new-password"}
+                minLength={tieneCuenta ? undefined : MIN_PASSWORD}
+                hint={tieneCuenta ? undefined : `Mínimo ${MIN_PASSWORD} caracteres.`}
+                inputClassName={`${input} pr-11`}
+                labelClassName="text-[13px] font-semibold"
+              />
               {/* Repetir solo tiene sentido al ELEGIR una contraseña nueva.
                   Pedírselo a quien entra sería hacerle escribir dos veces algo
                   que ya sabe. */}
               {tieneCuenta ? null : (
-                <div>
-                  <label className="mb-1.5 block text-[13px] font-semibold" htmlFor="password2">
-                    Repite la contraseña
-                  </label>
-                  <input
-                    id="password2"
-                    name="password2"
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    className={input}
-                  />
-                </div>
+                <PasswordField
+                  id="password2"
+                  label="Repite la contraseña"
+                  autoComplete="new-password"
+                  minLength={MIN_PASSWORD}
+                  inputClassName={`${input} pr-11`}
+                  labelClassName="text-[13px] font-semibold"
+                />
               )}
             </div>
 
