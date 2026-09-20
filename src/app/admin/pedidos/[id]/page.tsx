@@ -64,6 +64,21 @@ export default async function OrderDetailPage({
     .filter(Boolean)
     .join(", ");
 
+  // La dirección de FACTURACIÓN (quien paga). Puede estar en EE.UU.: KORA no
+  // envía allá, pero sí cobra allá. No va al chat; es dato del panel y del
+  // comprobante. Nula en pedidos anteriores al 20 sep 2026 sin backfill.
+  const billingAddress = [
+    order.billAddress,
+    order.billAddress2,
+    order.billNeighborhood ? `Barrio ${order.billNeighborhood}` : null,
+    order.billCity,
+    order.billState,
+    order.billZip,
+    order.billCountry === "US" ? "Estados Unidos" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div className="space-y-5">
       <Link
@@ -261,13 +276,14 @@ export default async function OrderDetailPage({
           {CONFIRMED_STATUSES.includes(order.status) && <DocumentosDelPedido orderId={order.id} />}
 
           <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
-            <h2 className="mb-4 text-[15px] font-bold text-kora-black">Comprador</h2>
+            <h2 className="mb-4 text-[15px] font-bold text-kora-black">Datos de facturación</h2>
             <dl className="space-y-3 text-[13px]">
               {[
                 ["Nombre", order.contactName],
                 ["Teléfono", order.contactPhone],
                 ["Correo", order.contactEmail],
                 ["Documento", order.contactDocument],
+                ["Dirección", billingAddress],
               ]
                 .filter(([, v]) => Boolean(v))
                 .map(([label, value]) => (
@@ -280,10 +296,34 @@ export default async function OrderDetailPage({
           </section>
 
           <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
-            <h2 className="mb-4 text-[15px] font-bold text-kora-black">Entrega y pago</h2>
+            <h2 className="mb-4 text-[15px] font-bold text-kora-black">Datos de envío y pago</h2>
             <dl className="space-y-3 text-[13px]">
+              {/* Quien recibe, cuando no es quien paga: el operador despacha a
+                  esta persona y la transportadora la llama a ella. Con la misma
+                  dirección se dice una vez en vez de repetir los datos. */}
+              {order.shipSameAsBilling ? (
+                <div>
+                  <dt className="text-[11.5px] text-[#9aa0ab]">Recibe</dt>
+                  <dd className="font-medium text-kora-black">La misma persona, en la misma dirección</dd>
+                </div>
+              ) : (
+                <>
+                  {[
+                    ["Recibe", order.shipName],
+                    ["Celular de quien recibe", order.shipPhone],
+                    ["Documento de quien recibe", order.shipDocument],
+                  ]
+                    .filter(([, v]) => Boolean(v))
+                    .map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-[11.5px] text-[#9aa0ab]">{label}</dt>
+                        <dd className="font-medium break-words text-kora-black">{value}</dd>
+                      </div>
+                    ))}
+                </>
+              )}
               <div>
-                <dt className="text-[11.5px] text-[#9aa0ab]">Dirección</dt>
+                <dt className="text-[11.5px] text-[#9aa0ab]">Dirección de entrega</dt>
                 <dd className="font-medium text-kora-black">{address || "—"}</dd>
               </div>
               {order.shipNotes && (

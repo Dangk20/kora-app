@@ -24,6 +24,7 @@ export function SelectorDivisionCiudad({
   labelCls,
   errorState,
   errorCity,
+  prefijo,
 }: {
   country: "CO" | "US";
   state: string;
@@ -34,8 +35,17 @@ export function SelectorDivisionCiudad({
   labelCls: string;
   errorState?: React.ReactNode;
   errorCity?: React.ReactNode;
+  /**
+   * Prefijo de los nombres de campo ("billing." / "shipping."): el checkout
+   * lleva DOS direcciones en el mismo formulario y sin esto los `name` y los
+   * `id` chocarían. Vacío = un solo selector, como en la cuenta.
+   */
+  prefijo?: string;
 }) {
   const isCO = country === "CO";
+  const idState = `${prefijo ?? ""}state`;
+  const idCity = `${prefijo ?? ""}city`;
+  const idLista = `${prefijo ?? ""}ciudades-sugeridas`;
   const ciudades = ciudadesDe(country, state);
   const cerrada = listaCerrada(country);
 
@@ -50,8 +60,8 @@ export function SelectorDivisionCiudad({
   return (
     <>
       <div>
-        <label className={labelCls} htmlFor="state">{isCO ? "Departamento" : "State"}</label>
-        <select id="state" name="state" required value={state}
+        <label className={labelCls} htmlFor={idState}>{isCO ? "Departamento" : "State"}</label>
+        <select id={idState} name={idState} required value={state}
           onChange={(e) => { setTocado(true); onState(e.target.value); if (cerrada) onCity(""); }}
           className={inputCls}>
           <option value="">{isCO ? "Selecciona…" : "Select…"}</option>
@@ -63,9 +73,9 @@ export function SelectorDivisionCiudad({
       </div>
 
       <div>
-        <label className={labelCls} htmlFor="city">{isCO ? "Ciudad / Municipio" : "City"}</label>
+        <label className={labelCls} htmlFor={idCity}>{isCO ? "Ciudad / Municipio" : "City"}</label>
         {cerrada ? (
-          <select id="city" name="city" required value={city} onChange={(e) => onCity(e.target.value)}
+          <select id={idCity} name={idCity} required value={city} onChange={(e) => onCity(e.target.value)}
             disabled={!state} className={`${inputCls} disabled:opacity-60`}>
             {/* La opción vacía va SIEMPRE, y `value={city}` la selecciona
                 mientras no haya elección: sin ella, el navegador preselecciona
@@ -78,9 +88,9 @@ export function SelectorDivisionCiudad({
           </select>
         ) : (
           <>
-            <input id="city" name="city" required value={city} onChange={(e) => onCity(e.target.value)}
-              className={inputCls} list="ciudades-sugeridas" placeholder="Ex. Miami" autoComplete="address-level2" />
-            <datalist id="ciudades-sugeridas">
+            <input id={idCity} name={idCity} required value={city} onChange={(e) => onCity(e.target.value)}
+              className={inputCls} list={idLista} placeholder="Ex. Miami" autoComplete="address-level2" />
+            <datalist id={idLista}>
               {ciudades.map((c) => <option key={c} value={c} />)}
             </datalist>
           </>

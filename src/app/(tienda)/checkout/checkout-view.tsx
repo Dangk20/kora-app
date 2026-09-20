@@ -25,6 +25,7 @@ import { ciudadCanonica } from "@/modules/geo/places";
 import { DOCUMENT_TYPES, PAYMENT_METHODS } from "@/modules/orders/geo";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import type { Address } from "@/modules/customers/addresses";
+import type { UltimaFacturacion } from "@/modules/buyer/orders";
 import { OrderBridge } from "./order-bridge";
 import { PantallaProceso } from "./pantalla-proceso";
 import { InvitacionCuenta } from "./invitacion-cuenta";
@@ -48,8 +49,11 @@ export type BuyerDefaults = {
    *  aplicable lo decide el servidor al crear el pedido. */
   cashback: number;
   /** Libreta del comprador (alcance nuevo, 1 sep 2026). Vacía = sin sesión o
-   *  sin direcciones guardadas: el checkout entonces es el de siempre. */
+   *  sin direcciones guardadas: el checkout entonces es el de siempre.
+   *  Es la libreta de ENVÍO: direcciones en Colombia. */
   direcciones: Address[];
+  /** Con qué facturó la última vez, para precargar "Quién paga". */
+  facturacion: UltimaFacturacion | null;
 } | null;
 
 export function CheckoutView({
@@ -77,74 +81,115 @@ export function CheckoutView({
   // servidor y el relato— porque el servidor responde en unos 300 ms y sin esto
   // la pantalla sería un parpadeo.
   const [procesoContado, setProcesoContado] = useState(false);
-  // ── Libreta de direcciones (alcance nuevo, 1 sep 2026) ──
-  // `null` = "usar otra dirección": los campos quedan libres y vacíos. Con
-  // sesión y al menos una guardada, se arranca en la predeterminada, que es
-  // justo lo que la cuenta debía ahorrarle al comprador.
-  const direcciones = buyer?.direcciones ?? [];
-  const inicial = direcciones.find((d) => d.isDefault) ?? direcciones[0] ?? null;
+  // ── Datos de facturación (change direccion-facturacion-y-envio, 20 sep 2026) ──
+  // Quien paga. Su país arranca desde la moneda (PED_HU001 §1) o desde su
+  // última facturación con sesión, y gobierna SU bloque: prefijo del teléfono,
+  // documento, campos de dirección y métodos de pago. No gobierna el envío.
+  // No va al chat de WhatsApp: es dato del panel, del comprobante y, el día que
+  // exista pasarela, de la validación de la tarjeta.
+  //
+  // Campos CONTROLADOS, a propósito: los datos de envío se precargan con estos
+  // y para copiar valores hay que tenerlos en estado, no en el DOM.
+  const facturacion = buyer?.facturacion ?? null;
+  const [country, setCountry] = useState<Country>(facturacion?.country ?? initialCountry);
+  const [fact, setFact] = useState({
+    name: buyer?.name ?? "",
+    phone: buyer?.phone ?? "",
+    email: buyer?.email ?? "",
+    documentType: "CC",
+    document: facturacion?.document ?? "",
+    state: facturacion?.state ?? "",
+    city: facturacion?.city ?? "",
+    address: facturacion?.address ?? "",
+    address2: facturacion?.address2 ?? "",
+    neighborhood: facturacion?.neighborhood ?? "",
+    zip: facturacion?.zip ?? "",
+  });
+  const setF = (patch: Partial<typeof fact>) => setFact((f) => ({ ...f, ...patch }));
 
-  // `country` y `state` arrancan EN la dirección inicial, no en blanco. Los
-  // demás campos no lo necesitan porque son no controlados y llevan
-  // `defaultValue`; estos dos son controlados, y dejarlos vacíos aquí
-  // producía un formulario precargado al que le faltaba el departamento —el
-  // único campo obligatorio sin llenar, y el que nadie mira porque el resto
-  // ya está puesto.
-  const [country, setCountry] = useState<Country>(
-    inicial ? (inicial.country === "US" ? "US" : "CO") : initialCountry,
-  );
-  const [state, setState] = useState(inicial?.state ?? "");
-  const [city, setCity] = useState(inicial?.city ?? "");
-  const [direccionId, setDireccionId] = useState<string | null>(inicial?.id ?? null);
-  const elegida = direcciones.find((d) => d.id === direccionId) ?? null;
+  // ── Datos de envío: SIEMPRE Colombia ──
+  // KORA no envía a EE.UU. (decisión del cliente, 13 sep 2026): quien compra
+  // en USD está allá y manda el pedido a un familiar acá. Con pagador en
+  // Colombia, la casilla "usar los mismos datos" (marcada por omisión)
+  // PRECARGA el envío con la facturación: los campos siguen visibles y
+  // editables —Daniel, 20 sep—, y tocar uno desmarca la casilla, para que el
+  // "misma dirección" que se guarda en el pedido sea verdad. Con pagador en
+  // EE.UU. la casilla no existe: la entrega no puede ser la misma.
+  const [mismaDireccion, setMismaDireccion] = useState(true);
+  const mismosDatos = country === "CO" && mismaDireccion;
+  const [envioPropio, setEnvioPropio] = useState({
+    name: "",
+    phone: "",
+    document: "",
+    state: "",
+    city: "",
+    address: "",
+    address2: "",
+    neighborhood: "",
+    notes: "",
+  });
+  const envio = mismosDatos
+    ? {
+        name: fact.name,
+        phone: fact.phone,
+        document: fact.document,
+        state: fact.state,
+        city: fact.city,
+        address: fact.address,
+        address2: fact.address2,
+        neighborhood: fact.neighborhood,
+        notes: envioPropio.notes,
+      }
+    : envioPropio;
+  /** Editar un campo de envío: si venía copiado, se queda con la copia y se desmarca. */
+  const setE = (patch: Partial<typeof envioPropio>) => {
+    if (mismosDatos) {
+      setEnvioPropio({ ...envio, ...patch });
+      setMismaDireccion(false);
+    } else {
+      setEnvioPropio((e) => ({ ...e, ...patch }));
+    }
+  };
+
+  // ── Libreta de direcciones (alcance nuevo, 1 sep 2026) ──
+  // Solo alimenta los datos de ENVÍO. Elegir una la copia a los campos, que
+  // siguen editables; "usar otra dirección" los vacía.
+  const direcciones = buyer?.direcciones ?? [];
+  const [direccionId, setDireccionId] = useState<string | null>(null);
 
   /**
-   * ¿A esta dirección guardada le falta algo obligatorio?
+   * ¿A esta dirección guardada le falta algo para poder entregarla?
    *
-   * Importa por las direcciones que vienen del backfill: las que existían como
-   * `customer.address` son texto libre, sin departamento ni barrio. Si se
-   * ocultaran los campos con una de esas elegida, el comprador enviaría un
-   * pedido incompleto y el servidor lo rechazaría señalando un campo que él NO
-   * PUEDE VER. Cuando falta algo, los campos se muestran para completarlos.
+   * Las del backfill son texto libre sin departamento ni barrio; las guardadas
+   * en EE.UU. antes del 20 sep 2026 no sirven como destino. Se enseñan
+   * marcadas para que el comprador complete lo que falte.
    */
   const incompleta = (d: Address | null) =>
     !!d &&
     (!d.address?.trim() ||
       !d.city?.trim() ||
       !d.state?.trim() ||
-      (d.country === "US" ? !d.zip?.trim() : !d.neighborhood?.trim()) ||
-      // Una dirección guardada antes del catálogo cerrado puede traer una
-      // ciudad que no es del departamento ("Amazonas / Bogotá"): se enseñan
-      // los campos para corregirla, en vez de mandar un pedido que el
-      // servidor va a rechazar señalando un campo invisible.
-      !ciudadCanonica(d.country === "US" ? "US" : "CO", d.state ?? "", d.city ?? ""));
+      !d.neighborhood?.trim() ||
+      d.country !== "CO" ||
+      !ciudadCanonica("CO", d.state ?? "", d.city ?? ""));
 
-  // Con una dirección elegida y completa, la tarjeta ya la enseña: repetir los
-  // campos debajo es ruido, y encima invita a editar en el checkout algo que
-  // se administra en la cuenta.
-  const camposVisibles = direccionId === null || incompleta(elegida);
-  const [guardarNueva, setGuardarNueva] = useState(false);
-
-  /**
-   * Elegir una dirección llena el formulario.
-   *
-   * El país se cambia también, y no es un detalle: los campos NO son los
-   * mismos —Colombia pide departamento y barrio, EE.UU. estado y ZIP—, así que
-   * sin esto elegir una dirección de Miami dejaría un formulario colombiano
-   * pidiendo un barrio que allá no existe.
-   */
+  /** Elegir una dirección de la libreta llena los datos de envío. */
   const elegirDireccion = (id: string | null) => {
     setDireccionId(id);
+    setMismaDireccion(false);
     const d = direcciones.find((x) => x.id === id);
-    if (!d) {
-      setState("");
-      setCity("");
-      return;
-    }
-    setCountry(d.country === "US" ? "US" : "CO");
-    setState(d.state ?? "");
-    setCity(d.city ?? "");
+    setEnvioPropio((e) => ({
+      ...e,
+      state: d?.state ?? "",
+      city: d?.city ?? "",
+      address: d?.address ?? "",
+      address2: d?.address2 ?? "",
+      neighborhood: d?.neighborhood ?? "",
+      notes: d?.notes ?? "",
+    }));
   };
+  const [guardarNueva, setGuardarNueva] = useState(false);
+
 
   // Cupón: solo el CÓDIGO viaja al servidor; el descuento lo calcula él.
   // La casilla de datos es lo único obligatorio que no es un campo de texto,
@@ -189,24 +234,47 @@ export function CheckoutView({
 
   const submit = (formData: FormData) => {
     setError(null);
+    const campo = (name: string) => String(formData.get(name) ?? "");
+    // Dos bloques anidados, con los nombres `billing.*` y `shipping.*` del
+    // formulario. Con "misma dirección" el envío NO viaja: lo deriva el
+    // servidor del pagador. Un segundo juego de campos escondido es justo lo
+    // que se quiere evitar.
     const payload = {
       checkoutToken: checkoutToken.current,
       couponCode: coupon?.code ?? "",
       cashbackRequested: cashbackAplicable,
-      country,
-      name: String(formData.get("name") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
-      address: String(formData.get("address") ?? ""),
-      address2: String(formData.get("address2") ?? ""),
-      city: String(formData.get("city") ?? ""),
-      state: String(formData.get("state") ?? ""),
-      neighborhood: String(formData.get("neighborhood") ?? ""),
-      zip: String(formData.get("zip") ?? ""),
-      document: String(formData.get("document") ?? ""),
-      documentType: String(formData.get("documentType") ?? ""),
-      notes: String(formData.get("notes") ?? ""),
-      paymentPreference: String(formData.get("paymentPreference") ?? ""),
+      billing: {
+        country,
+        name: campo("billing.name"),
+        email: campo("billing.email"),
+        phone: campo("billing.phone"),
+        document: campo("billing.document"),
+        documentType: campo("billing.documentType"),
+        address: campo("billing.address"),
+        address2: campo("billing.address2"),
+        city: campo("billing.city"),
+        state: campo("billing.state"),
+        neighborhood: campo("billing.neighborhood"),
+        zip: campo("billing.zip"),
+      },
+      // El envío viaja SIEMPRE tal como se ve —los campos están a la vista y
+      // se pueden editar—; la casilla solo dice si el comprador los dejó
+      // iguales a la facturación.
+      shipSameAsBilling: mismosDatos,
+      shipping: {
+        country: "CO" as const,
+        name: campo("shipping.name"),
+        phone: campo("shipping.phone"),
+        document: campo("shipping.document"),
+        address: campo("shipping.address"),
+        address2: campo("shipping.address2"),
+        city: campo("shipping.city"),
+        state: campo("shipping.state"),
+        neighborhood: campo("shipping.neighborhood"),
+        zip: "",
+        notes: campo("shipping.notes"),
+      },
+      paymentPreference: campo("paymentPreference"),
       acceptsData: formData.get("acceptsData") === "on",
       acceptsMarketing: formData.get("acceptsMarketing") === "on",
     };
@@ -223,16 +291,16 @@ export function CheckoutView({
         // que tiene el número del pedido delante. Lo encontró Daniel probando.
         // Después del pedido y sin bloquearlo: la venta ya está hecha, y una
         // comodidad no puede tumbarla si falla.
-        if (buyer && direccionId === null && guardarNueva) {
+        if (buyer && !mismosDatos && direccionId === null && guardarNueva) {
           void guardarDireccionDelPedido({
-            country: payload.country,
-            state: payload.state,
-            city: payload.city,
-            address: payload.address,
-            address2: payload.address2,
-            neighborhood: payload.neighborhood,
-            zip: payload.zip,
-            notes: payload.notes,
+            country: "CO",
+            state: payload.shipping.state,
+            city: payload.shipping.city,
+            address: payload.shipping.address,
+            address2: payload.shipping.address2,
+            neighborhood: payload.shipping.neighborhood,
+            zip: "",
+            notes: payload.shipping.notes,
           }).catch(() => {});
         }
 
@@ -400,15 +468,16 @@ export function CheckoutView({
         <div className="space-y-6">
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-kora-black">Tus datos</h2>
+              <h2 className="text-lg font-bold text-kora-black">
+                {isCO ? "Datos de facturación" : "Billing details"}
+              </h2>
               <label className="flex items-center gap-2 text-[12.5px] text-[#6b6f78]">
                 País
                 <select
                   value={country}
                   onChange={(e) => {
                     setCountry(e.target.value as Country);
-                    setState("");
-                    setCity("");
+                    setF({ state: "", city: "", neighborhood: "", zip: "" });
                   }}
                   className="min-h-11 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-black outline-none focus:border-kora-coral"
                 >
@@ -420,37 +489,37 @@ export function CheckoutView({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="name">
+                <label className={labelCls} htmlFor="billing.name">
                   {isCO ? "Nombre completo" : "Full name"}
                 </label>
-                <input id="name" name="name" required className={inputCls}
-                  defaultValue={buyer?.name ?? ""}
+                <input id="billing.name" name="billing.name" required className={inputCls}
+                  value={fact.name} onChange={(e) => setF({ name: e.target.value })}
                   placeholder={isCO ? "Ej. Laura Gómez" : "Ex. John Smith"} />
-                {fieldError("name")}
+                {fieldError("billing.name")}
               </div>
 
               <div>
-                <label className={labelCls} htmlFor="phone">
+                <label className={labelCls} htmlFor="billing.phone">
                   {isCO ? "Celular (WhatsApp)" : "Phone"}
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="rounded-[11px] bg-[#f5f3f0] px-3 py-3 text-sm font-semibold text-[#6b6f78]">
                     {isCO ? "+57" : "+1"}
                   </span>
-                  <input id="phone" name="phone" required inputMode="tel"
+                  <input id="billing.phone" name="billing.phone" required inputMode="tel"
                     className={inputCls}
-                    defaultValue={buyer?.phone ?? ""}
+                    value={fact.phone} onChange={(e) => setF({ phone: e.target.value })}
                     placeholder={isCO ? "300 123 4567" : "(305) 555-0123"} />
                 </div>
-                {fieldError("phone")}
+                {fieldError("billing.phone")}
               </div>
 
               <div>
-                <label className={labelCls} htmlFor="email">
+                <label className={labelCls} htmlFor="billing.email">
                   {isCO ? "Correo electrónico" : "Email"}
                 </label>
-                <input id="email" name="email" type="email" required className={inputCls}
-                  defaultValue={buyer?.email ?? ""}
+                <input id="billing.email" name="billing.email" type="email" required className={inputCls}
+                  value={fact.email} onChange={(e) => setF({ email: e.target.value })}
                   readOnly={Boolean(buyer)}
                   placeholder="correo@ejemplo.com" />
                 {/* Con sesión el correo es la credencial de acceso: se cambia
@@ -460,12 +529,12 @@ export function CheckoutView({
                     Es el correo de tu cuenta. Para cambiarlo, entra a Mi cuenta.
                   </p>
                 )}
-                {fieldError("email")}
+                {fieldError("billing.email")}
               </div>
 
               {isCO && (
                 <div className="sm:col-span-2">
-                  <label className={labelCls} htmlFor="document">
+                  <label className={labelCls} htmlFor="billing.document">
                     Documento de identidad
                     <span className="ml-1 font-normal text-[#9aa0ab]">
                       (lo exigen las transportadoras)
@@ -473,30 +542,108 @@ export function CheckoutView({
                   </label>
                   <div className="flex gap-2">
                     <select
-                      name="documentType"
+                      name="billing.documentType"
                       aria-label="Tipo de documento"
+                      value={fact.documentType}
+                      onChange={(e) => setF({ documentType: e.target.value })}
                       className="w-24 shrink-0 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-3 py-3 text-sm outline-none focus:border-kora-coral"
                     >
                       {DOCUMENT_TYPES.map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
-                    <input id="document" name="document" required inputMode="numeric"
-                      className={inputCls} placeholder="1020304050" />
+                    <input id="billing.document" name="billing.document" required inputMode="numeric"
+                      className={inputCls} placeholder="1020304050"
+                      value={fact.document} onChange={(e) => setF({ document: e.target.value })} />
                   </div>
-                  {fieldError("document")}
+                  {fieldError("billing.document")}
+                </div>
+              )}
+
+              {/* Departamento/estado → ciudad, encadenados. */}
+              <SelectorDivisionCiudad
+                country={country}
+                state={fact.state}
+                onState={(v) => setF({ state: v })}
+                city={fact.city}
+                onCity={(v) => setF({ city: v })}
+                inputCls={inputCls}
+                labelCls={labelCls}
+                errorState={fieldError("billing.state")}
+                errorCity={fieldError("billing.city")}
+                prefijo="billing."
+              />
+
+              <div className="sm:col-span-2">
+                <label className={labelCls} htmlFor="billing.address">
+                  {isCO ? "Dirección" : "Billing address"}
+                </label>
+                <input id="billing.address" name="billing.address" required className={inputCls}
+                  value={fact.address} onChange={(e) => setF({ address: e.target.value })}
+                  placeholder={isCO ? "Ej.: Carrera 7 # 82 - 15" : "Ex. 123 Main St"} />
+                {fieldError("billing.address")}
+              </div>
+
+              <div>
+                <label className={labelCls} htmlFor="billing.address2">
+                  {isCO ? "Apto / Torre / Conjunto" : "Apt / Suite"}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                </label>
+                <input id="billing.address2" name="billing.address2" className={inputCls}
+                  value={fact.address2} onChange={(e) => setF({ address2: e.target.value })} />
+              </div>
+
+              {isCO ? (
+                <div>
+                  <label className={labelCls} htmlFor="billing.neighborhood">Barrio</label>
+                  <input id="billing.neighborhood" name="billing.neighborhood" required className={inputCls}
+                    value={fact.neighborhood} onChange={(e) => setF({ neighborhood: e.target.value })}
+                    placeholder="Ej. Chapinero" />
+                  {fieldError("billing.neighborhood")}
+                </div>
+              ) : (
+                <div>
+                  <label className={labelCls} htmlFor="billing.zip">ZIP code</label>
+                  <input id="billing.zip" name="billing.zip" required className={inputCls}
+                    value={fact.zip} onChange={(e) => setF({ zip: e.target.value })}
+                    placeholder="33101" />
+                  {fieldError("billing.zip")}
                 </div>
               )}
             </div>
           </section>
 
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
-            <h2 className="mb-5 text-lg font-bold text-kora-black">
-              {isCO ? "Dirección de entrega" : "Shipping address"}
+            <h2 className="mb-1 text-lg font-bold text-kora-black">
+              {isCO ? "Datos de envío" : "Shipping details"}
             </h2>
+            <p className="mb-5 text-[12.5px] text-[#8a8f98]">
+              {isCO
+                ? "Hacemos envíos dentro de Colombia."
+                : "We only ship within Colombia — e.g. to a relative or friend."}
+            </p>
+
+            {/* Solo con pagador en Colombia. Marcada, PRECARGA los campos de
+                abajo con la facturación; siguen visibles y editables, y tocar
+                uno la desmarca. */}
+            {isCO && (
+              <label className="mb-5 flex cursor-pointer items-center gap-2.5 rounded-[14px] border-[1.6px] border-[#e2ddd6] p-3.5 text-[13.5px] font-semibold text-kora-black has-checked:border-kora-coral has-checked:bg-[#FFF7F3]">
+                <input
+                  type="checkbox"
+                  checked={mismaDireccion}
+                  onChange={(e) => {
+                    setMismaDireccion(e.target.checked);
+                    if (e.target.checked) setDireccionId(null);
+                  }}
+                  className="size-[18px] accent-kora-coral"
+                />
+                Usar los mismos datos de facturación
+              </label>
+            )}
 
             {direcciones.length > 0 && (
               <div className="mb-5 space-y-2">
+                <p className="text-[12.5px] font-semibold text-[#6b6f78]">Mis direcciones guardadas</p>
                 {direcciones.map((d) => (
                   <label
                     key={d.id}
@@ -527,130 +674,111 @@ export function CheckoutView({
                         Predeterminada
                       </span>
                     )}
+                    {incompleta(d) && (
+                      <span className="shrink-0 rounded-full bg-[#FFF4EF] px-2 py-0.5 text-[10.5px] font-bold text-kora-coral">
+                        Falta información
+                      </span>
+                    )}
                   </label>
                 ))}
-
-                {/* Siempre disponible: tener direcciones guardadas no puede
-                    impedir mandar un pedido a un sitio nuevo. */}
-                <label
-                  className={`flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.6px] p-3.5 transition-colors ${
-                    direccionId === null
-                      ? "border-kora-coral bg-[#FFF7F3]"
-                      : "border-[#e2ddd6] hover:border-[#d6d0c8]"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="direccionGuardada"
-                    checked={direccionId === null}
-                    onChange={() => elegirDireccion(null)}
-                    className="size-4 accent-kora-coral"
-                  />
-                  <span className="text-[13.5px] font-semibold text-kora-black">
-                    Usar otra dirección
-                  </span>
-                </label>
-              </div>
-            )}
-
-            {!camposVisibles && elegida && (
-              // Los valores viajan igual, en campos ocultos: el pedido guarda
-              // su snapshot y no puede depender de que se pinte un formulario.
-              // Sin `required`, que sobre un campo oculto bloquea el envío con
-              // un error que el navegador ni siquiera puede señalar.
-              <>
-                <input type="hidden" name="state" value={elegida.state ?? ""} />
-                <input type="hidden" name="city" value={elegida.city ?? ""} />
-                <input type="hidden" name="address" value={elegida.address ?? ""} />
-                <input type="hidden" name="address2" value={elegida.address2 ?? ""} />
-                <input type="hidden" name="neighborhood" value={elegida.neighborhood ?? ""} />
-                <input type="hidden" name="zip" value={elegida.zip ?? ""} />
-                <input type="hidden" name="notes" value={elegida.notes ?? ""} />
-                <p className="text-[12.5px] text-[#8a8f98]">
-                  Se enviará a la dirección seleccionada. Puedes cambiarla desde{" "}
+                <p className="text-[12px] text-[#8a8f98]">
+                  Al elegir una se copian sus datos abajo y puedes ajustarlos. Administra tu libreta en{" "}
                   <Link href="/cuenta?seccion=direcciones" className="font-semibold text-kora-coral underline underline-offset-2">
                     Mis direcciones
                   </Link>
                   .
                 </p>
-              </>
+              </div>
             )}
 
-            {camposVisibles && elegida && (
-              <p className="mb-4 rounded-[12px] bg-[#FFF4EF] px-4 py-3 text-[12.5px] text-[#6b6f78]">
-                A esta dirección le falta información para poder entregarla.
-                Complétala aquí y quedará guardada.
-              </p>
-            )}
-
-            {camposVisibles && (
-            // Ojo: el bloque se QUITA del DOM, no se esconde con CSS. Oculto
-            // por clase seguiría enviándose, y como arriba ya van los campos
-            // ocultos con la dirección elegida, cada dato viajaría dos veces.
-            <div key={direccionId ?? "nueva"} className="grid gap-4 sm:grid-cols-2">
-              {/* Departamento/estado → ciudad, encadenados. En Colombia la
-                  ciudad es un desplegable cerrado (DANE completo). */}
-              <SelectorDivisionCiudad
-                country={country}
-                state={state}
-                onState={setState}
-                city={city}
-                onCity={setCity}
-                inputCls={inputCls}
-                labelCls={labelCls}
-                errorState={fieldError("state")}
-                errorCity={fieldError("city")}
-              />
-
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="address">
-                  {isCO ? "Dirección" : "Street address"}
-                </label>
-                <input id="address" name="address" required className={inputCls}
-                  defaultValue={elegida?.address ?? ""}
-                  placeholder={isCO ? "Ej.: Carrera 7 # 82 - 15" : "Ex. 123 Main St"} />
-                {fieldError("address")}
+                <label className={labelCls} htmlFor="shipping.name">Nombre de quien recibe</label>
+                <input id="shipping.name" name="shipping.name" required className={inputCls}
+                  value={envio.name} onChange={(e) => setE({ name: e.target.value })}
+                  placeholder="Ej. Rosa Gómez" />
+                {fieldError("shipping.name")}
               </div>
 
               <div>
-                <label className={labelCls} htmlFor="address2">
-                  {isCO ? "Apto / Torre / Conjunto" : "Apt / Suite"}
-                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
-                </label>
-                <input id="address2" name="address2" className={inputCls}
-                  defaultValue={elegida?.address2 ?? ""} />
+                <label className={labelCls} htmlFor="shipping.phone">Celular de quien recibe</label>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-[11px] bg-[#f5f3f0] px-3 py-3 text-sm font-semibold text-[#6b6f78]">+57</span>
+                  <input id="shipping.phone" name="shipping.phone" required inputMode="tel" className={inputCls}
+                    value={envio.phone} onChange={(e) => setE({ phone: e.target.value })}
+                    placeholder="300 123 4567" />
+                </div>
+                {fieldError("shipping.phone")}
               </div>
 
-              {isCO ? (
-                <div>
-                  <label className={labelCls} htmlFor="neighborhood">Barrio</label>
-                  <input id="neighborhood" name="neighborhood" required className={inputCls}
-                    defaultValue={elegida?.neighborhood ?? ""}
-                    placeholder="Ej. Chapinero" />
-                  {fieldError("neighborhood")}
-                </div>
-              ) : (
-                <div>
-                  <label className={labelCls} htmlFor="zip">ZIP code</label>
-                  <input id="zip" name="zip" required className={inputCls}
-                    defaultValue={elegida?.zip ?? ""}
-                    placeholder="33101" />
-                  {fieldError("zip")}
-                </div>
-              )}
+              <div>
+                <label className={labelCls} htmlFor="shipping.document">
+                  Documento de quien recibe
+                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                </label>
+                <input id="shipping.document" name="shipping.document" inputMode="numeric" className={inputCls}
+                  value={envio.document} onChange={(e) => setE({ document: e.target.value })}
+                  placeholder="1020304050" />
+              </div>
+
+              {/* Departamento → municipio, encadenados: desplegable cerrado
+                  (DANE completo). Siempre Colombia. */}
+              <SelectorDivisionCiudad
+                country="CO"
+                state={envio.state}
+                onState={(v) => setE({ state: v })}
+                city={envio.city}
+                onCity={(v) => setE({ city: v })}
+                inputCls={inputCls}
+                labelCls={labelCls}
+                errorState={fieldError("shipping.state")}
+                errorCity={fieldError("shipping.city")}
+                prefijo="shipping."
+              />
 
               <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="notes">
+                <label className={labelCls} htmlFor="shipping.address">
+                  {isCO ? "Dirección" : "Street address (Colombia)"}
+                </label>
+                <input id="shipping.address" name="shipping.address" required className={inputCls}
+                  value={envio.address} onChange={(e) => setE({ address: e.target.value })}
+                  placeholder="Ej.: Carrera 7 # 82 - 15" />
+                {fieldError("shipping.address")}
+              </div>
+
+              <div>
+                <label className={labelCls} htmlFor="shipping.address2">
+                  {isCO ? "Apto / Torre / Conjunto" : "Apt / Tower"}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                </label>
+                <input id="shipping.address2" name="shipping.address2" className={inputCls}
+                  value={envio.address2} onChange={(e) => setE({ address2: e.target.value })} />
+              </div>
+
+              <div>
+                <label className={labelCls} htmlFor="shipping.neighborhood">
+                  {isCO ? "Barrio" : "Neighborhood (barrio)"}
+                </label>
+                <input id="shipping.neighborhood" name="shipping.neighborhood" required className={inputCls}
+                  value={envio.neighborhood} onChange={(e) => setE({ neighborhood: e.target.value })}
+                  placeholder="Ej. Chapinero" />
+                {fieldError("shipping.neighborhood")}
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className={labelCls} htmlFor="shipping.notes">
                   {isCO ? "Notas de entrega" : "Delivery notes"}
                   <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
                 </label>
-                <textarea id="notes" name="notes" rows={2} className={`${inputCls} resize-y`}
-                  defaultValue={elegida?.notes ?? ""}
-                  placeholder={isCO ? "Ej. Dejar en portería" : "Ex. Leave at the door"} />
+                <textarea id="shipping.notes" name="shipping.notes" rows={2} className={`${inputCls} resize-y`}
+                  value={envio.notes}
+                  onChange={(e) => (mismosDatos ? setEnvioPropio((x) => ({ ...x, notes: e.target.value })) : setE({ notes: e.target.value }))}
+                  placeholder={isCO ? "Ej. Dejar en portería" : "Ex. Leave at the front desk"} />
               </div>
 
-              {/* Solo con sesión: sin cuenta no hay libreta donde guardarla. */}
-              {buyer && direccionId === null && (
+              {/* Solo con sesión y con una dirección escrita a mano: sin cuenta
+                  no hay libreta, y una copiada de la libreta ya está en ella. */}
+              {buyer && !mismosDatos && direccionId === null && (
                 <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-[#4a4f58] sm:col-span-2">
                   <input
                     type="checkbox"
@@ -662,7 +790,6 @@ export function CheckoutView({
                 </label>
               )}
             </div>
-            )}
           </section>
 
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">

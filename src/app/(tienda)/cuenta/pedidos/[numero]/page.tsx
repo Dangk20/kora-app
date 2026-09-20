@@ -202,6 +202,13 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   <Home className="size-[18px]" />
                 </span>
                 <div className="text-[13.5px]">
+                  {/* A quién se le envía, cuando no es el propio comprador. */}
+                  {!pedido.shipSameAsBilling && pedido.shipName && (
+                    <p className="mb-1 font-semibold text-kora-black">
+                      Recibe: {pedido.shipName}
+                      {pedido.shipPhone && <span className="font-normal text-muted-foreground"> · {pedido.shipPhone}</span>}
+                    </p>
+                  )}
                   <p className="font-semibold text-kora-black">{direccion[0]}</p>
                   {direccion.slice(1).map((l) => <p key={l} className="text-muted-foreground">{l}</p>)}
                   {pedido.shipNotes && <p className="mt-1 text-[12.5px] text-muted-foreground">Indicaciones: {pedido.shipNotes}</p>}

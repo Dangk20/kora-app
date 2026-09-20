@@ -15,7 +15,13 @@ import { merchant } from "@/modules/legal/config";
 import { formatOrderNumber } from "@/modules/orders/message";
 
 /** Sube de 1 solo si cambia la FORMA del snapshot, no su contenido. */
-export const SNAPSHOT_VERSION = 1;
+/**
+ * 1 = una sola dirección (hasta el 19 sep 2026).
+ * 2 = facturación y envío por separado, con `sameAddress` (change
+ *     direccion-facturacion-y-envio). Un snapshot v1 se sigue dibujando
+ *     exactamente como se emitió: está congelado.
+ */
+export const SNAPSHOT_VERSION = 2;
 
 export type SalesDocumentSnapshot = {
   version: number;
@@ -36,8 +42,30 @@ export type SalesDocumentSnapshot = {
     phone: string | null;
   };
 
+  /**
+   * Dirección de FACTURACIÓN: la de quien paga (v2). Nula en snapshots v1 y
+   * en venta de mostrador. No va al chat de WhatsApp; es dato del comprobante,
+   * del panel y —el día que exista pasarela— de la validación de la tarjeta.
+   */
+  billing?: {
+    country: string | null;
+    state: string | null;
+    city: string | null;
+    address: string | null;
+    address2: string | null;
+    neighborhood: string | null;
+    zip: string | null;
+  } | null;
+
+  /** true = la entrega es a la misma persona y dirección que la facturación (v2). */
+  sameAddress?: boolean;
+
   /** A dónde se envió. Nulo en venta de mostrador. */
   shipping: {
+    /** Quien recibe (v2). Antes era siempre el comprador. */
+    name?: string | null;
+    phone?: string | null;
+    document?: string | null;
     country: string | null;
     state: string | null;
     city: string | null;
@@ -100,6 +128,17 @@ export type OrderParaComprobante = {
   contactPhone: string | null;
   contactEmail: string | null;
   contactDocument: string | null;
+  billCountry: string | null;
+  billState: string | null;
+  billCity: string | null;
+  billAddress: string | null;
+  billAddress2: string | null;
+  billNeighborhood: string | null;
+  billZip: string | null;
+  shipSameAsBilling: boolean;
+  shipName: string | null;
+  shipPhone: string | null;
+  shipDocument: string | null;
   shipCountry: string | null;
   shipState: string | null;
   shipCity: string | null;
@@ -131,6 +170,7 @@ export function buildSnapshot(
   // simplemente no la lleva. Una tarjeta "Enviar a: — — —" es ruido que
   // parece un dato perdido.
   const hayEnvio = Boolean(order.shipAddress || order.shipCity);
+  const hayFacturacion = Boolean(order.billAddress || order.billCity);
 
   return {
     version: SNAPSHOT_VERSION,
@@ -146,8 +186,23 @@ export function buildSnapshot(
       email: order.contactEmail,
       phone: order.contactPhone,
     },
+    billing: hayFacturacion
+      ? {
+          country: order.billCountry,
+          state: order.billState,
+          city: order.billCity,
+          address: order.billAddress,
+          address2: order.billAddress2,
+          neighborhood: order.billNeighborhood,
+          zip: order.billZip,
+        }
+      : null,
+    sameAddress: order.shipSameAsBilling,
     shipping: hayEnvio
       ? {
+          name: order.shipName,
+          phone: order.shipPhone,
+          document: order.shipDocument,
           country: order.shipCountry,
           state: order.shipState,
           city: order.shipCity,
@@ -196,6 +251,17 @@ export const SELECT_PARA_COMPROBANTE = {
   contactPhone: true,
   contactEmail: true,
   contactDocument: true,
+  billCountry: true,
+  billState: true,
+  billCity: true,
+  billAddress: true,
+  billAddress2: true,
+  billNeighborhood: true,
+  billZip: true,
+  shipSameAsBilling: true,
+  shipName: true,
+  shipPhone: true,
+  shipDocument: true,
   shipCountry: true,
   shipState: true,
   shipCity: true,

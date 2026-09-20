@@ -174,21 +174,25 @@ export async function renderSalesDocumentPdf(
   ctx.y -= 20;
 
   // ── Comprador y entrega, en dos columnas ──
+  // v1: "COMPRADOR" (datos) y "ENVIAR A" (dirección), como se emitió.
+  // v2: "FACTURADO A" (datos + dirección de quien paga) y "ENVIAR A" (quien
+  //     recibe + dirección); con la misma dirección, se dice una vez.
+  const partes = bloquesDePartes(snapshot);
   const colDerecha = MARGEN + 265;
   const yBloque = ctx.y;
 
-  texto(ctx, "COMPRADOR", MARGEN, yBloque, { size: 7.5, bold: true, color: GRIS });
+  texto(ctx, partes.izquierda.titulo, MARGEN, yBloque, { size: 7.5, bold: true, color: GRIS });
   let yc = yBloque - 14;
-  for (const l of lineasComprador(snapshot)) {
+  for (const l of partes.izquierda.lineas) {
     texto(ctx, l, MARGEN, yc, { size: 9, maxWidth: 240 });
     yc -= 12;
   }
 
   let ye = yBloque;
-  if (snapshot.shipping) {
-    texto(ctx, "ENVIAR A", colDerecha, yBloque, { size: 7.5, bold: true, color: GRIS });
+  if (partes.derecha) {
+    texto(ctx, partes.derecha.titulo, colDerecha, yBloque, { size: 7.5, bold: true, color: GRIS });
     ye = yBloque - 14;
-    for (const l of lineasEnvio(snapshot)) {
+    for (const l of partes.derecha.lineas) {
       texto(ctx, l, colDerecha, ye, { size: 9, maxWidth: 235 });
       ye -= 12;
     }
@@ -302,6 +306,35 @@ export async function renderSalesDocumentPdf(
   return doc.save();
 }
 
+type Bloque = { titulo: string; lineas: string[] };
+
+/**
+ * Las dos columnas de "quién" del comprobante, según la versión del snapshot.
+ *
+ *  v1: COMPRADOR (datos) · ENVIAR A (dirección) — como se emitió, congelado.
+ *  v2: FACTURADO A (datos + dirección de quien paga) · ENVIAR A (quien recibe
+ *      + dirección); con la misma dirección se dice una vez, no se repite.
+ *
+ * Es una función pura y exportada para que la prueba lea la decisión sin
+ * tener que extraer texto de un PDF.
+ */
+export function bloquesDePartes(s: SalesDocumentSnapshot): { izquierda: Bloque; derecha: Bloque | null } {
+  const v2 = s.version >= 2;
+  const izquierda: Bloque = {
+    titulo: v2 ? "FACTURADO A" : "COMPRADOR",
+    lineas: [...lineasComprador(s), ...(v2 ? lineasFacturacion(s) : [])],
+  };
+  if (!s.shipping) return { izquierda, derecha: null };
+  const derecha: Bloque = {
+    titulo: "ENVIAR A",
+    lineas:
+      v2 && s.sameAddress
+        ? ["Entrega a la misma dirección"]
+        : [...(v2 ? lineasDestinatario(s) : []), ...lineasEnvio(s)],
+  };
+  return { izquierda, derecha };
+}
+
 function lineasComprador(s: SalesDocumentSnapshot): string[] {
   const out: string[] = [];
   if (s.buyer.name) out.push(s.buyer.name);
@@ -309,6 +342,31 @@ function lineasComprador(s: SalesDocumentSnapshot): string[] {
   if (s.buyer.email) out.push(s.buyer.email);
   if (s.buyer.phone) out.push(s.buyer.phone);
   return out.length > 0 ? out : ["Consumidor final"];
+}
+
+/** La dirección de quien paga (v2). */
+function lineasFacturacion(s: SalesDocumentSnapshot): string[] {
+  const b = s.billing;
+  if (!b) return [];
+  const out: string[] = [];
+  if (b.address) out.push([b.address, b.address2].filter(Boolean).join(", "));
+  if (b.neighborhood) out.push(b.neighborhood);
+  const ciudad = [b.city, b.state].filter(Boolean).join(", ");
+  if (ciudad) out.push(ciudad);
+  const pais = [nombrePais(b.country), b.zip].filter(Boolean).join(" ");
+  if (pais) out.push(pais);
+  return out;
+}
+
+/** Quien recibe (v2): nombre, celular y documento si lo dio. */
+function lineasDestinatario(s: SalesDocumentSnapshot): string[] {
+  const e = s.shipping;
+  if (!e) return [];
+  const out: string[] = [];
+  if (e.name) out.push(e.name);
+  if (e.document) out.push(`Documento: ${e.document}`);
+  if (e.phone) out.push(e.phone);
+  return out;
 }
 
 function lineasEnvio(s: SalesDocumentSnapshot): string[] {

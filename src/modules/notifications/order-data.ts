@@ -42,6 +42,7 @@ export async function orderEmailContext(orderId: string): Promise<OrderEmailCont
     orderNumber: numero,
     buyerName: o.contactName,
     buyerEmail: o.contactEmail,
+    shipTo: o.shipSameAsBilling ? null : { name: o.shipName, city: o.shipCity },
     whatsappUrl: o.whatsappMessage
       ? whatsappUrl(await whatsappNumberFor(o.currency), o.whatsappMessage)
       : null,

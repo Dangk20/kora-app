@@ -53,6 +53,29 @@ describe("número de pedido", () => {
   });
 });
 
+describe("mensaje de WhatsApp con destinatario distinto", () => {
+  // Compra desde EE.UU. para un familiar en Colombia (13 sep 2026): el
+  // operador cobra a uno y despacha a otro, y lo tiene que ver de un vistazo.
+  it("titula 'Paga' al pagador y añade 'Enviar a' con quien recibe", () => {
+    const message = buildWhatsappMessage({
+      ...base,
+      contactName: "John Smith",
+      contactPhone: "+13055550123",
+      shipTo: { name: "Rosa Smith", phone: "+573109876543" },
+    });
+    expect(message).toContain("💳 Paga\n👤 John Smith\n📞 +13055550123");
+    expect(message).toContain(
+      "📍 Enviar a\n👤 Rosa Smith\n📞 +573109876543\nCarrera 7 # 82 - 15\nBarrio Chapinero, Bogotá, Bogotá D.C.",
+    );
+    expect(message).not.toContain("📍 Entrega");
+  });
+
+  it("sin destinatario el mensaje es exactamente el de siempre", () => {
+    expect(buildWhatsappMessage({ ...base, shipTo: undefined })).toBe(buildWhatsappMessage(base));
+    expect(buildWhatsappMessage(base)).not.toContain("Paga\n");
+  });
+});
+
 describe("mensaje de WhatsApp", () => {
   it("arma el mensaje con la estructura acordada", () => {
     const message = buildWhatsappMessage(base);

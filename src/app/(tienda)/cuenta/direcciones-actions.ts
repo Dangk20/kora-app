@@ -37,11 +37,10 @@ function leer(formData: FormData): AddressInput {
 function problema(d: AddressInput): string | null {
   if (!d.address) return "Escribe la dirección de entrega.";
   if (!d.city) return "Escribe la ciudad.";
-  if (!d.state) {
-    return d.country === "US" ? "Elige el estado." : "Elige el departamento.";
-  }
-  if (d.country === "CO" && !d.neighborhood) return "Escribe el barrio.";
-  if (d.country === "US" && !d.zip) return "Escribe el ZIP.";
+  // La libreta es de envío, y KORA solo envía dentro de Colombia.
+  if (d.country !== "CO") return "Solo hacemos envíos dentro de Colombia.";
+  if (!d.state) return "Elige el departamento.";
+  if (!d.neighborhood) return "Escribe el barrio.";
   return null;
 }
 

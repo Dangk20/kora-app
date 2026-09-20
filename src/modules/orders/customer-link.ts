@@ -16,14 +16,21 @@ export type OrderCustomerInput = {
   email: string;
   phone: string;
   document?: string | null;
+  /** País de QUIEN PAGA (CO | US). Es lo que guarda `customer.country`. */
   country: string;
+  /**
+   * Dirección de ENVÍO, siempre en Colombia: es la que estrena la libreta y
+   * la que el panel ve como "su dirección" — a donde le llegan las cosas.
+   * Desde el 20 sep 2026 (change direccion-facturacion-y-envio) ya no es la
+   * misma que la del pagador: quien compra desde EE.UU. envía a un familiar.
+   */
   city: string;
   address: string;
   acceptsMarketing: boolean;
-  /** Resto de la dirección de entrega, para estrenar la libreta del cliente. */
   state?: string | null;
   address2?: string | null;
   neighborhood?: string | null;
+  /** Sin uso desde que el envío es siempre Colombia; se conserva por compatibilidad. */
   zip?: string | null;
   notes?: string | null;
 };
@@ -148,13 +155,15 @@ async function estrenarLibreta(tx: Tx, customerId: string, input: OrderCustomerI
     data: {
       customerId,
       label: "Mi dirección",
-      country: input.country === "US" ? "US" : "CO",
+      // La libreta es de direcciones de ENVÍO, y el envío es siempre Colombia.
+      // `input.country` es el del pagador y aquí no pinta nada.
+      country: "CO",
       state: input.state?.trim() || null,
       city: input.city?.trim() || null,
       address: input.address.trim(),
       address2: input.address2?.trim() || null,
-      neighborhood: input.country === "US" ? null : input.neighborhood?.trim() || null,
-      zip: input.country === "US" ? input.zip?.trim() || null : null,
+      neighborhood: input.neighborhood?.trim() || null,
+      zip: null,
       notes: input.notes?.trim() || null,
       isDefault: true,
     },

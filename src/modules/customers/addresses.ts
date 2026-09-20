@@ -38,19 +38,33 @@ export type Address = AddressInput & {
 
 const limpio = (v: string | null | undefined) => v?.trim() || null;
 
+/**
+ * La libreta es de direcciones de ENVÍO, y KORA solo envía dentro de
+ * Colombia (decisión del cliente, 13 sep 2026). Una dirección en otro país
+ * no se puede guardar: no hay nada que hacer con ella. Las guardadas en
+ * EE.UU. antes del 20 sep 2026 se conservan —se ven como incompletas y se
+ * pueden borrar—, pero no se pueden elegir como destino ni editar sin
+ * traerlas a Colombia.
+ */
+export class PaisNoAtendidoError extends Error {
+  constructor() {
+    super("Solo hacemos envíos dentro de Colombia");
+    this.name = "PaisNoAtendidoError";
+  }
+}
+
 function normalizar(input: AddressInput) {
+  if (input.country !== "CO") throw new PaisNoAtendidoError();
   return {
     label: limpio(input.label),
-    country: input.country === "US" ? "US" : "CO",
+    country: "CO",
     state: limpio(input.state),
     city: limpio(input.city),
     address: limpio(input.address),
     address2: limpio(input.address2),
-    // Barrio solo en Colombia, ZIP solo en EE.UU.: guardar el campo del otro
-    // país deja datos que ninguna pantalla vuelve a enseñar y que reaparecen
-    // si el comprador cambia el país de la dirección.
-    neighborhood: input.country === "US" ? null : limpio(input.neighborhood),
-    zip: input.country === "US" ? limpio(input.zip) : null,
+    neighborhood: limpio(input.neighborhood),
+    // Sin uso desde que el envío es siempre Colombia; se deja nulo.
+    zip: null,
     notes: limpio(input.notes),
   };
 }

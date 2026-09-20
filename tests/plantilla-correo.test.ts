@@ -141,3 +141,25 @@ describe("el correo sobrevive al modo oscuro", () => {
     expect(html).toContain("🚚");
   });
 });
+
+describe("el correo de 'enviado' cuando recibe otra persona", () => {
+  // Compra desde EE.UU. para un familiar en Colombia (change
+  // direccion-facturacion-y-envio): "salió hacia tu dirección" sería mentira
+  // para quien pagó desde Miami.
+  it("nombra al destinatario y la ciudad", () => {
+    const { html, text, subject } = renderOrderEmail("BUYER_SHIPPED", {
+      ...PEDIDO,
+      buyerName: "John Smith",
+      shipTo: { name: "Rosa Smith", city: "Cali" },
+    });
+    expect(subject).toContain("va en camino");
+    expect(html).toContain("Rosa Smith en Cali");
+    expect(text).toContain("Rosa Smith en Cali");
+    expect(html).not.toContain("hacia la dirección que nos diste");
+  });
+
+  it("con la misma dirección dice lo de siempre", () => {
+    const { html } = renderOrderEmail("BUYER_SHIPPED", { ...PEDIDO, shipTo: null });
+    expect(html).toContain("hacia la dirección que nos diste");
+  });
+});

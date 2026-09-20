@@ -156,35 +156,61 @@ describe("«Mis datos» ya no contiene la dirección", () => {
 });
 
 describe("el checkout con una dirección elegida", () => {
+  // Desde el 20 sep 2026 (change direccion-facturacion-y-envio, decisión de
+  // Daniel): los campos de envío SIEMPRE se ven y se pueden editar. Elegir una
+  // dirección de la libreta los COPIA; no hay campos ocultos ni bloque
+  // colapsado. Y la libreta alimenta solo el envío, nunca la facturación.
   const vista = readFileSync("src/app/(tienda)/checkout/checkout-view.tsx", "utf8");
 
-  it("no repite los campos: la tarjeta ya enseña la dirección", () => {
-    expect(vista).toContain("const camposVisibles = direccionId === null || incompleta(elegida)");
-    expect(vista).toContain("{camposVisibles && (");
+  it("elegir una dirección copia sus datos en los campos de envío", () => {
+    expect(vista).toContain("const elegirDireccion = (id: string | null) => {");
+    expect(vista).toMatch(/setEnvioPropio\(\(e\) => \(\{\s*\.\.\.e,\s*state: d\?\.state/);
   });
 
-  it("quita el bloque del DOM en vez de esconderlo con CSS", () => {
-    // Oculto por clase seguiría enviándose, y como con la dirección elegida ya
-    // viajan los campos ocultos, cada dato iría DOS veces en el formulario:
-    // `formData.get()` devuelve el primero, así que el pedido se crearía con
-    // el valor equivocado sin que nada fallara.
-    expect(vista).not.toMatch(/className=\{camposVisibles \? "grid[^"]*" : "hidden"\}/);
+  it("no hay campos ocultos con la dirección elegida", () => {
+    expect(vista).not.toContain('type="hidden" name="shipping.');
+    expect(vista).not.toContain('type="hidden" name="state"');
   });
 
-  it("los campos ocultos no llevan `required`", () => {
-    // Un `required` sobre un campo que no se puede ver bloquea el envío con un
-    // error que el navegador ni siquiera consigue señalar.
-    const ocultos = vista.slice(
-      vista.indexOf('<input type="hidden" name="state"'),
-      vista.indexOf('<input type="hidden" name="notes"'),
+  it("la libreta no toca la facturación", () => {
+    // La función que copia la dirección elegida escribe SOLO en el estado del
+    // envío: ni `setFact` ni `setCountry` aparecen en ella.
+    const fn = vista.slice(
+      vista.indexOf("const elegirDireccion = (id: string | null) => {"),
+      vista.indexOf("const [guardarNueva, setGuardarNueva]"),
     );
-    expect(ocultos).not.toContain("required");
+    expect(fn).not.toContain("setFact(");
+    expect(fn).not.toContain("setCountry(");
   });
 
-  it("una dirección incompleta SÍ muestra los campos", () => {
-    // Las direcciones que vienen del backfill son texto libre, sin
-    // departamento ni barrio. Ocultarlas mandaría un pedido incompleto que el
-    // servidor rechaza señalando un campo que el comprador no puede ver.
+  it("una dirección incompleta o fuera de Colombia se señala", () => {
+    // Las del backfill son texto libre sin departamento ni barrio, y las
+    // guardadas en EE.UU. antes del 20 sep 2026 no sirven como destino.
     expect(vista).toContain("const incompleta = (d: Address | null) =>");
+    expect(vista).toContain('d.country !== "CO"');
+    expect(vista).toContain("{incompleta(d) && (");
+  });
+});
+
+describe("la libreta es de envío, y el envío es siempre Colombia", () => {
+  // KORA no envía a EE.UU. (decisión del cliente, 13 sep 2026). Una dirección
+  // en otro país no se puede guardar: no hay nada que hacer con ella.
+  it("crear una dirección fuera de Colombia se rechaza", async () => {
+    const { createAddress, PaisNoAtendidoError } = await import("@/modules/customers/addresses");
+    await expect(
+      createAddress("cliente-inexistente", {
+        country: "US",
+        state: "FL",
+        city: "Miami",
+        address: "123 Main St",
+        zip: "33101",
+      }),
+    ).rejects.toBeInstanceOf(PaisNoAtendidoError);
+  });
+
+  it("la cuenta ya no ofrece el selector de país", () => {
+    const cuenta = readFileSync("src/app/(tienda)/cuenta/direcciones.tsx", "utf8");
+    expect(cuenta).not.toContain('<option value="US">');
+    expect(cuenta).toContain('<input type="hidden" name="country" value="CO" />');
   });
 });

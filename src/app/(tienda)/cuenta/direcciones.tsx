@@ -83,9 +83,10 @@ function Formulario({
   onCerrar: () => void;
 }) {
   const [state, action] = useActionState(guardarDireccion, null);
-  const [pais, setPais] = useState(direccion?.country ?? "CO");
-  const [division, setDivision] = useState(direccion?.state ?? "");
-  const [ciudad, setCiudad] = useState(direccion?.city ?? "");
+  // Siempre Colombia: la libreta es de envío y KORA no envía a EE.UU. Una
+  // dirección guardada allá antes del 20 sep 2026 se edita como colombiana.
+  const [division, setDivision] = useState(direccion?.country === "CO" ? (direccion?.state ?? "") : "");
+  const [ciudad, setCiudad] = useState(direccion?.country === "CO" ? (direccion?.city ?? "") : "");
 
   useEffect(() => {
     if (state?.ok) onCerrar();
@@ -97,21 +98,8 @@ function Formulario({
     <form action={action} className="grid gap-3">
       {direccion && <input type="hidden" name="id" value={direccion.id} />}
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="country" className="text-[12.5px]">
-          País
-        </Label>
-        <select
-          id="country"
-          name="country"
-          value={pais}
-          onChange={(e) => { setPais(e.target.value); setDivision(""); setCiudad(""); }}
-          className="h-10 rounded-xl border-[1.6px] border-[#e2ddd6] px-3 text-[14px] text-kora-black outline-none focus:border-kora-coral"
-        >
-          <option value="CO">Colombia</option>
-          <option value="US">Estados Unidos</option>
-        </select>
-      </div>
+      <input type="hidden" name="country" value="CO" />
+      <p className="text-[12.5px] text-[#6b6f78]">Hacemos envíos dentro de Colombia.</p>
 
       <Campo id="label" label="Nombre para reconocerla (Casa, Oficina…)" defaultValue={direccion?.label} />
 
@@ -119,7 +107,7 @@ function Formulario({
           ciudad. Elegir una dirección allá y crearla aquí es la misma
           experiencia. */}
       <SelectorDivisionCiudad
-        country={pais === "US" ? "US" : "CO"}
+        country="CO"
         state={division}
         onState={setDivision}
         city={ciudad}
@@ -131,14 +119,7 @@ function Formulario({
       <Campo id="address" label="Dirección" defaultValue={direccion?.address} requerido />
       <Campo id="address2" label="Apartamento, torre, conjunto (opcional)" defaultValue={direccion?.address2} />
 
-      {/* Barrio solo en Colombia, ZIP solo en EE.UU.: los campos no son los
-          mismos, y pedir un barrio para una dirección de Miami es pedir algo
-          que allá no existe. */}
-      {pais === "US" ? (
-        <Campo id="zip" label="ZIP" defaultValue={direccion?.zip} />
-      ) : (
-        <Campo id="neighborhood" label="Barrio" defaultValue={direccion?.neighborhood} />
-      )}
+      <Campo id="neighborhood" label="Barrio" defaultValue={direccion?.neighborhood} requerido />
 
       <Campo id="notes" label="Indicaciones de entrega (opcional)" defaultValue={direccion?.notes} />
 

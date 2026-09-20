@@ -26,6 +26,12 @@ export type OrderEmailData = {
   cancelReason?: "EXPIRED" | "CANCELLED";
   /** Horas que le quedan al pedido. Solo para el recordatorio de pago. */
   hoursLeft?: number;
+  /**
+   * Quien recibe, cuando NO es quien pagó (compra desde EE.UU. para un
+   * familiar en Colombia): el correo de "enviado" lo nombra, con la ciudad.
+   * Nulo cuando la entrega es a la misma persona y dirección.
+   */
+  shipTo?: { name: string | null; city: string | null } | null;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -168,17 +174,25 @@ export function renderOrderEmail(
         cta: { label: "Ver mi pedido", url: `${storeUrl()}/cuenta` },
       });
 
-    case "BUYER_SHIPPED":
+    case "BUYER_SHIPPED": {
+      // A quien pagó por otra persona se le dice a quién va: "salió hacia tu
+      // dirección" sería mentira para quien compró desde Miami.
+      const destinatario = data.shipTo?.name
+        ? `${data.shipTo.name}${data.shipTo.city ? ` en ${data.shipTo.city}` : ""}`
+        : null;
       return base(data, {}, {
         timeline: linea,
         subject: `Tu pedido ${data.orderNumber} va en camino`,
-        preheader: "Ya salió hacia tu dirección.",
+        preheader: destinatario ? `Ya salió hacia ${destinatario}.` : "Ya salió hacia tu dirección.",
         title: "Tu pedido va en camino",
-        body:
-          "Tu pedido salió hacia la dirección que nos diste. Si necesitas coordinar la " +
-          "entrega, escríbenos por WhatsApp y lo vemos.",
+        body: destinatario
+          ? `Tu pedido salió hacia ${destinatario}, a la dirección que nos diste. Si necesitas ` +
+            "coordinar la entrega, escríbenos por WhatsApp y lo vemos."
+          : "Tu pedido salió hacia la dirección que nos diste. Si necesitas coordinar la " +
+            "entrega, escríbenos por WhatsApp y lo vemos.",
         cta: data.whatsappUrl ? { label: "Escribirnos", url: data.whatsappUrl } : null,
       });
+    }
 
     case "BUYER_DELIVERED": {
       const notes: string[] = [];

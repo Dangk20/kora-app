@@ -41,8 +41,15 @@ export type MessageInput = {
   cashbackApplied?: number;
   contactName: string;
   contactPhone: string;
-  /** Dirección en líneas: calle primero, ciudad y departamento después. */
+  /** Dirección de ENTREGA en líneas: calle primero, ciudad y departamento después. */
   address: string[];
+  /**
+   * Quien recibe, cuando NO es quien paga (compra desde EE.UU. para un
+   * familiar en Colombia, o regalo dentro del país). Sin esto el mensaje queda
+   * exactamente como siempre: el operador no tiene por qué leer dos nombres
+   * cuando son la misma persona.
+   */
+  shipTo?: { name: string; phone: string };
   paymentPreference: string;
 };
 
@@ -54,6 +61,9 @@ export function buildWhatsappMessage(input: MessageInput): string {
     "",
     `#${input.orderNumber}`,
     "",
+    // Con destinatario distinto, el bloque de arriba se titula "Paga": el
+    // operador cobra a uno y despacha a otro, y tiene que verlo de un vistazo.
+    ...(input.shipTo ? ["💳 Paga"] : []),
     `👤 ${input.contactName}`,
     `📞 ${input.contactPhone}`,
     "",
@@ -89,7 +99,8 @@ export function buildWhatsappMessage(input: MessageInput): string {
     `💰 Total: ${money(input.total)} ${input.currency}`,
     `💳 Pago: ${input.paymentPreference}`,
     "",
-    "📍 Entrega",
+    input.shipTo ? "📍 Enviar a" : "📍 Entrega",
+    ...(input.shipTo ? [`👤 ${input.shipTo.name}`, `📞 ${input.shipTo.phone}`] : []),
     ...input.address.filter(Boolean),
     "",
     "🟠 Estado: Nuevo pedido",

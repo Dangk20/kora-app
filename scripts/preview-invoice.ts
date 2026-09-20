@@ -19,7 +19,46 @@ import type { SalesDocumentSnapshot } from "../src/modules/invoicing/snapshot";
 
 const DESTINO = join(process.cwd(), ".invoices");
 
-async function snapshotDeEjemplo(): Promise<SalesDocumentSnapshot> {
+/**
+ * Tres ejemplos: misma dirección (el caso mayoritario), compra desde Colombia
+ * para otra persona, y compra desde EE.UU. para un familiar en Colombia.
+ */
+type Caso = "misma" | "otra-persona" | "desde-eeuu";
+
+async function snapshotDeEjemplo(caso: Caso = "misma"): Promise<SalesDocumentSnapshot> {
+  const facturacion =
+    caso === "desde-eeuu"
+      ? {
+          contactName: "John Smith",
+          contactPhone: "+13055550123",
+          contactEmail: "john.smith@example.com",
+          contactDocument: null,
+          billCountry: "US",
+          billState: "Florida",
+          billCity: "Miami",
+          billAddress: "123 Main St",
+          billAddress2: "Apt 4B",
+          billNeighborhood: null,
+          billZip: "33101",
+        }
+      : {
+          contactName: "María José Cruz Romero",
+          contactPhone: "+573229898711",
+          contactEmail: "mjcruzr29@ejemplo.com",
+          contactDocument: "CC 1000376141",
+          billCountry: "CO",
+          billState: "Huila",
+          billCity: "Neiva",
+          billAddress: "Calle 21 # 5-45",
+          billAddress2: "Apto 302",
+          billNeighborhood: "Altico",
+          billZip: null,
+        };
+  const destinatario =
+    caso === "misma"
+      ? { shipSameAsBilling: true, shipName: facturacion.contactName, shipPhone: facturacion.contactPhone, shipDocument: facturacion.contactDocument }
+      : { shipSameAsBilling: false, shipName: "Rosa Elena Cruz", shipPhone: "+573109876543", shipDocument: null };
+
   return buildSnapshot(
     {
       number: 7943,
@@ -30,10 +69,8 @@ async function snapshotDeEjemplo(): Promise<SalesDocumentSnapshot> {
       discountTotal: { toString: () => "24450" },
       cashbackApplied: { toString: () => "12000" },
       total: { toString: () => "452550" },
-      contactName: "María José Cruz Romero",
-      contactPhone: "+573229898711",
-      contactEmail: "mjcruzr29@ejemplo.com",
-      contactDocument: "1000376141",
+      ...facturacion,
+      ...destinatario,
       shipCountry: "CO",
       shipState: "Huila",
       shipCity: "Neiva",
@@ -93,8 +130,15 @@ async function main() {
     snapshot = doc.snapshot;
     etiqueta = `pedido real ${numero}`;
   } else {
-    snapshot = await snapshotDeEjemplo();
-    etiqueta = "pedido de ejemplo";
+    // Sin número: los tres casos de ejemplo, cada uno en su archivo.
+    for (const caso of ["otra-persona", "desde-eeuu"] as const) {
+      const snap = await snapshotDeEjemplo(caso);
+      const ruta = join(DESTINO, `ejemplo-${caso}.pdf`);
+      await writeFile(ruta, await renderSalesDocumentPdf(snap));
+      console.log(`✔ Comprobante de ejemplo (${caso}):\n  ${ruta}`);
+    }
+    snapshot = await snapshotDeEjemplo("misma");
+    etiqueta = "pedido de ejemplo, misma dirección";
   }
 
   const pdf = await renderSalesDocumentPdf(snapshot);

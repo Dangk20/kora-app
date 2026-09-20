@@ -27,8 +27,7 @@ import { ORDER_TTL_MS } from "./status";
 import { whatsappNumberFor } from "./settings";
 import { computeAccrual } from "@/modules/cashback/accrual";
 import { formatMoney } from "@/modules/pricing";
-import { ciudadCanonica } from "@/modules/geo/places";
-import { toE164 } from "@/modules/customers/phone";
+import { validarContacto, validarDireccion } from "./address-rules";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { resolveOrderCustomer } from "./customer-link";
 import { subscribeFromCheckout } from "@/modules/consent/subscription";
@@ -51,6 +50,45 @@ class CouponRaceError extends Error {
 }
 
 
+// Una dirección postal, sin país: el país lo pone cada bloque.
+const direccionSchema = {
+  address: z.string().trim().min(5, "Escribe la dirección"),
+  address2: z.string().trim().optional(),
+  city: z.string().trim().min(2, "Escribe la ciudad"),
+  state: z.string().trim().min(2, "Selecciona el departamento o estado"),
+  neighborhood: z.string().trim().optional(),
+  zip: z.string().trim().optional(),
+};
+
+/**
+ * QUIÉN PAGA: contacto y dirección de facturación, en Colombia o en EE.UU.
+ * Es con quien se habla por WhatsApp y a quien van los correos.
+ */
+const facturacionSchema = z.object({
+  country: z.enum(["CO", "US"]),
+  name: z.string().trim().min(3, "Escribe tu nombre completo"),
+  email: z.string().trim().email("Correo inválido"),
+  phone: z.string().trim().min(7, "Teléfono inválido"),
+  document: z.string().trim().optional(),
+  documentType: z.string().trim().optional(),
+  ...direccionSchema,
+});
+
+/**
+ * A QUIÉN SE ENVÍA: SIEMPRE en Colombia. KORA no envía a EE.UU. (decisión del
+ * cliente, 13 sep 2026): quien compra en USD está allá y manda el pedido a un
+ * familiar acá. El país va como literal para que una petición con otro país
+ * falle en el esquema, no en una comprobación posterior que alguien olvide.
+ */
+const envioSchema = z.object({
+  country: z.literal("CO", { error: "Solo hacemos envíos dentro de Colombia" }),
+  name: z.string().trim().min(3, "Escribe el nombre de quien recibe"),
+  phone: z.string().trim().min(7, "Celular inválido"),
+  document: z.string().trim().optional(),
+  ...direccionSchema,
+  notes: z.string().trim().max(500).optional(),
+});
+
 const baseSchema = z.object({
   checkoutToken: z.string().min(10).max(100),
   // El descuento NUNCA viene del navegador: solo el código. Quien calcula es
@@ -59,23 +97,45 @@ const baseSchema = z.object({
   // Igual que el cupón: llega la INTENCIÓN, no el descuento. Cuánto se puede
   // aplicar lo decide el servidor leyendo el libro de cashback.
   cashbackRequested: z.coerce.number().min(0).optional().default(0),
-  country: z.enum(["CO", "US"]),
-  name: z.string().trim().min(3, "Escribe tu nombre completo"),
-  email: z.string().trim().email("Correo inválido"),
-  phone: z.string().trim().min(7, "Teléfono inválido"),
-  address: z.string().trim().min(5, "Escribe la dirección"),
-  address2: z.string().trim().optional(),
-  city: z.string().trim().min(2, "Escribe la ciudad"),
-  state: z.string().trim().min(2, "Selecciona el departamento o estado"),
-  neighborhood: z.string().trim().optional(),
-  zip: z.string().trim().optional(),
-  document: z.string().trim().optional(),
-  documentType: z.string().trim().optional(),
-  notes: z.string().trim().max(500).optional(),
+  billing: facturacionSchema,
+  // Con `shipSameAsBilling`, `shipping` NO viaja: el servidor lo deriva del
+  // pagador. Un segundo juego de campos escondido en el formulario es
+  // exactamente lo que se quiere evitar.
+  shipSameAsBilling: z.boolean().default(false),
+  shipping: envioSchema.optional(),
   paymentPreference: z.string().trim().min(2, "Elige un método de pago"),
   acceptsData: z.literal(true, { error: "Debes aceptar el tratamiento de datos" }),
   acceptsMarketing: z.boolean().default(false),
 });
+
+type Envio = z.infer<typeof envioSchema>;
+
+/** El bloque de envío de un pedido: el escrito, o el pagador copiado. */
+function resolverEnvio(data: z.infer<typeof baseSchema>): Envio | { error: string; field: string } {
+  if (data.shipSameAsBilling) {
+    // "Misma dirección" solo tiene sentido si el pagador está en Colombia:
+    // desde EE.UU. no hay nada a lo que enviar.
+    if (data.billing.country !== "CO") {
+      return { error: "Escribe a quién se le envía en Colombia", field: "shipping.name" };
+    }
+    const b = data.billing;
+    return {
+      country: "CO",
+      name: b.name,
+      phone: b.phone,
+      document: b.document,
+      address: b.address,
+      address2: b.address2,
+      city: b.city,
+      state: b.state,
+      neighborhood: b.neighborhood,
+      zip: undefined,
+      notes: undefined,
+    };
+  }
+  if (!data.shipping) return { error: "Escribe a quién se le envía", field: "shipping.name" };
+  return data.shipping;
+}
 
 export type CheckoutResult =
   | {
@@ -186,39 +246,36 @@ export async function createOrder(
   const parsed = baseSchema.safeParse(form);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    return { ok: false, error: issue.message, field: String(issue.path[0] ?? "") };
+    // La ruta completa ("billing.city", "shipping.phone") señala el bloque.
+    return { ok: false, error: issue.message, field: issue.path.join(".") };
   }
   const data = parsed.data;
 
-  // Validaciones propias de cada país (PED_HU001 §2/§3).
-  if (data.country === "CO") {
-    if (!data.document || data.document.replace(/\D/g, "").length < 5) {
-      return { ok: false, error: "Escribe tu número de documento", field: "document" };
-    }
-    if (!data.neighborhood) {
-      return { ok: false, error: "Escribe el barrio", field: "neighborhood" };
-    }
-    if (data.phone.replace(/\D/g, "").replace(/^57/, "").length !== 10) {
-      return { ok: false, error: "El celular debe tener 10 dígitos", field: "phone" };
-    }
-    // La ciudad tiene que ser un municipio del departamento elegido. El
-    // navegador ya lo impide con el desplegable cerrado; esto es para quien
-    // no pasa por él. Una dirección "Medellín, Huila" es un paquete perdido.
-    const canonica = ciudadCanonica("CO", data.state, data.city);
-    if (!canonica) {
-      return { ok: false, error: "Elige un municipio del departamento seleccionado", field: "city" };
-    }
-    data.city = canonica; // "NEIVA" se guarda como "Neiva"
-  } else {
-    if (!/^\d{5}(-\d{4})?$/.test(data.zip ?? "")) {
-      return { ok: false, error: "ZIP inválido (##### o #####-####)", field: "zip" };
-    }
-    const canonica = ciudadCanonica("US", data.state, data.city);
-    if (!canonica) {
-      return { ok: false, error: "Choose a city in the selected state", field: "city" };
-    }
-    data.city = canonica;
+  // Validaciones propias de cada país (PED_HU001 §2/§3), las mismas para los
+  // dos bloques: `address-rules.ts`. El pagador con el documento obligatorio
+  // en Colombia; el destinatario con el documento opcional.
+  const pagador = data.billing;
+  const contactoPagador = validarContacto(pagador.country, pagador, { documentoObligatorio: true });
+  if (!contactoPagador.ok) {
+    return { ok: false, error: contactoPagador.error, field: `billing.${contactoPagador.field}` };
   }
+  const direccionPagador = validarDireccion(pagador.country, pagador);
+  if (!direccionPagador.ok) {
+    return { ok: false, error: direccionPagador.error, field: `billing.${direccionPagador.field}` };
+  }
+  pagador.city = direccionPagador.city; // "NEIVA" se guarda como "Neiva"
+
+  const envio = resolverEnvio(data);
+  if ("error" in envio) return { ok: false, error: envio.error, field: envio.field };
+  const contactoEnvio = validarContacto("CO", envio, { documentoObligatorio: false });
+  if (!contactoEnvio.ok) {
+    return { ok: false, error: contactoEnvio.error, field: `shipping.${contactoEnvio.field}` };
+  }
+  const direccionEnvio = validarDireccion("CO", envio);
+  if (!direccionEnvio.ok) {
+    return { ok: false, error: direccionEnvio.error, field: `shipping.${direccionEnvio.field}` };
+  }
+  envio.city = direccionEnvio.city;
 
   // Idempotencia: si este token ya creó un pedido, se devuelve el mismo.
   const existing = await db.order.findUnique({
@@ -233,7 +290,7 @@ export async function createOrder(
     return { ok: false, error: "Tu carrito está vacío o los productos ya no están disponibles" };
   }
 
-  const phone = toE164(data.phone, data.country);
+  const phone = contactoPagador.phone;
   const subtotal = buyable.reduce((sum, l) => sum + l.lineTotal, 0);
 
   // Si hay sesión de comprador, su pedido se ata a SU cliente por identidad.
@@ -246,7 +303,7 @@ export async function createOrder(
   // es esta.
   let coupon: Awaited<ReturnType<typeof validateCoupon>> | null = null;
   if (data.couponCode) {
-    coupon = await validateCoupon(data.couponCode, cart, { phone, email: data.email });
+    coupon = await validateCoupon(data.couponCode, cart, { phone, email: pagador.email });
     if (!coupon.ok) {
       return { ok: false, error: coupon.message, field: "couponCode" };
     }
@@ -290,33 +347,35 @@ export async function createOrder(
           sku: freeVariant.sku,
         }
       : null;
+  // La dirección de ENVÍO es la que estrena la libreta del cliente y la que
+  // el panel ve como "su dirección": es a donde le llegan las cosas.
   const address = compactAddress({
-    country: data.country,
-    address: data.address,
-    address2: data.address2,
-    neighborhood: data.neighborhood,
-    city: data.city,
-    state: data.state,
-    zip: data.zip,
+    country: "CO",
+    address: envio.address,
+    address2: envio.address2,
+    neighborhood: envio.neighborhood,
+    city: envio.city,
+    state: envio.state,
+    zip: undefined,
   });
 
   try {
     const order = await db.$transaction(async (tx) => {
       const customer = await resolveOrderCustomer(tx, {
         buyerCustomerId: buyer?.customerId ?? null,
-        name: data.name,
-        email: data.email,
+        name: pagador.name,
+        email: pagador.email,
         phone,
-        document: data.document,
-        country: data.country,
-        city: data.city,
+        document: pagador.document,
+        country: pagador.country,
+        city: envio.city,
         address,
         acceptsMarketing: data.acceptsMarketing,
-        state: data.state,
-        address2: data.address2,
-        neighborhood: data.neighborhood,
-        zip: data.zip,
-        notes: data.notes,
+        state: envio.state,
+        address2: envio.address2,
+        neighborhood: envio.neighborhood,
+        zip: undefined,
+        notes: envio.notes,
       });
 
       // El saldo se consume ANTES de crear el pedido y dentro de su misma
@@ -361,20 +420,37 @@ export async function createOrder(
           discountTotal,
           cashbackApplied,
           total,
-          contactName: data.name,
+          // Quien paga.
+          contactName: pagador.name,
           contactPhone: phone,
-          contactEmail: data.email,
-          contactDocument: data.document
-            ? `${data.documentType ?? "CC"} ${data.document}`
+          contactEmail: pagador.email,
+          contactDocument: pagador.document
+            ? `${pagador.documentType ?? "CC"} ${pagador.document}`
             : null,
-          shipCountry: data.country,
-          shipState: data.state,
-          shipCity: data.city,
-          shipAddress: data.address,
-          shipAddress2: data.address2 || null,
-          shipNeighborhood: data.neighborhood || null,
-          shipZip: data.zip || null,
-          shipNotes: data.notes || null,
+          billCountry: pagador.country,
+          billState: pagador.state,
+          billCity: pagador.city,
+          billAddress: pagador.address,
+          billAddress2: pagador.address2 || null,
+          billNeighborhood: pagador.country === "CO" ? pagador.neighborhood || null : null,
+          billZip: pagador.country === "US" ? pagador.zip || null : null,
+          // A quién se envía. Siempre Colombia.
+          shipSameAsBilling: data.shipSameAsBilling,
+          shipName: envio.name,
+          shipPhone: contactoEnvio.phone,
+          shipDocument: data.shipSameAsBilling
+            ? pagador.document
+              ? `${pagador.documentType ?? "CC"} ${pagador.document}`
+              : null
+            : envio.document?.trim() || null,
+          shipCountry: "CO",
+          shipState: envio.state,
+          shipCity: envio.city,
+          shipAddress: envio.address,
+          shipAddress2: envio.address2 || null,
+          shipNeighborhood: envio.neighborhood || null,
+          shipZip: null,
+          shipNotes: envio.notes || null,
           paymentPreference: data.paymentPreference,
           checkoutToken: data.checkoutToken,
           expiresAt: new Date(Date.now() + ORDER_TTL_MS),
@@ -427,18 +503,23 @@ export async function createOrder(
         total,
         discount: coupon?.ok ? { code: coupon.coupon.code, amount: discountTotal } : undefined,
         cashbackApplied,
-        contactName: data.name,
+        contactName: pagador.name,
         contactPhone: phone,
         // El mensaje la quiere en dos líneas; el pedido la guarda en una.
         address: addressLines({
-          country: data.country,
-          address: data.address,
-          address2: data.address2,
-          neighborhood: data.neighborhood,
-          city: data.city,
-          state: data.state,
-          zip: data.zip,
+          country: "CO",
+          address: envio.address,
+          address2: envio.address2,
+          neighborhood: envio.neighborhood,
+          city: envio.city,
+          state: envio.state,
+          zip: undefined,
         }),
+        // Solo cuando recibe otra persona: si es la misma, el mensaje queda
+        // como siempre.
+        shipTo: data.shipSameAsBilling
+          ? undefined
+          : { name: envio.name, phone: contactoEnvio.phone },
         paymentPreference: data.paymentPreference,
       });
 
@@ -511,6 +592,10 @@ export async function createOrder(
       });
       if (winner) return orderResult(winner);
     }
+    // Lo que llega aquí es INESPERADO —no un cupón agotado ni una carrera— y
+    // se registra antes de responder: hasta el 20 sep 2026 se tragaba la causa
+    // y el operador solo veía "Intenta de nuevo" sin nada en el servidor.
+    console.error("[checkout] no se pudo crear el pedido", e);
     // Sin redirigir y sin vaciar el carrito (PED_HU002, manejo de errores).
     return { ok: false, error: "No pudimos crear tu pedido. Intenta de nuevo." };
   }

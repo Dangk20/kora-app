@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { ensureSalesDocument, freezeSalesDocument } from "@/modules/invoicing/document";
 import { buildSnapshot } from "@/modules/invoicing/snapshot";
-import { renderSalesDocumentPdf } from "@/modules/invoicing/pdf";
+import { bloquesDePartes, renderSalesDocumentPdf } from "@/modules/invoicing/pdf";
 
 const PREFIJO = "zzt-comprobante";
 
@@ -155,6 +155,17 @@ describe("el código del pedido se congela, no se recalcula", () => {
         contactPhone: null,
         contactEmail: null,
         contactDocument: null,
+        billCountry: null,
+        billState: null,
+        billCity: null,
+        billAddress: null,
+        billAddress2: null,
+        billNeighborhood: null,
+        billZip: null,
+        shipSameAsBilling: false,
+        shipName: null,
+        shipPhone: null,
+        shipDocument: null,
         shipCountry: null,
         shipState: null,
         shipCity: null,
@@ -293,5 +304,90 @@ describe("el PDF se genera de verdad", () => {
       ],
     };
     await expect(renderSalesDocumentPdf(conRareza)).resolves.toBeInstanceOf(Uint8Array);
+  });
+});
+
+describe("facturación y envío en el comprobante (snapshot v2)", () => {
+  // Ver openspec/changes/direccion-facturacion-y-envio — specs/sales-document.
+  // KORA no envía a EE.UU.: quien paga puede estar allá y el pedido va a un
+  // familiar en Colombia. El comprobante congela LAS DOS direcciones.
+  it("congela facturación, destinatario y la marca de misma dirección", async () => {
+    const o = await db.order.create({
+      data: {
+        channel: "WEB",
+        status: "CONFIRMED",
+        currency: "USD",
+        subtotal: 15,
+        total: 15,
+        contactName: "John Smith",
+        contactPhone: "+13055550123",
+        billCountry: "US",
+        billState: "FL",
+        billCity: "Miami",
+        billAddress: "123 Main St",
+        billZip: "33101",
+        shipSameAsBilling: false,
+        shipName: "Rosa Smith",
+        shipPhone: "+573109876543",
+        shipCountry: "CO",
+        shipState: "Valle del Cauca",
+        shipCity: "Cali",
+        shipAddress: "Calle 10 # 5 - 20",
+        shipNeighborhood: "San Antonio",
+        note: PREFIJO,
+        confirmedAt: new Date(),
+      },
+    });
+    const doc = await ensureSalesDocument(o.id);
+    expect(doc!.snapshot.version).toBe(2);
+    expect(doc!.snapshot.billing).toMatchObject({ country: "US", city: "Miami", zip: "33101" });
+    expect(doc!.snapshot.sameAddress).toBe(false);
+    expect(doc!.snapshot.shipping).toMatchObject({ name: "Rosa Smith", phone: "+573109876543", city: "Cali" });
+
+    const partes = bloquesDePartes(doc!.snapshot);
+    expect(partes.izquierda.titulo).toBe("FACTURADO A");
+    expect(partes.izquierda.lineas).toEqual(["John Smith", "+13055550123", "123 Main St", "Miami, FL", "Estados Unidos 33101"]);
+    expect(partes.derecha).toEqual({
+      titulo: "ENVIAR A",
+      lineas: ["Rosa Smith", "+573109876543", "Calle 10 # 5 - 20", "San Antonio", "Cali, Valle del Cauca", "Colombia"],
+    });
+    // Y el PDF se genera con ese contenido.
+    expect(Buffer.from((await renderSalesDocumentPdf(doc!.snapshot)).slice(0, 5)).toString()).toBe("%PDF-");
+  });
+
+  it("con la misma dirección lo dice una vez en vez de repetirla", async () => {
+    const o = await db.order.create({
+      data: {
+        channel: "WEB",
+        status: "CONFIRMED",
+        currency: "COP",
+        subtotal: 100_000,
+        total: 100_000,
+        contactName: "Laura Gómez",
+        billCountry: "CO",
+        billCity: "Neiva",
+        billAddress: "Calle 21 # 5-45",
+        shipSameAsBilling: true,
+        shipName: "Laura Gómez",
+        shipCountry: "CO",
+        shipCity: "Neiva",
+        shipAddress: "Calle 21 # 5-45",
+        note: PREFIJO,
+        confirmedAt: new Date(),
+      },
+    });
+    const doc = await ensureSalesDocument(o.id);
+    const partes = bloquesDePartes(doc!.snapshot);
+    expect(partes.izquierda.lineas).toContain("Calle 21 # 5-45");
+    expect(partes.derecha).toEqual({ titulo: "ENVIAR A", lineas: ["Entrega a la misma dirección"] });
+  });
+
+  it("un snapshot v1 se sigue dibujando como se emitió", async () => {
+    const o = await pedido();
+    const doc = await ensureSalesDocument(o.id);
+    const v1 = { ...doc!.snapshot, version: 1, billing: undefined, sameAddress: undefined };
+    const partes = bloquesDePartes(v1);
+    expect(partes.izquierda).toEqual({ titulo: "COMPRADOR", lineas: ["Nombre original"] });
+    expect(partes.derecha).toEqual({ titulo: "ENVIAR A", lineas: ["Dirección original", "Neiva", "Colombia"] });
   });
 });

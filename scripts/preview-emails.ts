@@ -71,6 +71,22 @@ async function main() {
     console.log(r.ok ? `✅ ${type.padEnd(16)} ${r.providerId}` : `🔴 ${type}: ${r.error}`);
   }
 
+  // El noveno: "enviado" cuando quien recibe NO es quien pagó (compra desde
+  // EE.UU. para un familiar en Colombia). El cliente lo aprueba aparte.
+  const paraOtro = renderOrderEmail("BUYER_SHIPPED", {
+    ...EJEMPLO,
+    buyerName: "John Smith",
+    shipTo: { name: "Rosa Smith", city: "Cali" },
+  });
+  const r = await driver.send({
+    to: "john@example.com",
+    toName: "John Smith",
+    subject: `${paraOtro.subject} (a otra persona)`,
+    html: paraOtro.html,
+    text: paraOtro.text,
+  });
+  console.log(r.ok ? `✅ ${"BUYER_SHIPPED→otro".padEnd(16)} ${r.providerId}` : `🔴 BUYER_SHIPPED→otro: ${r.error}`);
+
   console.log("\nLos archivos están en .emails/ — ábrelos con doble clic.\n");
 }
 

@@ -191,6 +191,10 @@ function detalleDelPedido(o: PedidoConDetalle) {
     whatsappMessage: o.whatsappMessage,
     contactName: o.contactName,
     contactPhone: o.contactPhone,
+    // Quien recibe, cuando no es quien pagó (change direccion-facturacion-y-envio).
+    shipSameAsBilling: o.shipSameAsBilling,
+    shipName: o.shipName,
+    shipPhone: o.shipPhone,
     shipAddress: o.shipAddress,
     shipAddress2: o.shipAddress2,
     shipNeighborhood: o.shipNeighborhood,
@@ -216,5 +220,55 @@ function detalleDelPedido(o: PedidoConDetalle) {
     estadoEn: Object.fromEntries(
       o.statusHistory.filter((h) => h.from !== h.to).map((h) => [h.to, h.createdAt]),
     ) as Partial<Record<OrderStatus, Date>>,
+  };
+}
+
+/** Con qué facturó la última vez: para no hacerle escribir su dirección otra vez. */
+export type UltimaFacturacion = {
+  country: "CO" | "US";
+  state: string;
+  city: string;
+  address: string;
+  address2: string;
+  neighborhood: string;
+  zip: string;
+  document: string;
+};
+
+/**
+ * La facturación del pedido más reciente del comprador, para precargar el
+ * bloque "Quién paga" del checkout.
+ *
+ * Es una LECTURA del último pedido, a propósito, y no una columna en el
+ * cliente: `customer.city/address` ya es un espejo de la libreta con un solo
+ * escritor, y un segundo espejo para la facturación sería otra forma de
+ * desincronizarse sin dar error. El pedido es el snapshot; se lee de ahí.
+ */
+export async function ultimaFacturacion(customerId: string): Promise<UltimaFacturacion | null> {
+  const o = await db.order.findFirst({
+    where: { customerId, billAddress: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      billCountry: true,
+      billState: true,
+      billCity: true,
+      billAddress: true,
+      billAddress2: true,
+      billNeighborhood: true,
+      billZip: true,
+      contactDocument: true,
+    },
+  });
+  if (!o?.billAddress) return null;
+  return {
+    country: o.billCountry === "US" ? "US" : "CO",
+    state: o.billState ?? "",
+    city: o.billCity ?? "",
+    address: o.billAddress,
+    address2: o.billAddress2 ?? "",
+    neighborhood: o.billNeighborhood ?? "",
+    zip: o.billZip ?? "",
+    // El pedido guarda "CC 1020304050"; el formulario pide solo el número.
+    document: (o.contactDocument ?? "").replace(/^[A-Z]+\s+/, ""),
   };
 }

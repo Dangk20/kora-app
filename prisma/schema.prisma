@@ -357,7 +357,7 @@ model Customer {
   phone            String?        @unique // canal principal: WhatsApp
   email            String?        @unique
   document         String? // cédula/NIT, opcional
-  country          String         @default("CO")
+  country          String         @default("CO") // el país del PAGADOR, no del envío
   city             String?
   address          String?
   source           CustomerSource @default(WEB)
@@ -485,18 +485,42 @@ model Order {
   // ── Snapshot del comprador y la entrega (PED_HU001/002) ──
   // Viven en el pedido, no solo en el cliente: si el cliente cambia de
   // dirección después, el pedido despachado conserva la suya.
+  //
+  // Desde el 20 sep 2026 (change direccion-facturacion-y-envio) el pedido
+  // distingue QUIÉN PAGA de A QUIÉN SE ENVÍA: KORA no envía a EE.UU.; quien
+  // compra en USD está allá y manda el pedido a un familiar en Colombia.
+  //   contact* + bill*  → el pagador (con quien se habla por WhatsApp y a
+  //                       quien van los correos), en CO o en US.
+  //   ship*             → la entrega, SIEMPRE en Colombia (shipCountry = "CO").
+  // Los pedidos anteriores se rellenaron como "misma dirección": solo existía
+  // una y era la del propio comprador.
   contactName     String?
   contactPhone    String? // E.164: +57… / +1…
   contactEmail    String?
   contactDocument String? // CC/CE/NIT — lo exigen las transportadoras (solo CO)
 
-  shipCountry      String? @default("CO") // CO | US
-  shipState        String? // departamento (CO) | estado (US)
+  billCountry      String? // CO | US — el país del pagador
+  billState        String? // departamento (CO) | estado (US)
+  billCity         String?
+  billAddress      String?
+  billAddress2     String?
+  billNeighborhood String? // barrio (solo CO)
+  billZip          String? // ZIP (solo US)
+
+  /// true = la entrega es a la misma persona y dirección que la facturación.
+  /// Es un HECHO guardado, no una comparación de textos al leer.
+  shipSameAsBilling Boolean @default(false)
+  shipName          String? // el destinatario: la transportadora lo llama a él
+  shipPhone         String? // E.164, siempre +57
+  shipDocument      String? // opcional: quien compra desde fuera no siempre lo tiene
+
+  shipCountry      String? @default("CO") // siempre CO en pedidos nuevos
+  shipState        String? // departamento
   shipCity         String?
   shipAddress      String?
-  shipAddress2     String? // apto/torre/conjunto | Apt/Suite
-  shipNeighborhood String? // barrio (solo CO)
-  shipZip          String? // ZIP (solo US)
+  shipAddress2     String? // apto/torre/conjunto
+  shipNeighborhood String? // barrio
+  shipZip          String? // solo pedidos anteriores al 20 sep 2026
   shipNotes        String?
 
   paymentPreference String? // Nequi, Zelle… (administrable a futuro)
