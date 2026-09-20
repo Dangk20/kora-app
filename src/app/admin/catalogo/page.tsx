@@ -433,7 +433,18 @@ export default async function CatalogPage({
       )}
 
       {(altaAbierta || edicionAbierta) && (
-        <ProductModal categories={categoryTree(categories)} initial={sheetInitial} />
+        // ⚠️ `key` POR PRODUCTO. Al guardar un alta, la URL pasa de `?nuevo=1`
+        // a `?editar=<id>`, y sin la clave React reutiliza la MISMA instancia
+        // del modal: el estado del formulario seguía sin `id`, así que no
+        // aparecía la caja de fotos y un segundo "Guardar" volvía a CREAR el
+        // producto —conflicto de SKU, o un duplicado si se cambiaba el SKU—.
+        // Lo vio Daniel el 19 sep 2026. Con la clave, el modal se monta de
+        // nuevo con el producto ya creado.
+        <ProductModal
+          key={sheetInitial?.id ?? "nuevo"}
+          categories={categoryTree(categories)}
+          initial={sheetInitial}
+        />
       )}
 
       {Boolean(importar) && canCreate && <ImportSheet />}

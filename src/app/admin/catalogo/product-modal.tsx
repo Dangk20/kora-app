@@ -9,10 +9,11 @@
 // interfaces para el mismo objeto, con la matriz apretada en 480 px justo
 // cuando hay más que ver. Con las pestañas navegables el argumento desaparece.
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { ProductForm, type CategoryNode, type ProductDraft } from "./product-form";
+import { guardaDeFondo } from "./form-guards";
 
 export function ProductModal({
   categories,
@@ -23,6 +24,11 @@ export function ProductModal({
 }) {
   const router = useRouter();
   const close = () => router.push("/admin/catalogo");
+  // ⚠️ El fondo cierra SOLO si el clic empezó Y terminó en él. Seleccionar
+  // texto en un campo y soltar fuera del panel disparaba `click` en el fondo
+  // y cerraba el alta a medio llenar, sin guardar (13 sep 2026, en la reunión
+  // con el cliente). Ver `form-guards.ts`.
+  const fondo = useMemo(() => guardaDeFondo(close), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Con el modal abierto, la página de atrás no se desplaza; y Escape cierra,
   // que es lo que todo el mundo intenta primero.
@@ -43,7 +49,8 @@ export function ProductModal({
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(14,15,18,0.5)] p-4 sm:p-8"
-      onClick={close}
+      onMouseDown={fondo.onMouseDown}
+      onClick={fondo.onClick}
     >
       {/* Alto ESTABLE, no "el que pida el contenido": con la altura libre, el
           modal medía 745 px en el paso 1 y 590 en el 3, y cambiaba de tamaño
@@ -70,6 +77,7 @@ export function ProductModal({
             </p>
           </div>
           <button
+            type="button"
             onClick={close}
             aria-label="Cerrar"
             className="flex size-[34px] items-center justify-center rounded-full bg-[#f5f3f0] text-[#8a8f98] hover:text-kora-black"

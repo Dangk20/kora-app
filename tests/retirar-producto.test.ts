@@ -79,17 +79,23 @@ describe("el alta por pasos no se guarda a medias", () => {
   // sus nueve variantes y cero unidades.
   const formulario = readFileSync("src/app/admin/catalogo/product-form.tsx", "utf8");
 
-  it("Enter no envía el formulario en el recorrido", () => {
-    expect(formulario).toContain('if (e.key !== "Enter" || !porPasos) return;');
+  // Desde el 19 sep 2026 la decisión de qué hace Enter vive en
+  // `form-guards.ts` (`decidirEnter`) y se prueba con la lógica real en
+  // `tests/alta-producto-guardas.test.ts`. Aquí solo se fija que el
+  // formulario sigue pasando por ella.
+  it("Enter pasa por decidirEnter y se cancela salvo que la decisión sea dejarlo", () => {
+    expect(formulario).toContain('if (e.key !== "Enter") return;');
+    expect(formulario).toContain("const decision = decidirEnter({");
+    expect(formulario).toContain('if (decision === "dejar") return;');
     expect(formulario).toContain("e.preventDefault();");
   });
 
   it("Enter avanza de paso en un alta, en vez de guardar", () => {
-    expect(formulario).toMatch(/if \(esAlta && paso < 2\) \{\s*setPaso\(paso \+ 1\)/);
+    expect(formulario).toMatch(/if \(decision === "avanzar"\) \{\s*irAPaso\(paso \+ 1\)/);
   });
 
   it("en un área de texto, Enter sigue siendo un salto de línea", () => {
-    expect(formulario).toContain('if (destino.tagName === "TEXTAREA") return;');
+    expect(formulario).toContain('enAreaDeTexto: destino.tagName === "TEXTAREA"');
   });
 
   it("la comprobación de campos vive fuera del botón, porque hay DOS caminos", () => {

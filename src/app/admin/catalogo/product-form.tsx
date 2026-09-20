@@ -6,6 +6,7 @@ import { Boxes, Check, ImagePlus, Package, Tags } from "lucide-react";
 import { upsertProduct } from "@/modules/catalog/product-actions";
 import { quickCreateCategory } from "@/modules/catalog/category-actions";
 import { Switch } from "@/components/ui/switch";
+import { decidirEnter } from "./form-guards";
 import { nombreDeCombinacion, type OptionGroup } from "@/modules/catalog/options";
 import { OptionBuilder } from "./option-builder";
 import { VariantMatrix } from "./variant-matrix";
@@ -338,6 +339,25 @@ export function ProductForm({
   const esAlta = !initial;
 
   /**
+   * Cambiar de paso Y llevar el foco al primer campo del nuevo.
+   *
+   * Sin esto, el campo desde el que se avanzó se queda con el foco dentro de
+   * un bloque oculto hasta que el navegador lo recoloca, y cualquier tecla en
+   * esa ventana cae en un campo que no se ve. Además, quien viene tecleando
+   * sigue tecleando: no tiene que buscar el primer campo con el ratón.
+   */
+  const irAPaso = (n: number) => {
+    setPaso(n);
+    requestAnimationFrame(() => {
+      const bloque = document.querySelector<HTMLElement>(`[data-paso="${n}"]`);
+      (
+        bloque?.querySelector<HTMLElement>("input, select, textarea") ??
+        bloque?.querySelector<HTMLElement>("button")
+      )?.focus();
+    });
+  };
+
+  /**
    * ¿Se puede enviar? Si no, salta al paso del primer campo que falta.
    *
    * Vive aparte del botón porque hay DOS caminos hasta el envío —el botón y la
@@ -484,16 +504,34 @@ export function ProductForm({
         // recorrido de tres pasos eso guardaba el producto desde el paso 1 o
         // el 2 —a medio llenar y sin stock— y el modal se cerraba solo. Desde
         // fuera parecía que se cerraba sin guardar; en realidad guardaba mal.
-        if (e.key !== "Enter" || !porPasos) return;
+        //
+        // ⚠️ Y LO QUE SE ESCAPÓ (13 sep 2026, en la reunión con el cliente):
+        // mantener Enter un instante. La autorrepetición manda varios keydown:
+        // el primero avanzaba al paso 3 y el siguiente llegaba AL MISMO CAMPO
+        // —ya oculto, pero todavía con el foco— y enviaba desde el 3. Producto
+        // guardado sin stock y modal cerrado. La decisión vive en
+        // `form-guards.ts`, con su prueba.
+        if (e.key !== "Enter") return;
         const destino = e.target as HTMLElement;
-        // En un área de texto, Enter es un salto de línea legítimo.
-        if (destino.tagName === "TEXTAREA") return;
+        const bloque = destino.closest<HTMLElement>("[data-paso]");
+        const decision = decidirEnter({
+          porPasos,
+          esAlta,
+          paso,
+          ultimoPaso: PASOS.length - 1,
+          repeat: e.repeat,
+          enAreaDeTexto: destino.tagName === "TEXTAREA",
+          enBoton: destino.tagName === "BUTTON",
+          enPasoOculto: bloque !== null && Number(bloque.dataset.paso) !== paso,
+        });
+        if (decision === "dejar") return;
 
         e.preventDefault();
+        if (decision === "ignorar") return;
 
         // En un alta, Enter AVANZA: es lo que espera quien viene de teclear.
-        if (esAlta && paso < 2) {
-          setPaso(paso + 1);
+        if (decision === "avanzar") {
+          irAPaso(paso + 1);
           return;
         }
         const form = e.currentTarget;
@@ -503,7 +541,7 @@ export function ProductForm({
       <input type="hidden" name="payload" value={payload} />
       {product.id && <input type="hidden" name="id" value={product.id} />}
 
-      {porPasos && <PasosCabecera paso={paso} onIr={setPaso} />}
+      {porPasos && <PasosCabecera paso={paso} onIr={irAPaso} />}
 
       <div className="flex-1 space-y-4 px-7 py-6">
         <Bloque paso={0} visible={!porPasos || paso === 0}>
@@ -813,7 +851,7 @@ export function ProductForm({
       <div className="sticky bottom-0 flex gap-3 border-t border-[#f0ece6] bg-white px-7 py-4">
         <button
           type="button"
-          onClick={porPasos && esAlta && paso > 0 ? () => setPaso(paso - 1) : onCancel}
+          onClick={porPasos && esAlta && paso > 0 ? () => irAPaso(paso - 1) : onCancel}
           className="flex-1 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white py-3 text-sm font-semibold text-kora-black hover:bg-muted"
         >
           {porPasos && esAlta && paso > 0 ? "Atrás" : "Cancelar"}
@@ -823,7 +861,7 @@ export function ProductForm({
           // formulario a medio recorrido y guardaría un producto sin stock.
           <button
             type="button"
-            onClick={() => setPaso(paso + 1)}
+            onClick={() => irAPaso(paso + 1)}
             className="bg-kora-gradient flex-1 rounded-[11px] py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(255,90,31,0.3)] hover:opacity-90"
           >
             Siguiente
