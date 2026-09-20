@@ -58,6 +58,7 @@ export function buildEml(msg: EmailMessage, from = fromAddress()): string {
     cabeceras.push(`List-Unsubscribe: <${msg.unsubscribeUrl}>`);
     cabeceras.push("List-Unsubscribe-Post: List-Unsubscribe=One-Click");
   }
+  if (msg.threadKey) cabeceras.push(`X-Entity-Ref-ID: ${msg.threadKey}`);
   cabeceras.push(
     adjuntos.length > 0
       ? `Content-Type: multipart/mixed; boundary="${limiteExterior}"`

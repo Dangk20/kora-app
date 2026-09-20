@@ -29,6 +29,15 @@ export type EmailMessage = {
   /** Para el encabezado `List-Unsubscribe`: el botón nativo de Gmail/Outlook. */
   unsubscribeUrl?: string;
   /**
+   * Clave de conversación (`X-Entity-Ref-ID`). Gmail agrupa en un mismo hilo
+   * los correos del mismo remitente con el mismo asunto —y para compararlo
+   * IGNORA las etiquetas entre corchetes—, así que "[PRUEBA] Oferta" y
+   * "Oferta" caían juntos, y el hilo se titulaba con la prueba (reunión con
+   * el cliente, 13 sep 2026). Con esta cabecera distinta, Gmail los separa.
+   * La prueba lleva una clave propia y la campaña la suya.
+   */
+  threadKey?: string;
+  /**
    * Archivos adjuntos. Los dos drivers TIENEN que entregarlos: el de
    * producción con el mensaje, el de desarrollo escribiéndolos a disco para
    * que se puedan abrir y revisar.

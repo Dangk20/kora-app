@@ -46,6 +46,13 @@ services:
     environment:
       KORA_STORAGE_DRIVER: disk
       KORA_UPLOADS_DIR: /data/uploads
+      # La dirección pública de PRUEBAS. Sin ella, `storeUrl()` cae al valor
+      # por defecto —korashopp.com, la página de espera— y todo enlace y toda
+      # foto de los correos que salen de pruebas apuntan a producción: el
+      # "Compra ahora" de la campaña llevaba a "muy pronto" (13 sep 2026).
+      # Va aquí y no en `.env.staging` por la misma razón que el
+      # almacenamiento: este archivo sí viaja en cada despliegue.
+      NEXT_PUBLIC_STORE_URL: https://test.korashopp.com
     env_file:
       - .env.staging
     depends_on:
@@ -127,6 +134,13 @@ services:
     environment:
       KORA_STORAGE_DRIVER: disk
       KORA_UPLOADS_DIR: /data/uploads
+      # La dirección pública de PRUEBAS. Sin ella, `storeUrl()` cae al valor
+      # por defecto —korashopp.com, la página de espera— y todo enlace y toda
+      # foto de los correos que salen de pruebas apuntan a producción: el
+      # "Compra ahora" de la campaña llevaba a "muy pronto" (13 sep 2026).
+      # Va aquí y no en `.env.staging` por la misma razón que el
+      # almacenamiento: este archivo sí viaja en cada despliegue.
+      NEXT_PUBLIC_STORE_URL: https://test.korashopp.com
     depends_on:
       postgres:
         condition: service_healthy

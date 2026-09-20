@@ -95,3 +95,23 @@ describe("el worker tiene salida a internet", () => {
     }
   });
 });
+
+describe("pruebas conoce su propia dirección pública", () => {
+  // El 13 sep 2026 la campaña de prueba enviada desde pruebas llevaba el
+  // "Compra ahora" a korashopp.com —la página de espera— y, al absolutizar las
+  // fotos de los correos, habrían ido al mismo sitio. `storeUrl()` cae a
+  // producción si nadie declara `NEXT_PUBLIC_STORE_URL`, y `.env.staging`
+  // vive solo en el servidor: lo que no está en el compose no se puede
+  // revisar en un diff.
+  it("la app y el worker de staging declaran NEXT_PUBLIC_STORE_URL=test.korashopp.com", async () => {
+    const { readFileSync } = await import("node:fs");
+    const texto = readFileSync("deploy/docker-compose.staging.yml", "utf8");
+    const app = texto.slice(texto.indexOf("\n  app:\n"), texto.indexOf("\n  worker:\n"));
+    const worker = texto.slice(texto.indexOf("\n  worker:\n"), texto.indexOf("\n  migrate:\n"));
+    for (const [nombre, bloque] of [["app", app], ["worker", worker]] as const) {
+      expect(bloque, `${nombre}: sin la dirección pública de pruebas`).toContain(
+        "NEXT_PUBLIC_STORE_URL: https://test.korashopp.com",
+      );
+    }
+  });
+});

@@ -33,6 +33,7 @@ export function createResendDriver(apiKey: string, from = fromAddress()): EmailD
         headers["List-Unsubscribe"] = `<${msg.unsubscribeUrl}>`;
         headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
       }
+      if (msg.threadKey) headers["X-Entity-Ref-ID"] = msg.threadKey;
 
       try {
         const res = await fetch(ENDPOINT, {

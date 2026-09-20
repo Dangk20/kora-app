@@ -154,9 +154,23 @@ function parrafos(texto: string): string {
     .join("");
 }
 
-function producto(p: TemplateProduct): string {
+/**
+ * Toda imagen de un correo lleva dirección ABSOLUTA.
+ *
+ * El almacenamiento en disco —el de pruebas y producción— devuelve `/media/…`,
+ * que en la tienda resuelve contra el dominio y en un correo contra NADA:
+ * Gmail enseñaba el texto alternativo en lugar de la foto (reunión con el
+ * cliente, 13 sep 2026). Se corrige aquí, en el único sitio por el que pasa
+ * cada `<img>`, y no en el módulo de almacenamiento: la tienda sigue
+ * sirviéndose rutas relativas, que es lo que quiere.
+ */
+export function srcAbsoluto(url: string, base: string): string {
+  return url.startsWith("/") ? `${base}${url}` : url;
+}
+
+function producto(p: TemplateProduct, base: string): string {
   const imagen = p.imageUrl
-    ? `<img src="${p.imageUrl}" width="260" alt="${escapeHtml(p.name)}" style="display:block;width:100%;max-width:260px;height:auto;border:0;border-radius:10px;" />`
+    ? `<img src="${srcAbsoluto(p.imageUrl, base)}" width="260" alt="${escapeHtml(p.name)}" style="display:block;width:100%;max-width:260px;height:auto;border:0;border-radius:10px;" />`
     : `<div style="width:100%;max-width:260px;height:140px;background:${BEIGE};border-radius:10px;"></div>`;
 
   // Audiencia mixta → sin precio. No existe tasa de cambio en KORA: un precio
@@ -184,12 +198,12 @@ function producto(p: TemplateProduct): string {
   </td>`;
 }
 
-function parrillaProductos(products: TemplateProduct[]): string {
+function parrillaProductos(products: TemplateProduct[], base: string): string {
   if (products.length === 0) return "";
   const filas: string[] = [];
   for (let i = 0; i < products.length; i += 2) {
     const par = products.slice(i, i + 2);
-    const celdas = par.map(producto).join("");
+    const celdas = par.map((p) => producto(p, base)).join("");
     const relleno = par.length === 1 ? '<td style="width:50%;"></td>' : "";
     filas.push(`<tr>${celdas}${relleno}</tr>`);
   }
@@ -304,7 +318,7 @@ function botonHtml(label: string, url: string): string {
 }
 
 /** Los bloques, uno detrás de otro. Mismos estilos que el camino de campos fijos. */
-function bloquesHtml(blocks: TemplateBlock[]): string {
+function bloquesHtml(blocks: TemplateBlock[], base: string): string {
   return blocks
     .map((b) => {
       switch (b.type) {
@@ -313,13 +327,13 @@ function bloquesHtml(blocks: TemplateBlock[]): string {
         case "text":
           return parrafos(b.text);
         case "image": {
-          const img = `<img src="${b.url}" width="548" alt="${escapeHtml(b.alt)}" style="display:block;width:100%;max-width:548px;height:auto;border:0;border-radius:12px;" />`;
+          const img = `<img src="${srcAbsoluto(b.url, base)}" width="548" alt="${escapeHtml(b.alt)}" style="display:block;width:100%;max-width:548px;height:auto;border:0;border-radius:12px;" />`;
           return `<div style="margin:0 0 18px;">${b.linkUrl ? `<a href="${b.linkUrl}">${img}</a>` : img}</div>`;
         }
         case "button":
           return botonHtml(b.label, b.url);
         case "products":
-          return parrillaProductos(b.products);
+          return parrillaProductos(b.products, base);
         case "divider":
           return `<hr class="kora-borde" style="border:0;border-top:1px solid #eee9e2;margin:20px 0;" />`;
         case "spacer":
@@ -343,7 +357,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
   // NO son bloques: son lo que la ley y la marca exigen, y el operador no los
   // puede quitar ni mover.
   const cuerpo = input.blocks
-    ? bloquesHtml(input.blocks)
+    ? bloquesHtml(input.blocks, base)
     : `<h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
         input.title,
       )}</h1>
@@ -353,10 +367,10 @@ export function renderCampaignHtml(input: TemplateInput): string {
       ${input.footer ? parrafos(input.footer) : ""}
       ${cta}
       ${tablaPedido(input.order)}
-      ${parrillaProductos(input.products)}`;
+      ${parrillaProductos(input.products, base)}`;
 
   const banner = !input.blocks && input.imageUrl
-    ? `<img src="${input.imageUrl}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;" />`
+    ? `<img src="${srcAbsoluto(input.imageUrl, base)}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;" />`
     : "";
 
   return `<!DOCTYPE html>

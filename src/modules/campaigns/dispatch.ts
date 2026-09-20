@@ -189,6 +189,7 @@ export async function dispatchBatch(
       html,
       text,
       unsubscribeUrl: unsubscribeUrl(d.customerId),
+      threadKey: `campana:${campaign.id}`,
     });
 
     if (r.ok) {

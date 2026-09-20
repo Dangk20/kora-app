@@ -246,6 +246,8 @@ export async function sendTestEmail(campaignId: string, to: string): Promise<Act
     html,
     text,
     unsubscribeUrl: unsubscribeUrl("prueba"),
+    // Cada prueba en su propio hilo, y nunca en el de la campaña real.
+    threadKey: `prueba:${c.id}:${Date.now()}`,
   });
 
   if (!r.ok) return { ok: false, error: `No se pudo enviar la prueba: ${r.error}` };
