@@ -46,11 +46,14 @@ export function PasoCampana({
         </div>
         <div>
           <label className={labelCls} htmlFor="preheader">
-            Preheader <Suave>({datos.preheader.length}/{MAX_PREHEADER}) · se ve junto al asunto, decide si se abre</Suave>
+            Texto de vista previa <Suave>(opcional · {datos.preheader.length}/{MAX_PREHEADER}) · se lee en gris junto al asunto, antes de abrir</Suave>
           </label>
           <input id="preheader" maxLength={MAX_PREHEADER} value={datos.preheader}
-            onChange={(e) => onDatos({ ...datos, preheader: e.target.value })} className={inputCls} />
+            onChange={(e) => onDatos({ ...datos, preheader: e.target.value })} className={inputCls}
+            placeholder="Ej. Hasta 30 % en tecnología, solo hasta el domingo" />
         </div>
+
+        <PreviaBandeja subject={datos.subject} preheader={datos.preheader} />
       </Seccion>
 
       <Seccion titulo="A quién va">
@@ -111,6 +114,37 @@ export function PasoCampana({
           </span>
         </div>
       </Seccion>
+    </div>
+  );
+}
+
+/**
+ * Cómo se ve el correo en la bandeja de entrada ANTES de abrirlo, imitando la
+ * fila de Gmail: remitente, asunto en negrita y el texto de vista previa en
+ * gris. Existe porque "preheader" no se entiende hasta verlo en su sitio
+ * (Daniel, 20 sep 2026). Sin texto de vista previa, el cliente de correo
+ * enseña el principio del cuerpo — y se dice.
+ */
+function PreviaBandeja({ subject, preheader }: { subject: string; preheader: string }) {
+  const asunto = subject.trim() || "Tu asunto";
+  const previa = preheader.trim();
+  return (
+    <div className="mt-4">
+      <p className="mb-1.5 text-[11px] font-bold tracking-[0.5px] text-[#9aa0ab] uppercase">
+        Así se ve en la bandeja de entrada
+      </p>
+      <div className="flex items-center gap-3 overflow-hidden rounded-[12px] border border-[#e2ddd6] bg-white px-4 py-3 text-[13px]">
+        <span className="size-3.5 shrink-0 rounded-[3px] border border-[#c9c4bc]" aria-hidden />
+        <span className="w-16 shrink-0 font-bold text-kora-black">KORA</span>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-bold text-kora-black">{asunto}</span>
+          <span className="text-[#6b6f78]">
+            {" — "}
+            {previa || <span className="italic text-[#b3b8c0]">sin texto de vista previa, se lee el principio del correo</span>}
+          </span>
+        </span>
+        <span className="shrink-0 text-[12px] text-[#8a8f98]">9:41</span>
+      </div>
     </div>
   );
 }

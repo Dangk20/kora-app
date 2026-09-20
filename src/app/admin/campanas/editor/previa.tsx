@@ -16,6 +16,12 @@ import { Monitor, Moon, Smartphone, Sun } from "lucide-react";
 
 const OSCURO = /@media\s*\(prefers-color-scheme:\s*dark\)/g;
 
+/** Lo que se pinta cuando el servidor no pudo dibujar el correo. */
+export const PREVIA_FALLIDA =
+  "<html><body style='font-family:sans-serif;color:#8a3520;padding:40px;text-align:center;line-height:1.6'>" +
+  "No se pudo dibujar la vista previa.<br />Recarga la página: suele pasar tras una actualización del panel." +
+  "</body></html>";
+
 export function Previa({ html, alto = "calc(100vh - 260px)" }: { html: string; alto?: string }) {
   const [ancho, setAncho] = useState<"escritorio" | "movil">("escritorio");
   const [modo, setModo] = useState<"claro" | "oscuro">("claro");

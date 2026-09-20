@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, LayoutTemplate, Save, SendHorizonal, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { estimateAudience, previewCampaign, saveCampaign } from "@/modules/campaigns/actions";
+import { PREVIA_FALLIDA } from "./previa";
 import { validateBlocks, type Block } from "@/modules/campaigns/blocks";
 import { MAX_ASUNTO, type Segment } from "@/modules/campaigns/types";
 import { PasoCampana, type DatosCampana } from "./paso-campana";
@@ -77,9 +78,17 @@ export function Builder({
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       startRender(async () => {
-        const r = await previewCampaign({ subject: datos.subject, preheader: datos.preheader, blocks, segment });
-        setHtml(r.html);
-        setFaltantes(r.missing);
+        try {
+          const r = await previewCampaign({ subject: datos.subject, preheader: datos.preheader, blocks, segment });
+          setHtml(r.html);
+          setFaltantes(r.missing);
+        } catch {
+          // Pasa, sobre todo, cuando el panel quedó abierto durante un
+          // despliegue: la acción de servidor del build viejo ya no existe.
+          // Antes se quedaba un cuadro en blanco sin explicación (Daniel, 20
+          // sep 2026); ahora se dice y se pide recargar.
+          setHtml(PREVIA_FALLIDA);
+        }
       });
     }, 400);
     return () => {

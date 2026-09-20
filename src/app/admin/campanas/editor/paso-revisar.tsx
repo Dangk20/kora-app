@@ -50,7 +50,7 @@ export function PasoRevisar({
         <Seccion titulo="Lo que sale">
           <dl className="space-y-2 text-[13.5px]">
             <div><dt className="text-[11.5px] text-[#9aa0ab]">Asunto</dt><dd className="font-semibold text-kora-black">{datos.subject}</dd></div>
-            {datos.preheader && <div><dt className="text-[11.5px] text-[#9aa0ab]">Preheader</dt><dd className="text-kora-black">{datos.preheader}</dd></div>}
+            {datos.preheader && <div><dt className="text-[11.5px] text-[#9aa0ab]">Texto de vista previa</dt><dd className="text-kora-black">{datos.preheader}</dd></div>}
           </dl>
         </Seccion>
 

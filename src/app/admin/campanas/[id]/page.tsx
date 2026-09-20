@@ -138,7 +138,7 @@ export default async function CampanaDetallePage({
           </div>
           {c.preheader && (
             <div className="flex gap-3">
-              <dt className="w-24 shrink-0 text-muted-foreground">Preheader</dt>
+              <dt className="w-24 shrink-0 text-muted-foreground">Vista previa</dt>
               <dd className="text-kora-black">{c.preheader}</dd>
             </div>
           )}
