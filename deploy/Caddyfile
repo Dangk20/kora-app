@@ -98,15 +98,52 @@ korashopp.com {
 	import seguridad
 	encode zstd gzip
 
+	# ── PREVIA DEL LANZAMIENTO ────────────────────────────────────
+	# El público ve la página de espera; el equipo ve la tienda REAL, en el
+	# mismo dominio. No en un subdominio aparte a propósito: los correos, el
+	# comprobante, la sesión del comprador y los enlaces de WhatsApp apuntan
+	# todos a korashopp.com, y validar en otra dirección no validaría eso.
+	#
+	# Se entra UNA vez por navegador con https://korashopp.com/previa?clave=…
+	# y queda una cookie de 7 días. La clave vive en .env.edge
+	# (KORA_PREVIA_CLAVE), nunca aquí. Es una cortina, no un control de
+	# seguridad: el panel sigue pidiendo su propio login.
+	#
+	# FALLA CERRADO: con la clave vacía o de menos de 24 caracteres nadie
+	# entra y todos ven la página de espera (ver el aviso 4 de deploy/README:
+	# una variable vacía aquí no puede convertirse en puerta abierta).
+	#
+	# ▼▼▼ LANZAMIENTO: borrar los bloques @entrar, @previa y el último
+	# `handle` (la página de espera), y dejar solo el reverse_proxy.
+	# Luego RECREAR el contenedor (aviso 1 de deploy/README). ▼▼▼
+
+	# Los webhooks del proveedor de correo nunca pasan por la cortina.
+	@webhook path /api/webhooks/*
+	handle @webhook {
+		reverse_proxy kora-prod-app:3000 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	@entrar expression `path('/previa') && {query.clave} == "{$KORA_PREVIA_CLAVE}" && size("{$KORA_PREVIA_CLAVE}") >= 24`
+	handle @entrar {
+		header Set-Cookie "kora_previa={$KORA_PREVIA_CLAVE}; Path=/; Max-Age=604800; Secure; HttpOnly; SameSite=Lax"
+		redir * / 302
+	}
+
+	@previa expression `{http.request.cookie.kora_previa} == "{$KORA_PREVIA_CLAVE}" && size("{$KORA_PREVIA_CLAVE}") >= 24`
+	handle @previa {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy kora-prod-app:3000 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
 	# La página de espera, servida como archivo estático desde el propio borde.
 	# Que NO pase por Next.js es lo que la mantiene en pie aunque la aplicación
 	# esté caída o todavía no exista.
-	root * /srv/holding
-	file_server
-
-	# ▼▼▼ GO-LIVE (30 oct): sustituir las dos líneas anteriores por esto ▼▼▼
-	# El bloque `header_up` no es opcional: ver el mismo comentario en pruebas.
-	# reverse_proxy kora-prod-app:3000 {
-	# 	header_up X-Forwarded-For {remote_host}
-	# }
+	handle {
+		root * /srv/holding
+		file_server
+	}
 }
