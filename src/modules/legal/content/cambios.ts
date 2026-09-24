@@ -24,7 +24,7 @@
 // voluntario se resuelve con producto, no con dinero": mismo fondo, sin
 // pisar el retracto.
 //
-// PENDIENTE: visto bueno del cliente sobre las dos notas de arriba.
+// Aprobado por el cliente el 23 sep 2026.
 
 import type { LegalDocumentFactory } from "./types";
 
