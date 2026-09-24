@@ -25,7 +25,7 @@ export const datosPersonales: LegalDocumentFactory = (m) => ({
       blocks: [
         {
           kind: "p",
-          text: `${m.razonSocial}, identificada con NIT ${m.nit}, con domicilio en ${m.domicilio}, es la responsable del tratamiento de los datos personales recogidos a través de esta tienda y de sus canales de atención.`,
+          text: `${m.razonSocial}, con NIT ${m.nit} y domicilio en ${m.domicilio}, actúa como responsable del tratamiento de los datos personales recogidos a través de esta tienda y de sus canales de atención.`,
         },
         {
           kind: "p",
