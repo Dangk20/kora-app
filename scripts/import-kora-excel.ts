@@ -145,6 +145,16 @@ function normalizarReferencia(r: string): string {
   return r.toUpperCase().replace(/\s*-\s*/g, "-").replace(/\s+/g, "");
 }
 
+/**
+ * El "Grupo de referencia" solo se publica si parece un nombre de grupo. En el
+ * catálogo de maquillaje (2 oct 2026) esa columna traía el producto de Target
+ * usado como comparación, con medidas y enlace: publicado, la tienda habría
+ * tenido una subcategoría "Wet n Wild Photo Focus ⏎ https://www.target.com/…".
+ */
+function grupoPublicable(g: string): string {
+  return g && !/https?:|\n/.test(g) && g.length <= 60 ? g : "";
+}
+
 function subcategoriaDe(nombre: string): string {
   const primera = nombre.trim().split(/\s+/)[0]?.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") ?? "";
   if (PRENDA[primera]) return PRENDA[primera];
@@ -232,7 +242,7 @@ async function main() {
         sku: ref,
         producto: nombreFinal,
         categoria: categoriaArg || tipo || "General",
-        subcategoria: esCatalogo ? texto(col(f.v, "grupo de referencia")) || subcategoriaDe(texto(col(f.v, "tipo"))) : subcategoriaDe(nombre),
+        subcategoria: esCatalogo ? grupoPublicable(texto(col(f.v, "grupo de referencia"))) || subcategoriaDe(texto(col(f.v, "tipo"))) : subcategoriaDe(nombre),
         variante: talla ? `Talla ${talla}` : "",
         priceCopStore: cop,
         priceCopOnline: cop,
