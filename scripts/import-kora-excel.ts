@@ -1,6 +1,18 @@
 // Importa el inventario del cliente desde SU Excel, no desde nuestra plantilla.
 //
-//   pnpm catalog:import <archivo.xlsx> --fotos <carpeta> [--hoja "…"] [--actor admin@kora.local] [--simular]
+//   pnpm catalog:import <archivo.xlsx> --fotos <carpeta> [--hoja "…"] [--categoria Hombre] [--actor admin@kora.local] [--simular]
+//
+// Lee DOS formatos del cliente, y lo decide por la cabecera:
+//   · El inventario del 12 sep (columna "Referencia"), descrito abajo.
+//   · El CATÁLOGO por línea del 1 oct ("KORA Hombre Catalogo.xlsm", columna
+//     "SKU" + "Título comercial"): ya trae título y descripción de venta,
+//     marca comercial normalizada, talla y "Grupo de referencia". Ahí "Tipo"
+//     es la PRENDA (Camiseta, Polo), no la línea: la categoría no viene en
+//     ninguna columna y se pasa con `--categoria`, que es obligatoria en este
+//     formato; la subcategoría es el "Grupo de referencia" (Camisetas,
+//     Bermudas cargo…), que el cliente ya agrupó a mano y es mejor que
+//     deducirla de la primera palabra. La "Ficha técnica" y las
+//     "Observaciones de revisión" son notas internas: NO se publican.
 //
 // El archivo "INVENTARIO - PRODUCTOS KORASHOPP.COM.xlsx" (12 sep 2026) tiene
 // una hoja por línea (KHR hombre, KMR mujer, KNR niña) con SUS columnas:
@@ -85,14 +97,14 @@ function numero(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Cabecera: la fila que contiene "Referencia". Sus celdas, normalizadas, son las claves. */
+/** Cabecera: la fila que contiene "Referencia" (o "SKU"). Sus celdas, normalizadas, son las claves. */
 function leerHoja(ws: ExcelJS.Worksheet): { filas: Fila[]; columnas: string[] } | null {
   let cabecera: number | null = null;
   let columnas: string[] = [];
   ws.eachRow((row, i) => {
     if (cabecera !== null) return;
     const vals = row.values as unknown[];
-    const idx = vals.findIndex((c) => texto(c).toLowerCase() === "referencia");
+    const idx = vals.findIndex((c) => ["referencia", "sku"].includes(texto(c).toLowerCase()));
     if (idx >= 0) {
       cabecera = i;
       columnas = vals.map((c) => texto(c).toLowerCase());
@@ -147,6 +159,7 @@ async function main() {
   const actorEmail = args.includes("--actor") ? args[args.indexOf("--actor") + 1] : "admin@kora.local";
   const simular = args.includes("--simular");
   const carpetaFotos = args.includes("--fotos") ? args[args.indexOf("--fotos") + 1] : null;
+  const categoriaArg = args.includes("--categoria") ? args[args.indexOf("--categoria") + 1]?.trim() : null;
   if (!archivo || !carpetaFotos) {
     console.error('Uso: pnpm catalog:import <archivo.xlsx> --fotos <carpeta> [--hoja "nombre"] [--actor correo] [--simular]');
     process.exit(1);
@@ -168,9 +181,18 @@ async function main() {
   for (const ws of wb.worksheets) {
     if (hoja && ws.name !== hoja) continue;
     const leida = leerHoja(ws);
-    if (!leida) { avisos.push(`Hoja "${ws.name}": sin fila de cabecera con "Referencia" — omitida.`); continue; }
+    if (!leida) { avisos.push(`Hoja "${ws.name}": sin fila de cabecera con "Referencia" ni "SKU" — omitida.`); continue; }
+    const esCatalogo = leida.columnas.some((c) => c.startsWith("título comercial"));
+    if (esCatalogo && !categoriaArg) {
+      console.error(`Hoja "${ws.name}" tiene formato de catálogo: la categoría no viene en el archivo. Pásala con --categoria "Hombre".`);
+      process.exit(1);
+    }
 
-    const conRef = leida.filas.filter((f) => texto(col(f.v, "referencia")));
+    // En el catálogo, "referencia" aparece DENTRO de otras cabeceras ("Grupo de
+    // referencia", "Fotos de referencia"): la búsqueda por inclusión de `col`
+    // tomaría una de esas. Ahí la referencia es la columna "SKU", exacta.
+    const refDe = (v: Record<string, unknown>) => texto(esCatalogo ? v["sku"] : col(v, "referencia"));
+    const conRef = leida.filas.filter((f) => refDe(f.v));
     const conPrecio = conRef.filter((f) => numero(col(f.v, "precio venta pesos", "pesos")) !== undefined);
     if (conRef.length > 0 && conPrecio.length === 0) {
       avisos.push(`Hoja "${ws.name}": ${conRef.length} referencias y NINGUNA con precio — omitida entera (todavía no está lista).`);
@@ -178,8 +200,8 @@ async function main() {
     }
 
     for (const f of conRef) {
-      const ref = normalizarReferencia(texto(col(f.v, "referencia")));
-      const nombre = texto(col(f.v, "producto"));
+      const ref = normalizarReferencia(refDe(f.v));
+      const nombre = texto(esCatalogo ? col(f.v, "título comercial") : col(f.v, "producto"));
       const cop = numero(col(f.v, "precio venta pesos", "pesos"));
       const usd = numero(col(f.v, "precio venta usd", "usd"));
       const estado = texto(col(f.v, "estado")).toLowerCase();
@@ -188,8 +210,8 @@ async function main() {
       if (!conFotos.has(ref)) { omitidasSinFotos += 1; avisos.push(`${ref} (fila ${f.row}): sin fotos en el Drive — no se crea hasta que las tenga.`); continue; }
       if (estado === "inactivo") { avisos.push(`${ref} (fila ${f.row}): Estado "Inactivo" — omitida.`); continue; }
 
-      const marca = texto(col(f.v, "marca"));
-      const tipo = texto(col(f.v, "tipo"));
+      const marca = texto(col(f.v, "marca comercial", "marca"));
+      const tipo = esCatalogo ? categoriaArg! : texto(col(f.v, "tipo"));
       let talla = texto(col(f.v, "talla"));
       if (talla.startsWith("FECHA:")) {
         avisos.push(`${ref} (fila ${f.row}): la talla es una FECHA (${talla.slice(6)}) — Excel convirtió algo como "10-12". Entra SIN talla; corregir la celda como texto.`);
@@ -209,8 +231,8 @@ async function main() {
       const values: Partial<Record<ColumnKey, unknown>> = {
         sku: ref,
         producto: nombreFinal,
-        categoria: tipo || "General",
-        subcategoria: subcategoriaDe(nombre),
+        categoria: categoriaArg || tipo || "General",
+        subcategoria: esCatalogo ? texto(col(f.v, "grupo de referencia")) || subcategoriaDe(texto(col(f.v, "tipo"))) : subcategoriaDe(nombre),
         variante: talla ? `Talla ${talla}` : "",
         priceCopStore: cop,
         priceCopOnline: cop,
@@ -218,7 +240,7 @@ async function main() {
         priceUsdOnline: usd,
         stockInicial: stock,
         marca,
-        descripcion: texto(col(f.v, "notas")),
+        descripcion: texto(esCatalogo ? col(f.v, "descripción comercial") : col(f.v, "notas")),
       };
       raw.push({ row: f.row, values });
     }
