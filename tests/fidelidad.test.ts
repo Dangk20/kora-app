@@ -170,6 +170,13 @@ describe("el banner principal mide lo que Vitrina le pide al cliente", () => {
     const desde = maqueta.indexOf('id="banner:hero_lateral"');
     const lateral = maqueta.slice(desde, maqueta.indexOf("</Region>", desde));
     expect(lateral).toContain("aspect-[7/9]");
+    // Y la conserva en TODO tamaño: si hereda la altura de la fila, la
+    // columna más alta (Top Categorías) lo deforma y el arte se recorta
+    // por los lados (4 oct 2026).
+    const clases = lateral.match(/className="([^"]*)"/)?.[1] ?? "";
+    expect(clases).toContain("aspect-[7/9]");
+    expect(clases).not.toMatch(/aspect-auto|h-full/);
+    expect(maqueta).toContain("grid items-start");
     // Y la promo de la parrilla, 3:5 (600 × 1000).
     const promo = maqueta.slice(maqueta.indexOf('id="banner:promo_secundaria"'));
     expect(promo.slice(0, promo.indexOf("</Region>"))).toContain("aspect-[3/5]");

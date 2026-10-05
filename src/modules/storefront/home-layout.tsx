@@ -108,10 +108,17 @@ export function StoreHomeLayout({
               medir 1.4 × (7/9) ÷ (3/2) = 0.726fr; Top Categorías toma lo que
               sobra. Antes (1.4 / 0.85 / 1, con el principal cuadrado) los dos
               banners reales de Adidas perdían el logo y el titular por los
-              lados sin que nada avisara. Lo vio Daniel el 12 sep 2026. */}
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_0.726fr_1.124fr]">
-            {/* El principal marca la altura de la fila; el lateral y las
-                categorías se estiran a esa misma altura. */}
+              lados sin que nada avisara. Lo vio Daniel el 12 sep 2026.
+
+              `items-start` y la proporción fija en los DOS banners, en todo
+              tamaño: antes el lateral se estiraba a la altura de la fila, y
+              la fila la marcaba la columna MÁS ALTA. Con 8 categorías, Top
+              Categorías era más alta que el principal, el lateral dejaba de
+              ser 7:9 y el arte se recortaba por los lados (4 oct 2026). Ahora
+              ningún banner depende de lo que mida su vecino. Entre `sm` y
+              `lg` los dos banners van lado a lado con las mismas fracciones
+              (misma altura por cálculo) y las categorías debajo. */}
+          <div className="grid items-start gap-4 sm:grid-cols-[1.4fr_0.726fr] lg:grid-cols-[1.4fr_0.726fr_1.124fr]">
             <Region id="banner:hero_principal" editControl={editControl}>
               <BannerSlot
                 banners={banners.get("hero_principal")}
@@ -119,22 +126,19 @@ export function StoreHomeLayout({
                 placeholderLabel="Banner principal — cárgalo desde Vitrina"
               />
             </Region>
-            <Region id="banner:hero_lateral" editControl={editControl} className="h-full">
+            <Region id="banner:hero_lateral" editControl={editControl}>
               <BannerSlot
                 banners={banners.get("hero_lateral")}
-                // En móvil, la proporción 7:9 del arte que se le pide al
-                // cliente. `h-full` solo desde `sm`: con la proporción puesta
-                // y sin altura de padre definida, `h-full` deja la altura sin
-                // resolver y el banner se reacomoda cuando cargan las imágenes.
-                // Desde `lg` la altura la da el principal, y las columnas
-                // están calculadas para que salga 7:9 igual.
-                className="aspect-[7/9] w-full sm:aspect-auto sm:h-full sm:min-h-[280px]"
+                // 7:9 en TODO tamaño, la proporción del arte que se le pide
+                // al cliente (700 × 900). Nada de `h-full`/`aspect-auto`: la
+                // altura heredada es justo lo que lo recortaba.
+                className="aspect-[7/9] w-full"
                 placeholderLabel="Banner lateral — cárgalo desde Vitrina"
               />
             </Region>
 
             {topCategorias && categories.length > 0 && (
-              <Region id="top_categorias" editControl={editControl}>
+              <Region id="top_categorias" editControl={editControl} className="sm:col-span-2 lg:col-span-1">
                 <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-kora-black">
                   <KoraFlame className="size-[18px]" />
                   {topCategorias.title}

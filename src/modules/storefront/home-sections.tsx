@@ -46,9 +46,10 @@ export function CategoryCircles({
   return (
     // Móvil: fila desplazable, como el diseño (§02) — en 390 px una rejilla de
     // dos deja dos círculos enormes y obliga a bajar para ver el resto.
-    // Escritorio: la rejilla de dos columnas del prototipo, dentro de su
-    // columna de 1fr en el hero.
-    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-x-1.5 lg:gap-y-4 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+    // Escritorio: rejilla de TRES columnas (el prototipo tenía dos con menos
+    // categorías). Con las 8 líneas reales, dos columnas eran cuatro filas y
+    // la columna quedaba mucho más alta que los banners del hero.
+    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-x-1.5 lg:gap-y-3 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
       {categories.map((c) => (
         <Link
           key={c.id}
