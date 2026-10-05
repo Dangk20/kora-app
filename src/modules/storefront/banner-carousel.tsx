@@ -60,16 +60,33 @@ export function BannerCarousel({
       onMouseLeave={() => setPaused(false)}
     >
       {slides.map((banner, i) => {
+        // La pieza se muestra ENTERA (`object-contain`) y el espacio que
+        // sobre se rellena con ella misma, desenfocada. Con `object-cover`,
+        // un arte que no traía exactamente la proporción del espacio perdía
+        // texto por los lados —pasó dos veces el 4 oct 2026—, y la proporción
+        // del archivo no la controlamos: la decide quien lo diseña. Cuando el
+        // arte sí trae la medida pedida, contain y cover son lo mismo.
         const image = (
-          <Image
-            src={banner.imageUrl!}
-            alt={banner.title}
-            fill
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover"
-            unoptimized
-            priority={i === 0}
-          />
+          <>
+            <Image
+              src={banner.imageUrl!}
+              alt=""
+              aria-hidden
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="scale-110 object-cover blur-2xl"
+              unoptimized
+            />
+            <Image
+              src={banner.imageUrl!}
+              alt={banner.title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-contain"
+              unoptimized
+              priority={i === 0}
+            />
+          </>
         );
         return (
           <div

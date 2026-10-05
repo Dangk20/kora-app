@@ -1,20 +1,38 @@
 import {
   Baby,
   BookOpen,
+  CarFront,
   Coffee,
+  createLucideIcon,
   Dumbbell,
   Gem,
+  Flower2,
   Gift,
   Headphones,
   Lamp,
+  Milk,
   Package,
   PawPrint,
   Shirt,
   Smartphone,
   Sparkles,
+  ToyBrick,
   Watch,
   type LucideIcon,
 } from "lucide-react";
+
+// Lucide no trae vestido ni labial, que son justo dos líneas del catálogo
+// (Mujer, Maquillaje). Se dibujan con su mismo trazo para que no desentonen.
+const Dress = createLucideIcon("dress", [
+  ["path", { d: "M9 2v3.5c.9.8 1.9 1.2 3 1.2s2.1-.4 3-1.2V2", key: "escote" }],
+  ["path", { d: "M9 5.5 7.5 10l2.5 2-6 9h16l-6-9 2.5-2L15 5.5", key: "cuerpo" }],
+  ["path", { d: "M10 12h4", key: "cintura" }],
+]);
+const Lipstick = createLucideIcon("lipstick", [
+  ["rect", { x: "8", y: "13", width: "8", height: "9", rx: "1", key: "base" }],
+  ["path", { d: "M9 13V9h6v4", key: "tubo" }],
+  ["path", { d: "M10 9V5l4-3v7", key: "barra" }],
+]);
 
 // Set de íconos disponible para categorías (patrón del prototipo)
 export const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -32,6 +50,13 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   book: BookOpen,
   baby: Baby,
   paw: PawPrint,
+  // Añadidos el 4 oct 2026 para las líneas reales del catálogo.
+  dress: Dress,
+  lipstick: Lipstick,
+  flower: Flower2,
+  car: CarFront,
+  milk: Milk,
+  toy: ToyBrick,
 };
 
 // Paleta de tiles de categoría: pasteles derivados del gradiente oficial
