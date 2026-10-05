@@ -1,5 +1,6 @@
 // Página de inicio de la tienda. Toda su estructura y contenido salen del
 // módulo Vitrina: esta página solo pide los datos y los pinta.
+import { activeLocale } from "@/modules/i18n/server";
 import { Flame } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import {
@@ -20,10 +21,11 @@ export const metadata = storeMetadata({
 
 export default async function StoreHome() {
   const currency = await activeCurrency();
+  const locale = await activeLocale();
   const [sections, banners, categories] = await Promise.all([
-    getShowcase(currency),
+    getShowcase(currency, locale),
     getBanners(),
-    getShowcaseCategories(),
+    getShowcaseCategories(8, locale),
   ]);
 
   const hasContent = sections.some((s) => s.active && s.products.length > 0);

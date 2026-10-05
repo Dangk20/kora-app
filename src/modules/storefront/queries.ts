@@ -5,6 +5,7 @@
 //   - "Disponible" = tiene cupo online (`onlineUnits > 0`). El stock físico de
 //     la tienda no se vende por la web (motor de inventario, regla 2).
 import { db } from "@/lib/db";
+import { enIdioma, type Locale } from "@/modules/i18n";
 import { storage } from "@/modules/storage";
 import { resolvePrice, toNumber, type Currency, type VariantPrices } from "@/modules/pricing";
 
@@ -34,19 +35,22 @@ export type StoreProduct = {
 const PRODUCT_SELECT = {
   id: true,
   name: true,
+  nameEn: true,
   slug: true,
   brand: true,
   description: true,
+  descriptionEn: true,
   featured: true,
   updatedAt: true,
   category: {
     select: {
       id: true,
       name: true,
+      nameEn: true,
       slug: true,
       color: true,
       icon: true,
-      parent: { select: { id: true, name: true, slug: true } },
+      parent: { select: { id: true, name: true, nameEn: true, slug: true } },
     },
   },
   images: { orderBy: { position: "asc" }, select: { url: true, alt: true } },
@@ -69,18 +73,21 @@ const PRODUCT_SELECT = {
 type RawProduct = {
   id: string;
   name: string;
+  nameEn: string | null;
   slug: string;
   brand: string | null;
   description: string | null;
+  descriptionEn: string | null;
   featured: boolean;
   updatedAt: Date;
   category: {
     id: string;
     name: string;
+    nameEn: string | null;
     slug: string;
     color: string;
     icon: string;
-    parent: { id: string; name: string; slug: string } | null;
+    parent: { id: string; name: string; nameEn: string | null; slug: string } | null;
   };
   images: { url: string; alt: string | null }[];
   variants: {
@@ -95,24 +102,35 @@ type RawProduct = {
   }[];
 };
 
-function toStoreProduct(p: RawProduct): StoreProduct {
+/**
+ * El idioma se resuelve AQUÍ, al construir el producto, con caída al español:
+ * el resto de la tienda lee `name`/`description` sin saber de idiomas.
+ */
+function toStoreProduct(p: RawProduct, locale: Locale = "es"): StoreProduct {
   const driver = storage();
+  const descripcion = locale === "en" && p.descriptionEn?.trim() ? p.descriptionEn : p.description;
   return {
     id: p.id,
-    name: p.name,
+    name: enIdioma(locale, p.name, p.nameEn),
     slug: p.slug,
     brand: p.brand,
-    description: p.description,
+    description: descripcion,
     featured: p.featured,
     updatedAt: p.updatedAt,
     category: {
       id: p.category.id,
-      name: p.category.name,
+      name: enIdioma(locale, p.category.name, p.category.nameEn),
       slug: p.category.slug,
       color: p.category.color,
       icon: p.category.icon,
     },
-    parentCategory: p.category.parent,
+    parentCategory: p.category.parent
+      ? {
+          id: p.category.parent.id,
+          name: enIdioma(locale, p.category.parent.name, p.category.parent.nameEn),
+          slug: p.category.parent.slug,
+        }
+      : null,
     images: p.images.map((i) => ({ url: driver.urlFor(i.url), alt: i.alt })),
     variants: p.variants.map((v) => ({
       id: v.id,
@@ -147,6 +165,8 @@ export type CatalogFilters = {
   search?: string;
   sort?: "relevancia" | "precioAsc" | "precioDesc" | "nombre";
   currency: Currency;
+  /** Idioma del contenido; por omisión español (el panel siempre lo pide así). */
+  locale?: Locale;
 };
 
 /**
@@ -203,15 +223,18 @@ export async function searchMatchingIds(raw: string): Promise<string[]> {
         p.id,
         unaccent(lower(
           coalesce(p.name, '') || ' ' ||
+          coalesce(p."nameEn", '') || ' ' ||
           coalesce(p.brand, '') || ' ' ||
           coalesce(p.description, '') || ' ' ||
+          coalesce(p."descriptionEn", '') || ' ' ||
           coalesce(c.name, '') || ' ' ||
+          coalesce(c."nameEn", '') || ' ' ||
           coalesce(string_agg(coalesce(v.sku, '') || ' ' || coalesce(v.name, ''), ' '), '')
         )) AS texto
       FROM products p
       LEFT JOIN categories c ON c.id = p."categoryId"
       LEFT JOIN variants v ON v."productId" = p.id
-      GROUP BY p.id, c.name
+      GROUP BY p.id, c.name, c."nameEn"
     )
     SELECT id FROM doc
     WHERE NOT EXISTS (
@@ -266,7 +289,7 @@ export async function listProducts(filters: CatalogFilters): Promise<StoreProduc
     orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
   })) as unknown as RawProduct[];
 
-  const products = rows.map(toStoreProduct);
+  const products = rows.map((r) => toStoreProduct(r, filters.locale));
 
   // El orden por precio se resuelve en memoria: el precio vigente depende de
   // la moneda activa y del canal, no es una columna que se pueda ordenar en SQL.
@@ -286,17 +309,21 @@ export async function listProducts(filters: CatalogFilters): Promise<StoreProduc
   }
 }
 
-export async function getProductBySlug(slug: string): Promise<StoreProduct | null> {
+export async function getProductBySlug(
+  slug: string,
+  locale: Locale = "es",
+): Promise<StoreProduct | null> {
   const row = (await db.product.findFirst({
     where: { slug, active: true, variants: { some: { active: true } } },
     select: PRODUCT_SELECT,
   })) as unknown as RawProduct | null;
-  return row ? toStoreProduct(row) : null;
+  return row ? toStoreProduct(row, locale) : null;
 }
 
 export async function getRelatedProducts(
   product: StoreProduct,
   limit = 4,
+  locale: Locale = "es",
 ): Promise<StoreProduct[]> {
   const rows = (await db.product.findMany({
     where: {
@@ -309,7 +336,7 @@ export async function getRelatedProducts(
     take: limit,
     orderBy: { createdAt: "desc" },
   })) as unknown as RawProduct[];
-  return rows.map(toStoreProduct);
+  return rows.map((r) => toStoreProduct(r, locale));
 }
 
 export type StoreCategory = {
@@ -323,20 +350,21 @@ export type StoreCategory = {
 };
 
 /** Categorías raíz con productos visibles, para el nav y los tiles del home. */
-export async function listCategories(): Promise<StoreCategory[]> {
+export async function listCategories(locale: Locale = "es"): Promise<StoreCategory[]> {
   const categories = await db.category.findMany({
     where: { active: true, parentId: null },
     orderBy: { position: "asc" },
     select: {
       id: true,
       name: true,
+      nameEn: true,
       slug: true,
       color: true,
       icon: true,
       children: {
         where: { active: true },
         orderBy: { position: "asc" },
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, nameEn: true, slug: true },
       },
     },
   });
@@ -349,11 +377,13 @@ export async function listCategories(): Promise<StoreCategory[]> {
   const countBy = new Map(counts.map((c) => [c.categoryId, c._count._all]));
 
   return categories
-    .map((c) => ({
+    .map(({ nameEn, children, ...c }) => ({
       ...c,
+      name: enIdioma(locale, c.name, nameEn),
+      children: children.map((ch) => ({ id: ch.id, slug: ch.slug, name: enIdioma(locale, ch.name, ch.nameEn) })),
       productCount:
         (countBy.get(c.id) ?? 0) +
-        c.children.reduce((sum, ch) => sum + (countBy.get(ch.id) ?? 0), 0),
+        children.reduce((sum, ch) => sum + (countBy.get(ch.id) ?? 0), 0),
     }))
     .filter((c) => c.productCount > 0);
 }

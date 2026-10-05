@@ -6,6 +6,7 @@
 // entera por el esqueleto mientras volvía a consultar: se sentía como una
 // recarga que llevaba arriba, y si tardaba, el botón parecía no hacer nada
 // (lo reportó Daniel el 5 oct 2026).
+import { activeLocale } from "@/modules/i18n/server";
 import { activeCurrency } from "@/modules/pricing/currency";
 import { listProducts } from "@/modules/storefront/queries";
 import { ProductCard } from "@/modules/storefront/product-card";
@@ -18,11 +19,13 @@ export async function cargarMasProductos(params: {
   desde: number;
 }) {
   const currency = await activeCurrency();
+  const locale = await activeLocale();
   const products = await listProducts({
     categorySlug: params.categoria,
     search: params.q,
     sort: normalizarOrden(params.orden),
     currency,
+    locale,
   });
   const desde = Math.max(0, Math.floor(params.desde));
   const siguientes = products.slice(desde, desde + POR_PAGINA);

@@ -1,6 +1,7 @@
 "use server";
 
 import { activeCurrency } from "@/modules/pricing/currency";
+import { activeLocale } from "@/modules/i18n/server";
 import { resolveCart, type ResolvedCart } from "./resolve";
 import type { CartLine } from "./cart-context";
 
@@ -22,5 +23,5 @@ export async function getResolvedCart(lines: CartLine[]): Promise<ResolvedCart> 
         )
         .slice(0, 100)
     : [];
-  return resolveCart(safe, currency);
+  return resolveCart(safe, currency, await activeLocale());
 }

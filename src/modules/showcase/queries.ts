@@ -7,6 +7,7 @@
 import { db } from "@/lib/db";
 import { storage } from "@/modules/storage";
 import type { Currency } from "@/modules/pricing";
+import { enIdioma, type Locale } from "@/modules/i18n";
 import { listProducts, type StoreProduct } from "@/modules/storefront/queries";
 import { expandirElementos, productosDeCategoria, TOPE_POR_CATEGORIA, type ElementoSeccion } from "./expand";
 import { SECTIONS, type BannerSlot, type SectionKey } from "./sections";
@@ -77,8 +78,9 @@ async function autoProducts(
   rule: string,
   limit: number,
   currency: Currency,
+  locale: Locale,
 ): Promise<StoreProduct[]> {
-  const all = await listProducts({ currency });
+  const all = await listProducts({ currency, locale });
 
   switch (rule) {
     case "FEATURED": {
@@ -120,7 +122,11 @@ async function autoProducts(
   }
 }
 
-export async function getShowcase(currency: Currency): Promise<ResolvedSection[]> {
+export async function getShowcase(
+  currency: Currency,
+  /** La tienda pasa el del visitante; el panel (Vitrina) se queda en español. */
+  locale: Locale = "es",
+): Promise<ResolvedSection[]> {
   await ensureSections();
 
   const rows = await db.showcaseSection.findMany({
@@ -150,7 +156,7 @@ export async function getShowcase(currency: Currency): Promise<ResolvedSection[]
   // Un solo viaje al catálogo para todas las secciones manuales, traigan
   // productos sueltos o categorías.
   const hayManuales = rows.some((r) => r.mode === "MANUAL" && r.items.length > 0);
-  const catalogo = hayManuales ? await listProducts({ currency }) : [];
+  const catalogo = hayManuales ? await listProducts({ currency, locale }) : [];
   const driver = storage();
 
   const resolved: ResolvedSection[] = [];
@@ -170,7 +176,7 @@ export async function getShowcase(currency: Currency): Promise<ResolvedSection[]
           expandirElementos(elementos, catalogo)
         : // En automático se traen varias "páginas" para que el carrusel tenga
           // qué rotar, sin cargar el catálogo entero.
-          await autoProducts(row.autoRule, Math.min(row.limit * 2, 12), currency);
+          await autoProducts(row.autoRule, Math.min(row.limit * 2, 12), currency, locale);
 
     const items: EditorItem[] = row.items.map((i) =>
       i.category
@@ -246,12 +252,12 @@ export async function getBanners(): Promise<Map<BannerSlot, ResolvedBanner[]>> {
 }
 
 /** Categorías para los accesos redondos del hero. */
-export async function getShowcaseCategories(limit = 8) {
+export async function getShowcaseCategories(limit = 8, locale: Locale = "es") {
   const categories = await db.category.findMany({
     where: { active: true, parentId: null },
     orderBy: { position: "asc" },
-    select: { id: true, name: true, slug: true, color: true, icon: true },
+    select: { id: true, name: true, nameEn: true, slug: true, color: true, icon: true },
     take: limit,
   });
-  return categories;
+  return categories.map(({ nameEn, ...c }) => ({ ...c, name: enIdioma(locale, c.name, nameEn) }));
 }

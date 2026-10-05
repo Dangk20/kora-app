@@ -2,6 +2,7 @@
 // descripción y especificaciones abajo, relacionados al final.
 // El botón de compra queda anunciado (carrito = S7, pedido por WhatsApp = S8):
 // hasta entonces la ficha ofrece contacto directo, no un carrito falso.
+import { activeLocale } from "@/modules/i18n/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -25,7 +26,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const product = await getProductBySlug(slug, await activeLocale());
   if (!product) return {};
 
   return productMetadata(product);
@@ -56,11 +57,11 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const product = await getProductBySlug(slug, await activeLocale());
   if (!product) notFound();
 
   const currency = await activeCurrency();
-  const related = await getRelatedProducts(product);
+  const related = await getRelatedProducts(product, 4, await activeLocale());
   const categoryLink = product.parentCategory ?? product.category;
 
   return (

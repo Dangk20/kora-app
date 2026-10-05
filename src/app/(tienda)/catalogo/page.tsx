@@ -2,6 +2,7 @@
 // conteo, orden a la derecha, sidebar de filtros 262px + grid de 4 columnas.
 // Los filtros de marca/precio/descuento del mock llegan en S6 junto con la
 // búsqueda avanzada; aquí van categoría y orden, que es lo que S5 pide.
+import { activeLocale } from "@/modules/i18n/server";
 import Link from "next/link";
 import { ChevronRight, Flame, SlidersHorizontal } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
@@ -28,10 +29,11 @@ export default async function CatalogoPage({
   const { categoria, q, orden, ver } = await searchParams;
   const sort = normalizarOrden(orden);
   const currency = await activeCurrency();
+  const locale = await activeLocale();
 
   const [categories, products] = await Promise.all([
-    listCategories(),
-    listProducts({ categorySlug: categoria, search: q, sort, currency }),
+    listCategories(locale),
+    listProducts({ categorySlug: categoria, search: q, sort, currency, locale }),
   ]);
 
   const active = categories.find(

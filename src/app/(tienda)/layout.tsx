@@ -16,6 +16,9 @@ import { SearchBox } from "./search-box";
 import { CurrencySwitch } from "./currency-switch";
 import { CartButton } from "./cart-button";
 import { CartDrawer } from "./cart-drawer";
+import { activeLocale } from "@/modules/i18n/server";
+import { MESSAGES } from "@/modules/i18n/messages";
+import { I18nProvider } from "@/modules/i18n/provider";
 
 /** `+573142751611` → `+57 314 275 1611` para mostrarlo en el header. */
 function displayPhone(e164: string): string {
@@ -31,9 +34,11 @@ export default async function StoreLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await activeLocale();
+  const t = MESSAGES[locale];
   const [currency, categories, buyer] = await Promise.all([
     activeCurrency(),
-    listCategories(),
+    listCategories(locale),
     currentBuyer(),
   ]);
 
@@ -45,9 +50,12 @@ export default async function StoreLayout({
   };
 
   return (
+    <I18nProvider locale={locale}>
     <CartProvider>
     <MobileBarsProvider>
-    <div className="flex min-h-screen flex-col bg-[#F5F3F0]">
+    {/* `lang` aquí y no en <html>: el layout raíz lo comparte el panel, que
+        siempre va en español. */}
+    <div lang={locale} className="flex min-h-screen flex-col bg-[#F5F3F0]">
       {/* Chrome móvil: header que se oculta al bajar, banda de búsqueda y menú
           lateral. Es una navegación distinta, no la de escritorio encogida
           (ver src/modules/storefront/mobile/). */}
@@ -88,7 +96,7 @@ export default async function StoreLayout({
             >
               <User className="size-[21px]" aria-hidden />
               <div className="text-[11px] leading-tight">
-                <p>Mi cuenta</p>
+                <p>{t.layout.miCuenta}</p>
                 <p className="font-semibold text-[#F5F5F7]">
                   {buyer.name.split(" ")[0]}
                 </p>
@@ -100,14 +108,14 @@ export default async function StoreLayout({
                 href="/cuenta/crear"
                 className="text-[13px] font-semibold whitespace-nowrap text-[#F5F5F7] hover:text-white"
               >
-                Crear cuenta
+                {t.layout.crearCuenta}
               </Link>
               <span className="h-[18px] w-px bg-[#2a2e36]" aria-hidden />
               <Link
                 href="/cuenta/entrar"
                 className="text-[13px] font-medium whitespace-nowrap text-[#A0A4AD] hover:text-white"
               >
-                Entrar
+                {t.layout.entrar}
               </Link>
             </div>
           )}
@@ -121,7 +129,7 @@ export default async function StoreLayout({
               href="/catalogo"
               className="py-2 pr-3.5 text-[13.5px] font-semibold text-[#F5F5F7] hover:text-white"
             >
-              Todas las categorías
+              {t.layout.todasLasCategorias}
             </Link>
             <span className="mx-2 h-[18px] w-px bg-[#2a2e36]" aria-hidden />
             <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -146,7 +154,7 @@ export default async function StoreLayout({
               </span>
               <span className="hidden text-left md:block">
                 <span className="block text-[10.5px] text-[#9aa0ab]">
-                  Línea de WhatsApp
+                  {t.layout.lineaWhatsapp}
                 </span>
                 <span className="block text-[13px] font-bold text-white">
                   {WHATSAPP.display}
@@ -169,7 +177,7 @@ export default async function StoreLayout({
               height={36}
               className="h-7 w-auto"
             />
-            <span className="text-xs">© 2026 · Todo lo que quieres, en un solo lugar</span>
+            <span className="text-xs">© 2026 · {t.layout.lema}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
             <a
@@ -178,17 +186,17 @@ export default async function StoreLayout({
               rel="noopener noreferrer"
               className="hover:text-white"
             >
-              Escríbenos por WhatsApp
+              {t.layout.escribenosWhatsapp}
             </a>
             {/* El seguimiento va aquí, junto a WhatsApp, y no entre las
                 políticas: quien lo busca está buscando su pedido, no un
                 documento legal. Es la única vía para quien compró como
                 invitado, que es la mayoría mientras el correo esté bloqueado. */}
             <Link href="/pedido" className="hover:text-white">
-              Seguimiento de tu pedido
+              {t.layout.seguimientoPedido}
             </Link>
             <Link href="/login" className="hover:text-white">
-              Acceso al equipo
+              {t.layout.accesoEquipo}
             </Link>
           </div>
         </div>
@@ -201,7 +209,7 @@ export default async function StoreLayout({
             {LEGAL_LINKS.map((l) => (
               <li key={l.href}>
                 <Link href={l.href} className="hover:text-white">
-                  {l.label}
+                  {t.layout.legales[l.href] ?? l.label}
                 </Link>
               </li>
             ))}
@@ -219,5 +227,6 @@ export default async function StoreLayout({
     </div>
     </MobileBarsProvider>
     </CartProvider>
+    </I18nProvider>
   );
 }
