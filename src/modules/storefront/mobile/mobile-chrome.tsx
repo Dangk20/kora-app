@@ -97,6 +97,7 @@ export function MobileHeader({
   const buscar = () => {
     const termino = q.trim();
     router.push(termino ? `/catalogo?q=${encodeURIComponent(termino)}` : "/catalogo");
+    setQ(""); // igual que en escritorio: tras buscar, la caja queda limpia
   };
 
   return (

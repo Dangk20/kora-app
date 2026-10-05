@@ -93,57 +93,77 @@ export default async function ProductPage({
 
       <ProductDetail product={product} currency={currency} />
 
-      {/* En móvil, acordeones (diseño §04). La descripción y la tabla de
-          especificaciones son un muro de texto entre el precio y los productos
-          relacionados, y en un teléfono empujan los relacionados fuera de
-          alcance.
+      {/* En móvil, acordeones (diseño §04): la descripción y la tabla de
+          especificaciones son un muro de texto entre el precio y los
+          relacionados. En escritorio, tarjetas abiertas.
 
-          `<details>` nativo: sin JavaScript, accesible por teclado y con el
-          estado que ya trae el navegador. En escritorio no hay acordeón —el
-          resumen deja de responder al clic y el contenido se fuerza visible
-          con `[&>*:not(summary)]`—, así que allí siguen siendo las dos
-          tarjetas abiertas de siempre.
+          Son DOS marcados (tarjeta para `sm+`, `<details>` para móvil) y no
+          un `<details>` con el contenido forzado visible por CSS, que es lo
+          que había: Chrome ahora oculta el contenido de un `<details>`
+          cerrado con `::details-content` y el truco dejó de funcionar — en
+          escritorio se veían los dos títulos y nada más, en TODOS los
+          productos (5 oct 2026).
 
-          Las tres garantías que había aquí se quitaron: viven bajo los botones
-          de compra desde la auditoría del 7 ago, y repetirlas era decir dos
-          veces lo mismo en la misma pantalla. */}
-      <div className="mt-4 grid gap-3 sm:mt-6 sm:gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <details className="group rounded-[16px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-[30px] sm:[&>*:not(summary)]:!block">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black sm:pointer-events-none sm:mb-3 sm:text-xl [&::-webkit-details-marker]:hidden">
-            Descripción
-            <ChevronDown
-              className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180 sm:hidden"
-              aria-hidden
-            />
-          </summary>
-          <p className="mt-3 text-[14.5px] leading-[1.7] whitespace-pre-line text-[#4a4f58] sm:mt-0">
-            {product.description?.trim() ||
-              `${product.name}${product.brand ? ` de ${product.brand}` : ""}. Escríbenos por WhatsApp y te contamos todos los detalles.`}
-          </p>
-        </details>
+          Un bloque sin datos no se pinta: un recuadro vacío o un texto de
+          relleno se ve peor que no tenerlo (pedido de Daniel). */}
+      {(() => {
+        const descripcion = product.description?.trim();
+        const filas = specs(product);
+        const bloques = [
+          descripcion && {
+            titulo: "Descripción",
+            contenido: (
+              <p className="text-[14.5px] leading-[1.7] whitespace-pre-line text-[#4a4f58]">
+                {descripcion}
+              </p>
+            ),
+          },
+          filas.length > 0 && {
+            titulo: "Especificaciones",
+            contenido: (
+              <dl className="text-[13.5px]">
+                {filas.map(({ key, value }) => (
+                  <div
+                    key={key}
+                    className="flex justify-between gap-4 border-b border-[#f0ece6] py-2.5 last:border-0"
+                  >
+                    <dt className="text-[#8a8f98]">{key}</dt>
+                    <dd className="text-right font-semibold text-kora-black">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ),
+          },
+        ].filter((b): b is { titulo: string; contenido: React.ReactElement } => Boolean(b));
+        if (bloques.length === 0) return null;
 
-        <details className="group rounded-[16px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-[30px] sm:[&>*:not(summary)]:!block">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black sm:pointer-events-none sm:mb-3 sm:text-xl [&::-webkit-details-marker]:hidden">
-            Especificaciones
-            <ChevronDown
-              className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180 sm:hidden"
-              aria-hidden
-            />
-          </summary>
-          <dl className="mt-3 text-[13.5px] sm:mt-0">
-            {specs(product)
-              .map(({ key, value }) => (
-                <div
-                  key={key}
-                  className="flex justify-between border-b border-[#f0ece6] py-2.5 last:border-0"
-                >
-                  <dt className="text-[#8a8f98]">{key}</dt>
-                  <dd className="text-right font-semibold text-kora-black">{value}</dd>
-                </div>
-              ))}
-          </dl>
-        </details>
-      </div>
+        return (
+          <div
+            className={`mt-4 grid gap-3 sm:mt-6 sm:gap-6 ${
+              bloques.length > 1 ? "lg:grid-cols-[1.3fr_1fr]" : ""
+            }`}
+          >
+            {bloques.map(({ titulo, contenido }) => (
+              <div key={titulo}>
+                <section className="hidden h-full rounded-[20px] bg-white p-[30px] shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:block">
+                  <h2 className="mb-3 text-xl font-bold text-kora-black">{titulo}</h2>
+                  {contenido}
+                </section>
+                <details className="group rounded-[16px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black [&::-webkit-details-marker]:hidden">
+                    {titulo}
+                    <ChevronDown
+                      className="size-5 text-[#b3b8c0] transition-transform group-open:rotate-180"
+                      aria-hidden
+                    />
+                  </summary>
+                  <div className="mt-3">{contenido}</div>
+                </details>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {related.length > 0 && (
         <section className="mt-8 sm:mt-10">

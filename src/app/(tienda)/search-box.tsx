@@ -87,12 +87,17 @@ export function SearchBox() {
     setOpen(false);
     inputRef.current?.blur();
     router.push(`/catalogo?q=${encodeURIComponent(consulta)}`);
+    // Tras buscar, la caja queda limpia (pedido de Daniel, 5 oct 2026): el
+    // término ya se ve en "Resultados para …" del catálogo, y dejarlo escrito
+    // obligaba a borrarlo a mano antes de la siguiente búsqueda.
+    setValue("");
   }
 
   function abrirProducto(slug: string) {
     setOpen(false);
     inputRef.current?.blur();
     router.push(`/producto/${slug}`);
+    setValue("");
   }
 
   // El desplegable solo aparece cuando ya hay una respuesta para lo que se
