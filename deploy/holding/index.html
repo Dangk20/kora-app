@@ -37,9 +37,9 @@
      Excepción decidida por Daniel el 23 sep 2026: la página lleva UNA cuenta
      regresiva hacia la apertura (lunes 5 oct, 8:00 p.m.; se corrió desde el 25 sep). Es informativa, no presiona:
      no va acompañada de ofertas ni de "no te lo pierdas". La hora vive en
-     `data-apertura` del contador y es la ÚNICA que hay que cambiar. Al llegar a
-     cero la página no se abre sola —el cambio se hace en el Caddyfile—, así que
-     el contador dice que estamos abriendo en vez de quedarse en 00.
+     `data-apertura` del contador Y en el Caddyfile (`@abierta`): las dos
+     deben coincidir. Al llegar a cero la página se recarga y, como Caddy ya
+     sirve la tienda a esa hora, el visitante entra solo.
 
   Color y tipografía salen de los tokens de src/app/globals.css.
 -->
@@ -381,7 +381,12 @@
       var falta = Math.max(0, Math.floor((apertura - Date.now()) / 1000));
       if (falta === 0) {
         caja.hidden = true;
-        fecha.textContent = "Estamos abriendo las puertas. Vuelve en unos minutos.";
+        fecha.textContent = "¡Abrimos! Cargando la tienda…";
+        // A la hora, el servidor ya sirve la tienda en esta misma dirección:
+        // basta recargar. Un pequeño retraso al azar evita que todos los
+        // visitantes golpeen el servidor en el mismo segundo, y si el reloj
+        // del visitante va adelantado y aún sale esta página, lo reintenta.
+        setTimeout(function () { location.reload(); }, 2000 + Math.random() * 6000);
         return false;
       }
       pintar("d", dos(Math.floor(falta / 86400)));

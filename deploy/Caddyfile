@@ -113,9 +113,24 @@ korashopp.com {
 	# entra y todos ven la página de espera (ver el aviso 4 de deploy/README:
 	# una variable vacía aquí no puede convertirse en puerta abierta).
 	#
-	# ▼▼▼ LANZAMIENTO: borrar los bloques @entrar, @previa y el último
-	# `handle` (la página de espera), y dejar solo el reverse_proxy.
-	# Luego RECREAR el contenedor (aviso 1 de deploy/README). ▼▼▼
+	# ── APERTURA AUTOMÁTICA ───────────────────────────────────────
+	# Desde el lunes 5 oct 2026, 8:00 p. m. hora de Colombia (= 1791248400,
+	# 01:00 UTC del 6 oct) TODO el mundo ve la tienda, sin que nadie toque
+	# el servidor: lo pidió Daniel para que abrir no dependa de una persona.
+	# La comparación la hace Caddy en cada petición con su reloj; probada
+	# contra caddy:2-alpine con una fecha pasada y una futura. La página del
+	# contador se recarga sola al llegar a cero y cae aquí.
+	#
+	# Si la fecha se mueve: cambiar el número (y `data-apertura` en
+	# holding/index.html), desplegar y RECREAR el contenedor (aviso 1 de
+	# deploy/README). Pasada la apertura, la cortina de abajo ya no se usa y
+	# se puede borrar con calma.
+	@abierta expression `int({time.now.unix}) >= 1791248400`
+	handle @abierta {
+		reverse_proxy kora-prod-app:3000 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
 
 	# Los webhooks del proveedor de correo nunca pasan por la cortina.
 	@webhook path /api/webhooks/*
