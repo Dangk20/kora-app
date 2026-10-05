@@ -23,6 +23,14 @@ export function BannerCarousel({
   const slides = banners.filter((b) => b.active && b.imageUrl);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Proporción REAL de la pieza (ancho / alto), leída de la imagen al
+  // cargar. El contenedor toma esa forma: la pieza se ve entera, sin
+  // recortes y sin bandas de relleno, traiga la medida que traiga (pedido
+  // de Daniel, 5 oct 2026). Hasta que carga, manda la proporción del espacio
+  // (la clase `aspect-*` de quien lo usa), que es la que se le pide al
+  // diseñador. Se toma la de la PRIMERA pieza: las de un mismo espacio
+  // comparten formato, y cambiar de alto en cada rotación movería la página.
+  const [ratio, setRatio] = useState<number | null>(null);
 
   const go = useCallback(
     (next: number) => setIndex(((next % slides.length) + slides.length) % slides.length),
@@ -56,37 +64,31 @@ export function BannerCarousel({
   return (
     <div
       className={`group/carousel relative overflow-hidden rounded-[18px] ${className ?? ""}`}
+      style={ratio ? { aspectRatio: String(ratio) } : undefined}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       {slides.map((banner, i) => {
-        // La pieza se muestra ENTERA (`object-contain`) y el espacio que
-        // sobre se rellena con ella misma, desenfocada. Con `object-cover`,
-        // un arte que no traía exactamente la proporción del espacio perdía
-        // texto por los lados —pasó dos veces el 4 oct 2026—, y la proporción
-        // del archivo no la controlamos: la decide quien lo diseña. Cuando el
-        // arte sí trae la medida pedida, contain y cover son lo mismo.
         const image = (
-          <>
-            <Image
-              src={banner.imageUrl!}
-              alt=""
-              aria-hidden
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="scale-110 object-cover blur-2xl"
-              unoptimized
-            />
-            <Image
-              src={banner.imageUrl!}
-              alt={banner.title}
-              fill
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-contain"
-              unoptimized
-              priority={i === 0}
-            />
-          </>
+          <Image
+            src={banner.imageUrl!}
+            alt={banner.title}
+            fill
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            className="object-cover"
+            unoptimized
+            priority={i === 0}
+            onLoad={
+              i === 0
+                ? (e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth && img.naturalHeight) {
+                      setRatio(img.naturalWidth / img.naturalHeight);
+                    }
+                  }
+                : undefined
+            }
+          />
         );
         return (
           <div

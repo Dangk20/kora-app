@@ -10,17 +10,8 @@ import { ProductCard } from "@/modules/storefront/product-card";
 import { storeMetadata } from "@/modules/storefront/metadata";
 import { SortSelect } from "./sort-select";
 import { MobileFilters } from "./mobile-filters";
-
-/**
- * Cuántos productos se pintan de golpe.
- *
- * Sin tope, el catálogo real (~1.000 productos) manda todas las tarjetas en la
- * primera respuesta: cientos de imágenes y un HTML enorme, en un teléfono con
- * datos móviles. El diseño pide **"Cargar más", nunca paginación numérica**
- * (§03), y aquí es un enlace: funciona sin JavaScript y la URL sigue siendo
- * compartible.
- */
-const POR_PAGINA = 12;
+import { CatalogGrid } from "./catalog-grid";
+import { POR_PAGINA, normalizarOrden } from "./paginacion";
 
 export const metadata = storeMetadata({
   title: "Catálogo",
@@ -29,16 +20,13 @@ export const metadata = storeMetadata({
   path: "/catalogo",
 });
 
-const SORTS = ["relevancia", "precioAsc", "precioDesc", "nombre"] as const;
-type Sort = (typeof SORTS)[number];
-
 export default async function CatalogoPage({
   searchParams,
 }: {
   searchParams: Promise<{ categoria?: string; q?: string; orden?: string; ver?: string }>;
 }) {
   const { categoria, q, orden, ver } = await searchParams;
-  const sort: Sort = SORTS.includes(orden as Sort) ? (orden as Sort) : "relevancia";
+  const sort = normalizarOrden(orden);
   const currency = await activeCurrency();
 
   const [categories, products] = await Promise.all([
@@ -60,16 +48,6 @@ export default async function CatalogoPage({
   );
   const mostrados = products.slice(0, visibles);
   const quedan = products.length - mostrados.length;
-
-  /** Enlace de "Cargar más" conservando categoría, búsqueda y orden. */
-  const masUrl = () => {
-    const next = new URLSearchParams();
-    if (categoria) next.set("categoria", categoria);
-    if (q) next.set("q", q);
-    if (orden) next.set("orden", orden);
-    next.set("ver", String(visibles + POR_PAGINA));
-    return `/catalogo?${next}`;
-  };
 
   const title = q
     ? `Resultados para "${q}"`
@@ -194,25 +172,17 @@ export default async function CatalogoPage({
         </aside>
 
         {products.length > 0 ? (
-          <div>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-              {mostrados.map((p) => (
-                <ProductCard key={p.id} product={p} currency={currency} />
-              ))}
-            </div>
-
-            {quedan > 0 && (
-              <div className="mt-8 text-center">
-                <Link
-                  href={masUrl()}
-                  scroll={false}
-                  className="inline-flex min-h-12 items-center rounded-full border-[1.8px] border-kora-black bg-white px-7 text-[14px] font-bold text-kora-black hover:bg-kora-black hover:text-white"
-                >
-                  Cargar más ({quedan})
-                </Link>
-              </div>
-            )}
-          </div>
+          <CatalogGrid
+            // La clave reinicia lo cargado al cambiar de categoría, búsqueda u orden.
+            key={`${categoria ?? ""}|${q ?? ""}|${orden ?? ""}`}
+            mostradosIniciales={mostrados.length}
+            quedanIniciales={quedan}
+            filtros={{ categoria, q, orden }}
+          >
+            {mostrados.map((p) => (
+              <ProductCard key={p.id} product={p} currency={currency} />
+            ))}
+          </CatalogGrid>
         ) : (
           <div className="rounded-[18px] bg-white px-6 py-12 text-center sm:p-16">
             <Flame className="mx-auto size-14 text-[#e2ddd6]" />

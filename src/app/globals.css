@@ -138,6 +138,26 @@
   }
   html {
     @apply font-sans;
+    /* Sin zoom por DOBLE TOQUE: en móvil, tocar dos veces una tarjeta o un
+       botón agrandaba la página como si fuera una foto (5 oct 2026). El zoom
+       con dos dedos sigue funcionando: `manipulation` solo quita el doble
+       toque, no bloquea a quien necesita ampliar para leer. */
+    touch-action: manipulation;
+  }
+}
+
+/* iOS hace zoom solo al enfocar un campo cuyo texto mide menos de 16 px, y no
+   lo deshace al salir: la página queda ampliada y "se daña" (5 oct 2026). Los
+   campos de la tienda iban a 13–14 px. En pantallas táctiles se suben a 16 px;
+   en escritorio conservan su tamaño de diseño. Va FUERA de `@layer` a
+   propósito: en Tailwind 4 una utilidad (`text-[13.5px]`) gana a cualquier
+   regla de `base`, y lo que no está en ninguna capa gana a todas. No se usa
+   `maximum-scale=1`: en Android eso desactiva también el zoom con dos dedos. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }
 
