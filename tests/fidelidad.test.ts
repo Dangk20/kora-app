@@ -79,9 +79,14 @@ describe("la tarjeta de producto no vende desde el listado", () => {
 
   it("el botón sigue existiendo para la ficha, que es donde se compra", () => {
     // Quitarlo de la tarjeta no debe haberlo dejado huérfano.
+    // Los textos viven en el diccionario desde la tienda en inglés: se pide
+    // que la ficha USE las dos claves, no que las palabras aparezcan (antes
+    // pasaba también por comentarios).
     const ficha = leer("src/app/(tienda)/producto/[slug]/product-detail.tsx");
-    expect(ficha).toContain("Agregar al carrito");
-    expect(ficha).toContain("Comprar ahora");
+    expect(ficha).toMatch(/\.agregarAlCarrito\b/);
+    expect(ficha).toMatch(/\.comprarAhora\b/);
+    expect(leer("src/modules/i18n/messages/es/producto.ts")).toContain('"Agregar al carrito"');
+    expect(leer("src/modules/i18n/messages/es/producto.ts")).toContain('"Comprar ahora"');
   });
 
   it("la regla de CLAUDE.md y el código dicen lo mismo", () => {

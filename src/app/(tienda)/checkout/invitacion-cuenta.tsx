@@ -27,6 +27,7 @@ import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { crearCuentaDelPedido, entrarDesdePedido } from "./cuenta-actions";
 import { PasswordField } from "../cuenta/password-field";
 import { MIN_PASSWORD } from "@/modules/buyer/password";
+import { useMessages } from "@/modules/i18n/provider";
 
 const input =
   "w-full min-h-12 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-[15px] py-3 text-base sm:text-sm outline-none focus:border-kora-coral";
@@ -54,6 +55,7 @@ export function InvitacionCuenta({
   const [paso, setPaso] = useState<"oferta" | "password">("oferta");
   const [error, setError] = useState<string | null>(null);
   const [enviando, startEnviando] = useTransition();
+  const tc = useMessages().checkout;
 
   const enviar = (form: FormData) => {
     setError(null);
@@ -68,7 +70,8 @@ export function InvitacionCuenta({
       // Salga bien o mal, WhatsApp sigue estando a un clic: la compra nunca
       // queda atrapada detrás de esta pantalla.
       if (r.ok) onContinuar();
-      else setError(r.error);
+      // Traducido en el borde: el mensaje nace en las reglas de la cuenta.
+      else setError(tc.errorServidor(r.error));
     });
   };
 
@@ -80,35 +83,31 @@ export function InvitacionCuenta({
         </span>
 
         <h1 className="mt-5 text-[24px] leading-tight font-extrabold text-kora-black">
-          Tu pedido {orderNumber} está listo
+          {tc.pedidoListo(orderNumber)}
         </h1>
 
         {paso === "oferta" ? (
           <>
             <p className="mt-3 text-[15px] leading-relaxed text-[#4a4f58]">
-              {tieneCuenta
-                ? "Ya tienes una cuenta con este correo. ¿Quieres entrar para seguir este pedido desde ahí?"
-                : "Guarda tus datos y sigue este pedido desde tu cuenta. Solo tienes que elegir una contraseña — el resto ya lo tenemos."}
+              {tieneCuenta ? tc.ofertaConCuenta : tc.ofertaSinCuenta}
             </p>
 
             <ul className="mt-6 space-y-2.5 text-left">
               {[
-                "Sigue el estado de este pedido y de los que vengan",
+                tc.beneficioSeguir,
                 // EN FUTURO, y no por prudencia de redacción: el cashback se
                 // acredita al CONFIRMAR el pedido, y aquí el pedido acaba de
                 // nacer pendiente. Escrito en pasado mandaría a buscar un
                 // saldo que el libro todavía no tiene. Misma regla que la
                 // pantalla de pedidos del comprador.
-                cashback ? `Generará ${cashback} de Kora Cashback a tu nombre` : null,
-                tieneCuenta
-                  ? "Este pedido ya quedó en tu cuenta: entrar solo es para verlo ahora"
-                  : "Compra más rápido: no vuelves a escribir tus datos",
+                cashback ? tc.beneficioCashback(cashback) : null,
+                tieneCuenta ? tc.beneficioConCuenta : tc.beneficioSinCuenta,
               ]
                 .filter(Boolean)
-                .map((t) => (
-                  <li key={t as string} className="flex gap-2.5 text-[14px] text-[#4a4f58]">
+                .map((b) => (
+                  <li key={b as string} className="flex gap-2.5 text-[14px] text-[#4a4f58]">
                     <ShieldCheck className="mt-0.5 size-4 shrink-0 text-kora-orange" />
-                    <span>{t}</span>
+                    <span>{b}</span>
                   </li>
                 ))}
             </ul>
@@ -118,7 +117,7 @@ export function InvitacionCuenta({
               onClick={() => setPaso("password")}
               className="bg-kora-gradient mt-7 min-h-13 w-full rounded-full px-7 text-[16px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)]"
             >
-              {tieneCuenta ? "Iniciar sesión" : "Crear mi cuenta"}
+              {tieneCuenta ? tc.iniciarSesion : tc.crearMiCuenta}
             </button>
 
             {/* Enlace y no botón: se ve, se toca y no compite. */}
@@ -127,15 +126,13 @@ export function InvitacionCuenta({
               onClick={onContinuar}
               className="mt-4 w-full text-[14px] text-muted-foreground underline underline-offset-2"
             >
-              {tieneCuenta ? "No, en otro momento" : "En otro momento"}
+              {tieneCuenta ? tc.noEnOtroMomento : tc.enOtroMomento}
             </button>
           </>
         ) : (
           <form action={enviar} className="mt-5 text-left">
             <p className="text-center text-[14.5px] text-[#4a4f58]">
-              {tieneCuenta
-                ? "Escribe tu contraseña para entrar."
-                : "Elige tu contraseña. Es lo único que falta."}
+              {tieneCuenta ? tc.escribeContrasena : tc.eligeContrasena}
             </p>
 
             {/* El MISMO campo con el ojo que usa el resto de la tienda: uno
@@ -144,10 +141,10 @@ export function InvitacionCuenta({
             <div className="mt-5 space-y-3">
               <PasswordField
                 id="password"
-                label="Contraseña"
+                label={tc.contrasena}
                 autoComplete={tieneCuenta ? "current-password" : "new-password"}
                 minLength={tieneCuenta ? undefined : MIN_PASSWORD}
-                hint={tieneCuenta ? undefined : `Mínimo ${MIN_PASSWORD} caracteres.`}
+                hint={tieneCuenta ? undefined : tc.minimoCaracteres(MIN_PASSWORD)}
                 inputClassName={`${input} pr-11`}
                 labelClassName="text-[13px] font-semibold"
               />
@@ -157,7 +154,7 @@ export function InvitacionCuenta({
               {tieneCuenta ? null : (
                 <PasswordField
                   id="password2"
-                  label="Repite la contraseña"
+                  label={tc.repiteContrasena}
                   autoComplete="new-password"
                   minLength={MIN_PASSWORD}
                   inputClassName={`${input} pr-11`}
@@ -182,11 +179,11 @@ export function InvitacionCuenta({
             >
               {enviando
                 ? tieneCuenta
-                  ? "Entrando…"
-                  : "Creando tu cuenta…"
+                  ? tc.entrando
+                  : tc.creandoCuenta
                 : tieneCuenta
-                  ? "Entrar y continuar"
-                  : "Crear cuenta y continuar"}
+                  ? tc.entrarYContinuar
+                  : tc.crearCuentaYContinuar}
             </button>
 
             <button
@@ -194,7 +191,7 @@ export function InvitacionCuenta({
               onClick={onContinuar}
               className="mt-4 w-full text-[14px] text-muted-foreground underline underline-offset-2"
             >
-              {tieneCuenta ? "No, en otro momento" : "En otro momento"}
+              {tieneCuenta ? tc.noEnOtroMomento : tc.enOtroMomento}
             </button>
           </form>
         )}

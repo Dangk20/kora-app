@@ -19,6 +19,8 @@ import {
   ProductGrid,
 } from "./home-sections";
 import { GUARANTEES } from "./guarantees";
+import type { Locale } from "@/modules/i18n";
+import { MESSAGES } from "@/modules/i18n/messages";
 
 export type HomeData = {
   currency: Currency;
@@ -27,6 +29,11 @@ export type HomeData = {
   categories: { id: string; name: string; slug: string; color: string; icon: string }[];
   /** Vista previa del panel de Vitrina: se ve igual, pero no interactúa. */
   preview?: boolean;
+  /**
+   * Idioma del visitante. La tienda lo pasa; el panel de Vitrina no, y se
+   * queda en español, que es el idioma del panel.
+   */
+  locale?: Locale;
   /**
    * Control de edición que se superpone a una sección o banner (el lápiz de
    * Vitrina). La tienda real no lo pasa; el panel sí, y así se edita
@@ -80,7 +87,9 @@ export function StoreHomeLayout({
   categories,
   preview = false,
   editControl,
+  locale = "es",
 }: HomeData) {
+  const t = MESSAGES[locale].tienda;
   // En la tienda solo se pintan las secciones activas; en Vitrina se pintan
   // TODAS, incluso vacías u ocultas: si desaparecieran, no habría forma de
   // volver a llenarlas.
@@ -123,7 +132,7 @@ export function StoreHomeLayout({
               <BannerSlot
                 banners={banners.get("hero_principal")}
                 className="aspect-[3/2] w-full"
-                placeholderLabel="Banner principal — cárgalo desde Vitrina"
+                placeholderLabel={t.banners.principal}
               />
             </Region>
             <Region id="banner:hero_lateral" editControl={editControl}>
@@ -133,7 +142,7 @@ export function StoreHomeLayout({
                 // al cliente (700 × 900). Nada de `h-full`/`aspect-auto`: la
                 // altura heredada es justo lo que lo recortaba.
                 className="aspect-[7/9] w-full"
-                placeholderLabel="Banner lateral — cárgalo desde Vitrina"
+                placeholderLabel={t.banners.lateral}
               />
             </Region>
 
@@ -160,7 +169,7 @@ export function StoreHomeLayout({
                   href="/catalogo"
                   className="text-[13px] font-bold text-kora-coral hover:opacity-80"
                 >
-                  Ver más
+                  {t.verMas}
                 </Link>
               </div>
               {mejorSemana.products.length > 0 ? (
@@ -170,7 +179,7 @@ export function StoreHomeLayout({
                   columns={Math.min(4, Math.max(1, mejorSemana.products.length))}
                 />
               ) : (
-                <EmptySection label={mejorSemana.title} />
+                <EmptySection label={mejorSemana.title} locale={locale} />
               )}
             </Region>
           )}
@@ -183,12 +192,13 @@ export function StoreHomeLayout({
           <Region id="ofertas" editControl={editControl}>
             {ofertas.products.length > 0 ? (
               <DealsPanel
+                  locale={locale}
                 title={ofertas.title}
                 products={ofertas.products}
                 currency={currency}
               />
             ) : (
-              <EmptySection label={ofertas.title} />
+              <EmptySection label={ofertas.title} locale={locale} />
             )}
           </Region>
         </section>
@@ -199,7 +209,10 @@ export function StoreHomeLayout({
         {/* 2×2 en móvil como el diseño (§02): en una sola columna estas cuatro
             filas empujan el catálogo media pantalla hacia abajo. */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-5 rounded-[20px] bg-white px-5 py-6 shadow-[0_4px_22px_rgba(0,0,0,0.05)] sm:grid-cols-3 sm:gap-6 sm:px-8 sm:py-7">
-          {GUARANTEES.map(({ icon: Icon, title, text }) => (
+          {GUARANTEES.map(({ icon: Icon }, i) => {
+            // El ícono sale de la lista; el texto, del idioma (mismo orden).
+            const { title, text } = t.garantias[i];
+            return (
             <div key={title} className="flex gap-3.5">
               <span className="flex size-[46px] shrink-0 items-center justify-center rounded-[13px] bg-[#FFE9DD] text-kora-coral">
                 <Icon className="size-[22px]" />
@@ -209,7 +222,8 @@ export function StoreHomeLayout({
                 <p className="text-[12.5px] leading-snug text-[#6b6f78]">{text}</p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -241,7 +255,7 @@ export function StoreHomeLayout({
                         carousel={false}
                       />
                     ) : (
-                      <EmptySection label={mejorValorados.title} />
+                      <EmptySection label={mejorValorados.title} locale={locale} />
                     )}
                   </div>
                 </Region>
@@ -254,7 +268,7 @@ export function StoreHomeLayout({
                 <BannerSlot
                   banners={banners.get("promo_secundaria")}
                   className="aspect-[3/5] w-full"
-                  placeholderLabel="Promo de la parrilla — cárgala desde Vitrina"
+                  placeholderLabel={t.banners.promo}
                 />
               </Region>
             </div>
@@ -262,13 +276,14 @@ export function StoreHomeLayout({
             <Region id="destacados" editControl={editControl}>
               {destacados.products.length > 0 ? (
                 <ProductGrid
+                  locale={locale}
                   title={destacados.title}
                   products={destacados.products}
                   currency={currency}
                   preview={preview}
                 />
               ) : (
-                <EmptySection label={destacados.title} />
+                <EmptySection label={destacados.title} locale={locale} />
               )}
             </Region>
           </div>
@@ -277,7 +292,7 @@ export function StoreHomeLayout({
 
       {/* FRANJA DE MARCA */}
       <section className={`${CONTAINER} pb-16`}>
-        <BrandBand />
+        <BrandBand locale={locale} />
       </section>
     </>
   );

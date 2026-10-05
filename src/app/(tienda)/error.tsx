@@ -13,6 +13,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
+import { useMessages } from "@/modules/i18n/provider";
 
 export default function ErrorTienda({
   error,
@@ -21,6 +22,7 @@ export default function ErrorTienda({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useMessages().errores.pagina;
   useEffect(() => {
     // El `digest` es el identificador que Next deja también en el registro del
     // servidor: es lo que permite cruzar lo que vio el comprador con la causa.
@@ -33,11 +35,10 @@ export default function ErrorTienda({
         <RefreshCw className="size-7" aria-hidden />
       </span>
       <h1 className="text-[20px] font-extrabold text-kora-black">
-        No pudimos cargar esta página
+        {t.titulo}
       </h1>
       <p className="mt-2 text-[13.5px] leading-relaxed text-[#8a8f98]">
-        Revisa tu conexión e intenta de nuevo. Si sigue pasando, escríbenos por
-        WhatsApp y te ayudamos.
+        {t.cuerpo}
       </p>
 
       <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
@@ -46,13 +47,13 @@ export default function ErrorTienda({
           onClick={reset}
           className="bg-kora-gradient flex min-h-12 items-center justify-center rounded-full px-7 text-[14px] font-bold text-white"
         >
-          Intentar de nuevo
+          {t.reintentar}
         </button>
         <Link
           href="/catalogo"
           className="flex min-h-12 items-center justify-center rounded-full border-[1.8px] border-kora-black bg-white px-7 text-[14px] font-bold text-kora-black"
         >
-          Ir al catálogo
+          {t.irCatalogo}
         </Link>
       </div>
     </div>

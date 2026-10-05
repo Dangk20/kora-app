@@ -10,10 +10,11 @@ import {
 } from "@/modules/catalog/category-actions";
 import { CATEGORY_ICONS, TILE_PALETTE, inkFor } from "@/modules/catalog/tiles";
 
-type Child = { id: string; name: string; icon: string; productCount: number };
+type Child = { id: string; name: string; nameEn: string | null; icon: string; productCount: number };
 type Parent = {
   id: string;
   name: string;
+  nameEn: string | null;
   color: string;
   icon: string;
   /** Incluye los de sus subcategorías. */
@@ -22,7 +23,7 @@ type Parent = {
 };
 
 /** Lo que se edita: una categoría padre (con color) o una subcategoría. */
-type Editable = { id: string; name: string; icon: string; color?: string };
+type Editable = { id: string; name: string; nameEn: string | null; icon: string; color?: string };
 
 const ICON_OPTIONS = Object.keys(CATEGORY_ICONS);
 
@@ -222,6 +223,7 @@ function AddSubcategory({ parentId }: { parentId: string }) {
 function CategoryEditModal({ category, onClose }: { category: Editable; onClose: () => void }) {
   const [state, formAction, pending] = useActionState(updateCategory, null);
   const [name, setName] = useState(category.name);
+  const [nameEn, setNameEn] = useState(category.nameEn ?? "");
   const [icon, setIcon] = useState(category.icon);
   const [color, setColor] = useState(category.color);
   const esPadre = category.color !== undefined;
@@ -277,6 +279,18 @@ function CategoryEditModal({ category, onClose }: { category: Editable; onClose:
           onChange={(e) => setName(e.target.value)}
           required
           autoFocus
+          className="w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral"
+        />
+
+        <label className="mt-4 mb-1.5 block text-xs font-semibold text-[#6b6f78]" htmlFor="edit-cat-name-en">
+          Nombre en inglés <span className="font-normal text-[#9aa0ab]">(tienda para el exterior)</span>
+        </label>
+        <input
+          id="edit-cat-name-en"
+          name="nameEn"
+          value={nameEn}
+          onChange={(e) => setNameEn(e.target.value)}
+          placeholder="Vacío = se muestra el nombre en español"
           className="w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral"
         />
 
@@ -418,7 +432,7 @@ export function CategoryManager({
                   <button
                     type="button"
                     onClick={() =>
-                      setEditing({ id: cat.id, name: cat.name, icon: cat.icon, color: cat.color })
+                      setEditing({ id: cat.id, name: cat.name, nameEn: cat.nameEn, icon: cat.icon, color: cat.color })
                     }
                     aria-label={`Editar ${cat.name}`}
                     title="Editar nombre, color e ícono"
@@ -445,7 +459,7 @@ export function CategoryManager({
                       sub={sub}
                       canEdit={canEdit}
                       canDelete={canDelete}
-                      onEdit={() => setEditing({ id: sub.id, name: sub.name, icon: sub.icon })}
+                      onEdit={() => setEditing({ id: sub.id, name: sub.name, nameEn: sub.nameEn, icon: sub.icon })}
                     />
                   ))}
                 </div>

@@ -26,6 +26,7 @@ import {
   guardarDireccion,
   marcarPredeterminada,
 } from "./direcciones-actions";
+import { useMessages } from "@/modules/i18n/provider";
 
 /** Una línea legible: "CL 22 A # 43 - 61, apto 1103 · Barrio Orquídea". */
 function resumen(d: Address): string {
@@ -38,9 +39,10 @@ function lugar(d: Address): string {
 
 function Enviar({ texto }: { texto: string }) {
   const { pending } = useFormStatus();
+  const t = useMessages().cuenta;
   return (
     <Button type="submit" variant="brand" className="w-full" disabled={pending}>
-      {pending ? "Guardando…" : texto}
+      {pending ? t.guardando : texto}
     </Button>
   );
 }
@@ -83,6 +85,8 @@ function Formulario({
   onCerrar: () => void;
 }) {
   const [state, action] = useActionState(guardarDireccion, null);
+  const tc = useMessages().cuenta;
+  const t = tc.direcciones;
   // Siempre Colombia: la libreta es de envío y KORA no envía a EE.UU. Una
   // dirección guardada allá antes del 20 sep 2026 se edita como colombiana.
   const [division, setDivision] = useState(direccion?.country === "CO" ? (direccion?.state ?? "") : "");
@@ -99,9 +103,9 @@ function Formulario({
       {direccion && <input type="hidden" name="id" value={direccion.id} />}
 
       <input type="hidden" name="country" value="CO" />
-      <p className="text-[12.5px] text-[#6b6f78]">Hacemos envíos dentro de Colombia.</p>
+      <p className="text-[12.5px] text-[#6b6f78]">{t.soloColombia}</p>
 
-      <Campo id="label" label="Nombre para reconocerla (Casa, Oficina…)" defaultValue={direccion?.label} />
+      <Campo id="label" label={t.etiqueta} defaultValue={direccion?.label} />
 
       {/* El MISMO selector encadenado del checkout: departamento/estado →
           ciudad. Elegir una dirección allá y crearla aquí es la misma
@@ -116,12 +120,12 @@ function Formulario({
         labelCls="mb-1.5 block text-[12.5px] font-medium"
       />
 
-      <Campo id="address" label="Dirección" defaultValue={direccion?.address} requerido />
-      <Campo id="address2" label="Apartamento, torre, conjunto (opcional)" defaultValue={direccion?.address2} />
+      <Campo id="address" label={t.direccion} defaultValue={direccion?.address} requerido />
+      <Campo id="address2" label={t.direccion2} defaultValue={direccion?.address2} />
 
-      <Campo id="neighborhood" label="Barrio" defaultValue={direccion?.neighborhood} requerido />
+      <Campo id="neighborhood" label={t.barrio} defaultValue={direccion?.neighborhood} requerido />
 
-      <Campo id="notes" label="Indicaciones de entrega (opcional)" defaultValue={direccion?.notes} />
+      <Campo id="notes" label={t.indicaciones} defaultValue={direccion?.notes} />
 
       {!esPrimera && (
         <label className="flex items-center gap-2 text-[13px] text-[#4a4f58]">
@@ -131,7 +135,7 @@ function Formulario({
             defaultChecked={direccion?.isDefault ?? false}
             className="size-4 accent-kora-coral"
           />
-          Usar como dirección predeterminada
+          {t.usarPredeterminada}
         </label>
       )}
 
@@ -142,13 +146,13 @@ function Formulario({
       )}
 
       <div className="grid gap-2">
-        <Enviar texto={direccion ? "Guardar cambios" : "Guardar dirección"} />
+        <Enviar texto={direccion ? t.guardarCambios : t.guardarDireccion} />
         <button
           type="button"
           onClick={onCerrar}
           className="text-[13px] font-semibold text-[#8a8f98] hover:text-kora-black"
         >
-          Cancelar
+          {tc.cancelar}
         </button>
       </div>
     </form>
@@ -157,16 +161,18 @@ function Formulario({
 
 function ConfirmarBorrado({ direccion }: { direccion: Address }) {
   const [abierto, setAbierto] = useState(false);
+  const tc = useMessages().cuenta;
+  const t = tc.direcciones;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        aria-label={`Eliminar la dirección ${direccion.label ?? resumen(direccion)}`}
+        aria-label={t.eliminarAria(direccion.label ?? resumen(direccion))}
         className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[#8a8f98] transition-colors hover:text-destructive"
       >
-        <Trash2 className="size-[14px]" aria-hidden /> Eliminar
+        <Trash2 className="size-[14px]" aria-hidden /> {t.eliminar}
       </button>
 
       <Dialog open={abierto} onOpenChange={setAbierto}>
@@ -177,12 +183,11 @@ function ConfirmarBorrado({ direccion }: { direccion: Address }) {
           <div className="px-6 pt-6">
             <DialogHeader className="space-y-2 text-left">
               <DialogTitle className="text-[17px] font-bold text-kora-black">
-                ¿Eliminar esta dirección?
+                {t.confirmarTitulo}
               </DialogTitle>
               <DialogDescription className="text-[13.5px] leading-relaxed text-[#6b7280]">
-                <span className="font-semibold text-kora-black">{resumen(direccion)}</span> saldrá
-                de tu libreta. Tus pedidos anteriores conservan la dirección con la que se
-                hicieron.
+                <span className="font-semibold text-kora-black">{resumen(direccion)}</span>{" "}
+                {t.confirmarCuerpo}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -194,7 +199,7 @@ function ConfirmarBorrado({ direccion }: { direccion: Address }) {
               onClick={() => setAbierto(false)}
               className="w-full rounded-full bg-kora-black px-6 py-3.5 text-[14.5px] font-bold text-white transition-colors hover:bg-kora-gray-dark"
             >
-              Cancelar
+              {tc.cancelar}
             </button>
             <form action={eliminarDireccion}>
               <input type="hidden" name="id" value={direccion.id} />
@@ -202,7 +207,7 @@ function ConfirmarBorrado({ direccion }: { direccion: Address }) {
                 type="submit"
                 className="w-full rounded-full px-6 py-2.5 text-[13.5px] font-semibold text-destructive transition-colors hover:bg-destructive/10"
               >
-                Sí, eliminarla
+                {t.siEliminar}
               </button>
             </form>
           </div>
@@ -214,11 +219,13 @@ function ConfirmarBorrado({ direccion }: { direccion: Address }) {
 
 function Tarjeta({ direccion }: { direccion: Address }) {
   const [editando, setEditando] = useState(false);
+  const tc = useMessages().cuenta;
+  const t = tc.direcciones;
 
   if (editando) {
     return (
       <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6">
-        <h3 className="mb-4 text-[15.5px] font-extrabold text-kora-black">Editar dirección</h3>
+        <h3 className="mb-4 text-[15.5px] font-extrabold text-kora-black">{t.editarTitulo}</h3>
         <Formulario direccion={direccion} esPrimera={false} onCerrar={() => setEditando(false)} />
       </section>
     );
@@ -242,7 +249,7 @@ function Tarjeta({ direccion }: { direccion: Address }) {
             )}
             {direccion.isDefault ? (
               <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-[#FFF4EF] px-2.5 py-1 text-[11.5px] font-bold text-kora-coral">
-                <Star className="size-[12px] fill-current" aria-hidden /> Predeterminada
+                <Star className="size-[12px] fill-current" aria-hidden /> {t.predeterminada}
               </span>
             ) : (
               <form action={marcarPredeterminada} className="mt-2.5">
@@ -251,7 +258,7 @@ function Tarjeta({ direccion }: { direccion: Address }) {
                   type="submit"
                   className="text-[12px] font-semibold text-[#8a8f98] underline underline-offset-2 hover:text-kora-black"
                 >
-                  Usar como predeterminada
+                  {t.marcarPredeterminada}
                 </button>
               </form>
             )}
@@ -264,7 +271,7 @@ function Tarjeta({ direccion }: { direccion: Address }) {
             onClick={() => setEditando(true)}
             className="flex items-center gap-1.5 text-[12.5px] font-semibold text-kora-coral"
           >
-            <Pencil className="size-[14px]" aria-hidden /> Editar
+            <Pencil className="size-[14px]" aria-hidden /> {tc.editar}
           </button>
           <ConfirmarBorrado direccion={direccion} />
         </div>
@@ -275,6 +282,7 @@ function Tarjeta({ direccion }: { direccion: Address }) {
 
 export function Direcciones({ direcciones }: { direcciones: Address[] }) {
   const [agregando, setAgregando] = useState(false);
+  const t = useMessages().cuenta.direcciones;
 
   return (
     <div className="space-y-4">
@@ -285,17 +293,17 @@ export function Direcciones({ direcciones }: { direcciones: Address[] }) {
       {direcciones.length === 0 && !agregando && (
         <section className="rounded-[18px] bg-white p-6 text-center shadow-[0_4px_18px_rgba(0,0,0,0.04)]">
           <p className="text-[14px] text-[#6b6f78]">
-            Todavía no tienes direcciones guardadas.
+            {t.vacia}
           </p>
           <p className="mt-1 text-[12.5px] text-[#8a8f98]">
-            Guarda una y no tendrás que escribirla en cada compra.
+            {t.vaciaAyuda}
           </p>
         </section>
       )}
 
       {agregando ? (
         <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6">
-          <h3 className="mb-4 text-[15.5px] font-extrabold text-kora-black">Nueva dirección</h3>
+          <h3 className="mb-4 text-[15.5px] font-extrabold text-kora-black">{t.nueva}</h3>
           <Formulario
             esPrimera={direcciones.length === 0}
             onCerrar={() => setAgregando(false)}
@@ -307,7 +315,7 @@ export function Direcciones({ direcciones }: { direcciones: Address[] }) {
           onClick={() => setAgregando(true)}
           className="bg-kora-gradient flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[14px] font-bold text-white hover:opacity-90 sm:w-auto sm:px-7"
         >
-          <Plus className="size-[18px]" aria-hidden /> Agregar una dirección
+          <Plus className="size-[18px]" aria-hidden /> {t.agregar}
         </button>
       )}
     </div>

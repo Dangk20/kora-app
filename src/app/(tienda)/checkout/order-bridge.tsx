@@ -12,6 +12,7 @@ import { CheckCircle2, MessageCircle } from "lucide-react";
 // sitio donde estaba escrito a mano; los otros dos eran la página de términos
 // y las plantillas de correo.
 import { ORDER_TTL_HOURS } from "@/modules/orders/status";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function OrderBridge({
   orderNumber,
@@ -32,6 +33,7 @@ export function OrderBridge({
   onEnviado?: () => void;
 }) {
   const [opened, setOpened] = useState(false);
+  const tc = useMessages().checkout;
 
   useEffect(() => {
     onLlegada?.();
@@ -56,12 +58,10 @@ export function OrderBridge({
           <CheckCircle2 className="size-9 text-kora-orange" />
         </span>
         <h1 className="mt-5 text-[26px] font-extrabold text-kora-black">
-          ¡Tu pedido {orderNumber} fue creado! 🔥
+          {tc.pedidoCreado(orderNumber)}
         </h1>
         <p className="mt-3 text-[14.5px] leading-relaxed text-[#4a4f58]">
-          {opened
-            ? "Abrimos WhatsApp con tu pedido listo para enviar."
-            : "Te estamos llevando a WhatsApp con tu pedido listo para enviar…"}
+          {opened ? tc.abrimosWhatsapp : tc.teLlevamos}
         </p>
 
         <a
@@ -69,14 +69,13 @@ export function OrderBridge({
           onClick={() => onEnviado?.()}
           className="bg-kora-gradient mt-7 inline-flex items-center justify-center gap-2.5 rounded-full px-7 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90"
         >
-          <MessageCircle className="size-[18px]" /> Abrir WhatsApp
+          <MessageCircle className="size-[18px]" /> {tc.abrirWhatsapp}
         </a>
 
         <div className="mt-7 rounded-[13px] bg-[#FFF4EF] px-5 py-4 text-left">
           <p className="text-[12.5px] leading-relaxed text-[#4a4f58]">
-            <strong className="font-semibold text-kora-black">Importante:</strong> tu
-            pedido se confirma cuando completes la conversación en WhatsApp.
-            Tiene una validez de <strong>{ORDER_TTL_HOURS} horas</strong>.
+            <strong className="font-semibold text-kora-black">{tc.importante}</strong>{" "}
+            {tc.seConfirma} <strong>{tc.horas(ORDER_TTL_HOURS)}</strong>.
           </p>
         </div>
 
@@ -84,7 +83,7 @@ export function OrderBridge({
           href="/catalogo"
           className="mt-6 inline-block text-[13px] font-semibold text-[#8a8f98] hover:text-kora-black"
         >
-          Seguir comprando
+          {tc.seguirComprando}
         </Link>
       </div>
     </div>

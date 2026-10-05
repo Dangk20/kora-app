@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function PasswordField({
   id,
@@ -32,6 +33,7 @@ export function PasswordField({
   labelClassName?: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const t = useMessages().cuenta;
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id} className={labelClassName}>{label}</Label>
@@ -48,7 +50,7 @@ export function PasswordField({
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          aria-label={visible ? t.ocultarContrasena : t.mostrarContrasena}
           aria-pressed={visible}
           className="absolute top-1/2 right-3 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-[#f5f3f0] hover:text-kora-black"
         >

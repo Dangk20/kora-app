@@ -4,10 +4,14 @@ import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { availableFor } from "@/modules/cashback/redemption";
 import { listAddresses } from "@/modules/customers/addresses";
 import { ultimaFacturacion } from "@/modules/buyer/orders";
+import { getMessages } from "@/modules/i18n/server";
 import { CheckoutView } from "./checkout-view";
 
 // El layout raíz ya añade el sufijo "· KORA" (template de metadata).
-export const metadata: Metadata = { title: "Finalizar pedido" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getMessages();
+  return { title: t.checkout.tituloPagina };
+}
 
 export default async function CheckoutPage() {
   // La moneda define el país de QUIEN PAGA: COP → Colombia, USD → EE.UU.

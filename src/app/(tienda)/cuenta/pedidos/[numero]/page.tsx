@@ -8,12 +8,11 @@ import { buyerOrder } from "@/modules/buyer/orders";
 import { formatOrderNumber, variantDetails, whatsappUrl } from "@/modules/orders/message";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import { PASOS_PEDIDO, fraseDeEstado, money } from "../../ui";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = { title: "Detalle del pedido · KORA" };
-
-const fechaLarga = (d: Date) => new Intl.DateTimeFormat("es-CO", { dateStyle: "long" }).format(d);
-const fechaHora = (d: Date) =>
-  new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(d);
+export async function generateMetadata() {
+  return { title: (await getMessages()).pedido.meta.detalle };
+}
 
 /**
  * El detalle de un pedido, como una compra en Mercado Libre pero con lo que
@@ -24,6 +23,11 @@ const fechaHora = (d: Date) =>
 export default async function PedidoPage({ params }: { params: Promise<{ numero: string }> }) {
   const { numero } = await params;
   const buyer = await requireBuyer(`/cuenta/pedidos/${numero}`);
+  const t = await getMessages();
+  const tp = t.pedido;
+  const fechaLarga = (d: Date) => new Intl.DateTimeFormat(t.comun.formatoFecha, { dateStyle: "long" }).format(d);
+  const fechaHora = (d: Date) =>
+    new Intl.DateTimeFormat(t.comun.formatoFecha, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(d);
   const n = Number(numero);
   if (!Number.isInteger(n)) notFound();
 
@@ -38,7 +42,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
 
   const cancelado = pedido.status === "CANCELLED";
   const pasoActual = PASOS_PEDIDO.findIndex((p) => p.status === pedido.status);
-  const estado = fraseDeEstado(pedido.status, pedido.estadoEn[pedido.status] ?? pedido.createdAt);
+  const estado = fraseDeEstado(pedido.status, pedido.estadoEn[pedido.status] ?? pedido.createdAt, t);
   const tieneComprobante = CONFIRMED_STATUSES.includes(pedido.status);
 
   const direccion = [
@@ -51,7 +55,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
     <main className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-5 sm:py-10">
       <nav className="mb-4 flex items-center gap-2 text-[13px] text-muted-foreground">
         <Link href="/cuenta" className="inline-flex items-center gap-1 hover:text-kora-black">
-          <ArrowLeft className="size-4" /> Mis pedidos
+          <ArrowLeft className="size-4" /> {tp.misPedidos}
         </Link>
         <span>›</span>
         <span className="text-kora-black">{formatOrderNumber(pedido.number, pedido.createdAt)}</span>
@@ -86,14 +90,14 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                 {/* Móvil: barra horizontal. Cada paso lleva su icono; el actual,
                     más grande y con halo. La etiqueta del paso actual va debajo
                     de la barra porque cinco etiquetas no caben en 390 px. */}
-                <ol className="mt-6 flex items-center sm:hidden" aria-label="Progreso del pedido">
+                <ol className="mt-6 flex items-center sm:hidden" aria-label={tp.progreso}>
                   {PASOS_PEDIDO.map((p, i) => {
                     const hecho = i <= pasoActual;
                     const actual = i === pasoActual;
                     return (
                       <li key={p.status} className="flex flex-1 items-center last:flex-none">
                         <span
-                          aria-label={p.label}
+                          aria-label={tp.pasos[p.status]}
                           aria-current={actual ? "step" : undefined}
                           className={`flex shrink-0 items-center justify-center rounded-full ${
                             actual
@@ -111,8 +115,8 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   })}
                 </ol>
                 <p className="mt-2 text-[12px] text-muted-foreground sm:hidden">
-                  {PASOS_PEDIDO[pasoActual]?.label}
-                  {pasoActual < PASOS_PEDIDO.length - 1 && ` · siguiente: ${PASOS_PEDIDO[pasoActual + 1].label.toLowerCase()}`}
+                  {PASOS_PEDIDO[pasoActual] && tp.pasos[PASOS_PEDIDO[pasoActual].status]}
+                  {pasoActual < PASOS_PEDIDO.length - 1 && tp.siguiente(tp.pasos[PASOS_PEDIDO[pasoActual + 1].status].toLowerCase())}
                 </p>
                 <ol className="mt-6 hidden sm:block">
                   {PASOS_PEDIDO.map((p, i) => {
@@ -137,7 +141,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                           <p.Icono className="size-4" />
                         </span>
                         <div className="pt-1.5">
-                          <p className={`text-[14px] font-semibold ${hecho ? "text-kora-black" : "text-[#b3b8c0]"}`}>{p.label}</p>
+                          <p className={`text-[14px] font-semibold ${hecho ? "text-kora-black" : "text-[#b3b8c0]"}`}>{tp.pasos[p.status]}</p>
                           {hecho && cuando && <p className="text-[12px] text-muted-foreground">{fechaHora(cuando)}</p>}
                         </div>
                       </li>
@@ -152,16 +156,16 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                 {whatsapp ? (
                   <>
                     <p className="text-[13.5px] text-kora-black">
-                      Tu pedido está reservado. Retoma la conversación para confirmar el pago.
+                      {tp.reservado}
                     </p>
                     <a href={whatsapp} target="_blank" rel="noopener noreferrer"
                       className="bg-kora-gradient mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[13.5px] font-semibold text-white">
-                      <MessageCircle className="size-4" /> Continuar por WhatsApp
+                      <MessageCircle className="size-4" /> {tp.continuarWhatsapp}
                     </a>
                   </>
                 ) : (
                   <p className="text-[13.5px] text-kora-black">
-                    Este pedido superó su vigencia sin confirmarse. Si todavía lo quieres, vuelve a armarlo desde el catálogo.
+                    {tp.vencido}
                   </p>
                 )}
               </div>
@@ -170,7 +174,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
 
           {/* Qué se compró */}
           <section className="rounded-[16px] border border-[#eee9e2] bg-white">
-            <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">Productos</h2>
+            <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">{tp.productos}</h2>
             <ul>
               {pedido.items.map((i) => (
                 <li key={i.id} className="flex items-center gap-4 border-b border-[#f0ece6] px-5 py-3.5 last:border-0">
@@ -182,9 +186,9 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                       {i.productName}
                     </Link>
                     <p className="text-[12.5px] text-muted-foreground">
-                      {i.qty} u.
+                      {tp.unidades(i.qty)}
                       {variantDetails(i.variantName).length > 0 && ` · ${variantDetails(i.variantName).join(", ")}`}
-                      {" · "}{money(i.unitPrice, pedido.currency)} c/u
+                      {" · "}{money(i.unitPrice, pedido.currency)} {tp.porUnidad}
                     </p>
                   </div>
                   <span className="shrink-0 text-[14px] font-bold text-kora-black">{money(i.total, pedido.currency)}</span>
@@ -196,7 +200,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
           {/* A dónde va */}
           {direccion.length > 0 && (
             <section className="rounded-[16px] border border-[#eee9e2] bg-white">
-              <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">Entrega</h2>
+              <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">{tp.entrega}</h2>
               <div className="flex items-start gap-4 px-5 py-4">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#eee9e2] text-kora-black">
                   <Home className="size-[18px]" />
@@ -205,14 +209,14 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   {/* A quién se le envía, cuando no es el propio comprador. */}
                   {!pedido.shipSameAsBilling && pedido.shipName && (
                     <p className="mb-1 font-semibold text-kora-black">
-                      Recibe: {pedido.shipName}
+                      {tp.recibe(pedido.shipName)}
                       {pedido.shipPhone && <span className="font-normal text-muted-foreground"> · {pedido.shipPhone}</span>}
                     </p>
                   )}
                   <p className="font-semibold text-kora-black">{direccion[0]}</p>
                   {direccion.slice(1).map((l) => <p key={l} className="text-muted-foreground">{l}</p>)}
-                  {pedido.shipNotes && <p className="mt-1 text-[12.5px] text-muted-foreground">Indicaciones: {pedido.shipNotes}</p>}
-                  <p className="mt-2 text-[12px] text-muted-foreground">El envío se coordina contigo por WhatsApp al confirmar.</p>
+                  {pedido.shipNotes && <p className="mt-1 text-[12.5px] text-muted-foreground">{tp.indicaciones(pedido.shipNotes)}</p>}
+                  <p className="mt-2 text-[12px] text-muted-foreground">{tp.envioPorWhatsapp}</p>
                 </div>
               </div>
             </section>
@@ -220,7 +224,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
 
           {/* Comprobante */}
           <section className="rounded-[16px] border border-[#eee9e2] bg-white">
-            <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">Información de la compra</h2>
+            <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">{tp.infoCompra}</h2>
             {tieneComprobante ? (
               <a href={`/cuenta/pedidos/${pedido.number}/comprobante?descargar`}
                 className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-[#faf8f5]">
@@ -228,8 +232,8 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   <FileText className="size-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-kora-black">Comprobante de pedido</span>
-                  <span className="block text-[12.5px] text-muted-foreground">El mismo que te enviamos por correo al confirmar</span>
+                  <span className="block text-[14px] font-semibold text-kora-black">{tp.comprobante}</span>
+                  <span className="block text-[12.5px] text-muted-foreground">{tp.comprobanteAyuda}</span>
                 </span>
                 <Download className="size-[18px] text-muted-foreground" />
               </a>
@@ -239,7 +243,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   <FileText className="size-[18px]" />
                 </span>
                 <span className="text-[13.5px] text-muted-foreground">
-                  {cancelado ? "Un pedido cancelado no genera comprobante." : "El comprobante se genera al confirmar el pago."}
+                  {cancelado ? tp.sinComprobanteCancelado : tp.sinComprobante}
                 </span>
               </div>
             )}
@@ -248,28 +252,28 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
 
         {/* ══════════ Derecha: el resumen ══════════ */}
         <aside className="rounded-[16px] border border-[#eee9e2] bg-white p-5 lg:sticky lg:top-24">
-          <h2 className="text-[16px] font-bold text-kora-black">Detalle de la compra</h2>
+          <h2 className="text-[16px] font-bold text-kora-black">{tp.detalleCompra}</h2>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">
             {fechaLarga(pedido.createdAt)} · {formatOrderNumber(pedido.number, pedido.createdAt)}
           </p>
           <dl className="mt-4 space-y-2 border-t border-[#f0ece6] pt-4 text-[13.5px]">
-            <Fila label={`Producto${pedido.items.length === 1 ? "" : "s"}`} valor={money(pedido.subtotal, pedido.currency)} />
-            {pedido.discountTotal > 0 && <Fila label="Descuento" valor={`− ${money(pedido.discountTotal, pedido.currency)}`} />}
-            {pedido.cashbackApplied > 0 && <Fila label="Kora Cashback" valor={`− ${money(pedido.cashbackApplied, pedido.currency)}`} />}
-            <Fila label="Envío" valor="Por WhatsApp" suave />
+            <Fila label={tp.filaProductos(pedido.items.length)} valor={money(pedido.subtotal, pedido.currency)} />
+            {pedido.discountTotal > 0 && <Fila label={tp.descuento} valor={`− ${money(pedido.discountTotal, pedido.currency)}`} />}
+            {pedido.cashbackApplied > 0 && <Fila label={tp.cashback} valor={`− ${money(pedido.cashbackApplied, pedido.currency)}`} />}
+            <Fila label={tp.envio} valor={tp.envioValor} suave />
           </dl>
           <div className="mt-3 flex items-baseline justify-between border-t border-[#f0ece6] pt-3">
-            <span className="text-[15px] font-bold text-kora-black">Total</span>
+            <span className="text-[15px] font-bold text-kora-black">{tp.total}</span>
             <span className="text-[20px] font-extrabold text-kora-black">{money(pedido.total, pedido.currency)}</span>
           </div>
 
           {pedido.cashback > 0 && (
             <p className="mt-4 rounded-[12px] bg-[#FFF4EF] px-4 py-3 text-[12.5px] leading-relaxed text-[#6b6f78]">
               {pedido.cashbackAcreditado ? (
-                <>Te dio <strong className="text-kora-black">{money(pedido.cashback, pedido.currency)}</strong> de Kora Cashback
-                  {pedido.cashbackVence && <>, disponible hasta el {fechaLarga(pedido.cashbackVence)}</>}.</>
+                <>{tp.cashbackDio} <strong className="text-kora-black">{money(pedido.cashback, pedido.currency)}</strong> {tp.cashbackDe}
+                  {pedido.cashbackVence && <>{tp.cashbackHasta(fechaLarga(pedido.cashbackVence))}</>}.</>
               ) : pedido.cashbackEstado === "estimado" ? (
-                <>Al confirmarse te dará <strong className="text-kora-black">~{money(pedido.cashback, pedido.currency)}</strong> de Kora Cashback.</>
+                <>{tp.cashbackDara} <strong className="text-kora-black">~{money(pedido.cashback, pedido.currency)}</strong> {tp.cashbackDe}.</>
               ) : null}
             </p>
           )}

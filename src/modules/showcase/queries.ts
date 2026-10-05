@@ -30,6 +30,8 @@ export type EditorItem = {
 export type ResolvedSection = {
   key: SectionKey;
   title: string;
+  /** El que escribió el operador (vacío = el de la sección por omisión). */
+  titleEn: string | null;
   subtitle: string | null;
   active: boolean;
   mode: "MANUAL" | "AUTO";
@@ -203,7 +205,8 @@ export async function getShowcase(
 
     resolved.push({
       key: def.key,
-      title: row.title,
+      title: locale === "en" ? row.titleEn?.trim() || def.titleEn : row.title,
+      titleEn: row.titleEn,
       subtitle: row.subtitle,
       active: row.active,
       mode: row.mode,

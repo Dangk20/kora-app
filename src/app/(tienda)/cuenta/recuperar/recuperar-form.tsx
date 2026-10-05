@@ -10,6 +10,7 @@ import { useActionState, useState } from "react";
 import { PasswordField } from "../password-field";
 import Link from "next/link";
 import { confirmarCodigo, pedirCodigo, type FormState } from "../actions";
+import { useMessages } from "@/modules/i18n/provider";
 
 const input =
   "w-full min-h-12 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-[15px] py-3 text-base sm:text-sm outline-none focus:border-kora-coral";
@@ -29,6 +30,10 @@ export function RecuperarForm({
   volverA?: string;
   minimoPassword?: number;
 } = {}) {
+  // El panel también usa este formulario, fuera del proveedor de la tienda:
+  // ahí el contexto vale "es" por omisión y se ve en español, como el panel.
+  const tc = useMessages().cuenta;
+  const t = tc.recuperar;
   const [paso, setPaso] = useState<"pedir" | "confirmar">("pedir");
   const [correo, setCorreo] = useState("");
 
@@ -56,7 +61,7 @@ export function RecuperarForm({
       <form action={accionPedir} className="space-y-4">
         <div>
           <label className={label} htmlFor="email">
-            Tu correo
+            {t.tuCorreo}
           </label>
           <input
             id="email"
@@ -64,7 +69,7 @@ export function RecuperarForm({
             type="email"
             required
             autoComplete="email"
-            placeholder="correo@ejemplo.com"
+            placeholder={t.placeholderCorreo}
             className={input}
           />
         </div>
@@ -76,12 +81,12 @@ export function RecuperarForm({
         ) : null}
 
         <button type="submit" disabled={enviando} className={boton}>
-          {enviando ? "Enviando…" : "Enviarme el código"}
+          {enviando ? t.enviando : t.enviarCodigo}
         </button>
 
         <p className="text-center text-[13px] text-muted-foreground">
           <Link href={volverA} className="underline">
-            Volver a entrar
+            {t.volverAEntrar}
           </Link>
         </p>
       </form>
@@ -98,7 +103,7 @@ export function RecuperarForm({
 
       <div>
         <label className={label} htmlFor="code">
-          Código de 6 dígitos
+          {t.codigo}
         </label>
         <input
           id="code"
@@ -114,12 +119,12 @@ export function RecuperarForm({
 
       <PasswordField
         id="password"
-        label="Tu contraseña nueva"
+        label={t.nueva}
         autoComplete="new-password"
         inputClassName={`${input} pr-11`}
         labelClassName={label}
         minLength={minimoPassword}
-        hint={minimoPassword ? `Mínimo ${minimoPassword} caracteres.` : undefined}
+        hint={minimoPassword ? tc.minimoCaracteres(minimoPassword) : undefined}
       />
 
       {cambio?.error ? (
@@ -132,17 +137,17 @@ export function RecuperarForm({
       ) : null}
 
       <button type="submit" disabled={confirmando} className={boton}>
-        {confirmando ? "Cambiando…" : "Cambiar mi contraseña"}
+        {confirmando ? t.cambiando : t.cambiar}
       </button>
 
       <p className="text-center text-[13px] text-muted-foreground">
-        ¿No te llegó?{" "}
+        {t.noLlego}{" "}
         <button
           type="button"
           onClick={() => setPaso("pedir")}
           className="underline"
         >
-          Pedir otro código
+          {t.pedirOtro}
         </button>
       </p>
     </form>

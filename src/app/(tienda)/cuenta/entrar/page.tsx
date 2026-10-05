@@ -3,8 +3,11 @@ import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { entrar } from "../actions";
 import { EntrarForm } from "../auth-form";
 import { Marco } from "../marco";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = { title: "Entrar a mi cuenta · KORA" };
+export async function generateMetadata() {
+  return { title: (await getMessages()).cuenta.meta.entrar };
+}
 
 export default async function EntrarPage({
   searchParams,
@@ -13,11 +16,12 @@ export default async function EntrarPage({
 }) {
   const { volver } = await searchParams;
   if (await currentBuyer()) redirect(volver?.startsWith("/") ? volver : "/cuenta");
+  const t = (await getMessages()).cuenta;
 
   return (
     <Marco
-      titulo="Entrar a mi cuenta"
-      bajada="Consulta tu Kora Cashback, tus pedidos y tus datos."
+      titulo={t.entrar.titulo}
+      bajada={t.entrar.bajada}
     >
       <EntrarForm action={entrar} volver={volver} />
     </Marco>

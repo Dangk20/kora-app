@@ -12,6 +12,7 @@
 // para agregar puede olvidarse de confirmar.
 import { ShoppingCart, Check } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useMessages } from "@/modules/i18n/provider";
 
 export type AvisoAgregado = { id: number; nombre?: string };
 
@@ -25,6 +26,7 @@ export function AvisoDeAgregado({
   // El último mensaje se conserva para que el aviso pueda SALIR con su
   // animación en vez de desaparecer de golpe cuando `aviso` vuelve a null.
   const [ultimo, setUltimo] = useState<AvisoAgregado | null>(null);
+  const t = useMessages();
   useEffect(() => {
     if (aviso) setUltimo(aviso);
   }, [aviso]);
@@ -56,7 +58,7 @@ export function AvisoDeAgregado({
         <Check className="size-[18px] text-white" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] font-bold text-white">Agregado al carrito</p>
+        <p className="text-[13.5px] font-bold text-white">{t.carrito.agregado}</p>
         {ultimo.nombre && (
           <p className="truncate text-[12px] text-[#A0A4AD]">{ultimo.nombre}</p>
         )}
@@ -67,7 +69,7 @@ export function AvisoDeAgregado({
         className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-white/20"
       >
         <ShoppingCart className="size-4" aria-hidden />
-        Ver
+        {t.carrito.ver}
       </button>
     </div>
   );

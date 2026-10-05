@@ -1,2 +1,40 @@
-// Área "carrito" de la tienda. `en/carrito.ts` debe tener exactamente la misma forma.
-export const carrito = {};
+// Área "carrito" de la tienda: página del carrito, panel lateral, botón del
+// header, confirmación de quitar y aviso de agregado. `en/carrito.ts` debe
+// tener exactamente la misma forma.
+export const carrito = {
+  tituloPagina: "Tu carrito",
+  titulo: "Tu carrito",
+  vacioTitulo: "Tu carrito está vacío",
+  vacioTextoPagina: "Explora el catálogo y encuentra productos increíbles.",
+  vacioTextoPanel: "Agrega productos y aparecerán aquí.",
+  explorarProductos: "Explorar productos",
+  productos: (n: number) => `${n} ${n === 1 ? "producto" : "productos"}`,
+  agotadoOnline: "Agotado en la tienda online",
+  agotado: "Agotado",
+  noDisponibleEn: (moneda: string) => `No disponible en ${moneda}`,
+  cadaUno: "c/u",
+  soloQuedan: (n: number) => `Solo quedan ${n}; ajustamos la cantidad.`,
+  quitarUnaUnidad: "Quitar una unidad",
+  agregarUnaUnidad: "Agregar una unidad",
+  resumen: "Resumen",
+  subtotal: "Subtotal",
+  total: "Total",
+  envioAcordadoPagina: "El costo de envío se acuerda contigo por WhatsApp al confirmar el pedido.",
+  envioAcordadoPanel: "El envío se acuerda contigo por WhatsApp al confirmar el pedido.",
+  continuarCompra: "Continuar compra",
+  continuar: "Continuar",
+  seguirComprando: "Seguir comprando",
+  irAPagar: "Ir a pagar",
+  verCarritoCompleto: "Ver carrito completo",
+  cerrarCarrito: "Cerrar carrito",
+  abrirCarrito: (n: number) => (n > 0 ? `Abrir carrito: ${n} artículos` : "Abrir carrito (vacío)"),
+  // Confirmación de quitar
+  quitarAria: (nombre: string) => `Quitar ${nombre} del carrito`,
+  quitarPregunta: "¿Quitar este producto?",
+  quitarSaldra: "saldrá de tu carrito. Puedes volver a agregarlo cuando quieras.",
+  cancelar: "Cancelar",
+  siQuitar: "Sí, quitarlo del carrito",
+  // Aviso de agregado
+  agregado: "Agregado al carrito",
+  ver: "Ver",
+};

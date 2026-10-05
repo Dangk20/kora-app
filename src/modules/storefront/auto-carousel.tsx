@@ -17,6 +17,7 @@
 // tira, para no pelear con quien está deslizando; retoma a los 10 s.
 import { Children, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useMessages } from "@/modules/i18n/provider";
 
 const ROTATE_MS = 6000;
 
@@ -41,6 +42,7 @@ export function AutoCarousel({
   perViewMobile?: number;
   tone?: "light" | "dark";
 }) {
+  const t = useMessages().tienda.carrusel;
   const items = Children.toArray(children);
   const pages = Math.ceil(items.length / perView);
   const [page, setPage] = useState(0);
@@ -138,7 +140,7 @@ export function AutoCarousel({
         <>
           <button
             type="button"
-            aria-label="Anterior"
+            aria-label={t.anterior}
             onClick={() => goTo((page - 1 + pages) % pages)}
             className={`absolute top-1/2 -left-3 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors md:flex ${arrowCls}`}
           >
@@ -146,7 +148,7 @@ export function AutoCarousel({
           </button>
           <button
             type="button"
-            aria-label="Siguiente"
+            aria-label={t.siguiente}
             onClick={() => goTo((page + 1) % pages)}
             className={`absolute top-1/2 -right-3 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full transition-colors md:flex ${arrowCls}`}
           >
@@ -158,7 +160,7 @@ export function AutoCarousel({
               <button
                 key={p}
                 type="button"
-                aria-label={`Ver página ${p + 1} de ${pages}`}
+                aria-label={t.verPagina(p + 1, pages)}
                 aria-current={p === page}
                 onClick={() => goTo(p)}
                 className={`h-1.5 rounded-full transition-all ${

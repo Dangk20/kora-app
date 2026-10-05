@@ -7,12 +7,13 @@
 import type { Metadata } from "next";
 import { storeUrl } from "@/lib/site";
 import type { StoreProduct } from "./queries";
+import type { Locale } from "@/modules/i18n";
+import { MESSAGES } from "@/modules/i18n/messages";
 
 /** Imagen de respaldo cuando el producto todavía no tiene fotos cargadas. */
 const IMAGEN_MARCA = "/logo-kora.png";
 
 const NOMBRE = "KORA";
-const LEMA = "Todo lo que quieres, en un solo lugar";
 
 /**
  * Metadata de una página pública de la tienda.
@@ -25,6 +26,8 @@ export function storeMetadata(opts: {
   description: string;
   path: string;
   image?: string;
+  /** Idioma de la página; decide el `og:locale`. Por omisión español. */
+  locale?: Locale;
 }): Metadata {
   const url = `${storeUrl()}${opts.path}`;
   const image = opts.image ?? IMAGEN_MARCA;
@@ -41,7 +44,7 @@ export function storeMetadata(opts: {
     openGraph: {
       type: "website",
       siteName: NOMBRE,
-      locale: "es_CO",
+      locale: MESSAGES[opts.locale ?? "es"].tienda.meta.ogLocale,
       title: titleCompleto,
       description: opts.description,
       url,
@@ -57,7 +60,7 @@ export function storeMetadata(opts: {
 }
 
 /** Descripción de una ficha: la del producto, o una construida con lo que hay. */
-export function productDescription(product: StoreProduct): string {
+export function productDescription(product: StoreProduct, locale: Locale = "es"): string {
   const propia = product.description?.trim();
   if (propia) {
     // Las vistas previas cortan alrededor de 160-200 caracteres; cortar aquí
@@ -65,16 +68,18 @@ export function productDescription(product: StoreProduct): string {
     return propia.length > 180 ? `${propia.slice(0, 177).trimEnd()}…` : propia;
   }
 
+  const t = MESSAGES[locale].tienda.meta;
   const marca = product.brand ? `${product.brand} · ` : "";
-  return `${marca}${product.category.name} en ${NOMBRE}. ${LEMA}.`;
+  return `${marca}${product.category.name} ${t.en} ${NOMBRE}. ${t.lema}.`;
 }
 
-export function productMetadata(product: StoreProduct): Metadata {
+export function productMetadata(product: StoreProduct, locale: Locale = "es"): Metadata {
   return storeMetadata({
     // El nombre del producto va primero: el layout raíz añade "· KORA".
     title: product.name,
-    description: productDescription(product),
+    description: productDescription(product, locale),
     path: `/producto/${product.slug}`,
     image: product.images[0]?.url,
+    locale,
   });
 }

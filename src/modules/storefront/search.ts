@@ -18,6 +18,7 @@
 import { db } from "@/lib/db";
 import { resolvePrice, toNumber, type Currency } from "@/modules/pricing";
 import { storage } from "@/modules/storage";
+import { enIdioma, type Locale } from "@/modules/i18n";
 import { PUBLICADO, searchMatchingIds } from "./queries";
 import {
   normalizeQuery,
@@ -28,6 +29,7 @@ import {
 type RawSuggestion = {
   slug: string;
   name: string;
+  nameEn: string | null;
   brand: string | null;
   images: { url: string; alt: string | null }[];
   variants: {
@@ -41,6 +43,8 @@ type RawSuggestion = {
 export async function searchSuggestions(
   raw: string | null | undefined,
   currency: Currency,
+  /** Idioma del NOMBRE que se muestra, con caída al español. */
+  locale: Locale = "es",
 ): Promise<SearchSuggestions> {
   const query = normalizeQuery(raw);
   if (!query) return { query: "", items: [], total: 0 };
@@ -53,6 +57,7 @@ export async function searchSuggestions(
       select: {
         slug: true,
         name: true,
+        nameEn: true,
         brand: true,
         images: {
           select: { url: true, alt: true },
@@ -105,7 +110,7 @@ export async function searchSuggestions(
       const img = row.images[0];
       return {
         slug: row.slug,
-        name: row.name,
+        name: enIdioma(locale, row.name, row.nameEn),
         brand: row.brand,
         image: img ? { url: driver.urlFor(img.url), alt: img.alt } : null,
         price,

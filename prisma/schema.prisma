@@ -1006,6 +1006,8 @@ model ShowcaseSection {
    */
   key      String       @id
   title    String
+  /// Título para la tienda en inglés; vacío = la traducción por omisión de la sección.
+  titleEn  String?
   subtitle String?
   active   Boolean      @default(true)
   mode     ShowcaseMode @default(MANUAL)

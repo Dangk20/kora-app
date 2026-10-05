@@ -49,6 +49,9 @@ export type ProductDraft = {
   brand: string;
   categoryId: string;
   description: string;
+  /** Tienda en inglés: vacío = se muestra el español. */
+  nameEn?: string;
+  descriptionEn?: string;
   active: boolean;
   featured: boolean;
   variants: VariantDraft[];
@@ -691,6 +694,36 @@ export function ProductForm({
             placeholder="Se muestra en la ficha del producto"
           />
         </div>
+        {/* Versión en inglés: la ven quienes entran desde fuera de Colombia.
+            Plegada porque es opcional y secundaria: vacía, la tienda en
+            inglés muestra el texto en español. */}
+        <details className="rounded-[12px] border border-[#ece8e2] px-4 py-3" open={Boolean(product.nameEn || product.descriptionEn)}>
+          <summary className="cursor-pointer text-[13px] font-semibold text-kora-black">
+            Versión en inglés <span className="font-normal text-[#9aa0ab]">(tienda para el exterior)</span>
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div>
+              <label className={labelCls} htmlFor="p-name-en">Nombre en inglés</label>
+              <input
+                id="p-name-en"
+                className={inputCls}
+                value={product.nameEn ?? ""}
+                onChange={(e) => setField("nameEn", e.target.value)}
+                placeholder="Vacío = se muestra el nombre en español"
+              />
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="p-desc-en">Descripción en inglés</label>
+              <textarea
+                id="p-desc-en"
+                className={`${inputCls} min-h-20 resize-y`}
+                value={product.descriptionEn ?? ""}
+                onChange={(e) => setField("descriptionEn", e.target.value)}
+                placeholder="Vacío = se muestra la descripción en español"
+              />
+            </div>
+          </div>
+        </details>
         {/* Interruptores, no casillas: una casilla marcada se lee como
             "seleccionado en una lista"; un interruptor se lee como "esto está
             encendido", que es lo que significan Activo y Destacado. Y es el

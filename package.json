@@ -36,7 +36,8 @@
     "geo:places": "tsx scripts/update-places.ts",
     "geo:places:us": "tsx scripts/update-places-us.ts",
     "geo:update": "tsx scripts/update-geo.ts",
-    "geo:check": "tsx scripts/check-geo.ts"
+    "geo:check": "tsx scripts/check-geo.ts",
+    "translations:load": "tsx scripts/cargar-traducciones.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1090.0",

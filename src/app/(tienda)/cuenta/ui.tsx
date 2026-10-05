@@ -1,5 +1,7 @@
 import { BadgeCheck, ClipboardCheck, Home, Package, Truck, type LucideIcon } from "lucide-react";
 import type { Currency, OrderStatus } from "@/generated/prisma/enums";
+import { getMessages } from "@/modules/i18n/server";
+import type { Messages } from "@/modules/i18n/messages";
 
 export function money(valor: number, moneda: Currency): string {
   return new Intl.NumberFormat(moneda === "USD" ? "en-US" : "es-CO", {
@@ -12,29 +14,37 @@ export function money(valor: number, moneda: Currency): string {
 // En KORA el pago ocurre por WhatsApp, fuera de la plataforma: un pedido
 // pendiente NO es un error, es el estado normal de una compra recién hecha. Si
 // la cuenta no lo dice, el comprador cree que su compra falló y la repite.
-const ESTADO: Record<OrderStatus, { texto: string; clase: string }> = {
-  PENDING: { texto: "Por confirmar", clase: "bg-[#FFF4EF] text-[#8a4520] border-[#ffd9c7]" },
-  CONFIRMED: { texto: "Confirmado", clase: "bg-[#EEF7EF] text-[#2c6b34] border-[#cfe6d3]" },
-  PREPARING: { texto: "En preparación", clase: "bg-[#EEF3FA] text-[#2b4d7a] border-[#cfdcee]" },
-  SHIPPED: { texto: "Enviado", clase: "bg-[#EEF3FA] text-[#2b4d7a] border-[#cfdcee]" },
-  DELIVERED: { texto: "Entregado", clase: "bg-[#EEF7EF] text-[#2c6b34] border-[#cfe6d3]" },
-  CANCELLED: { texto: "Cancelado", clase: "bg-[#f5f3f0] text-[#6b6b6b] border-[#e2ddd6]" },
+//
+// Solo el COLOR vive aquí; el texto sale del diccionario (`pedido.estado`), así
+// el estado se traduce en la vista sin tocar el enum.
+const CLASE_ESTADO: Record<OrderStatus, string> = {
+  PENDING: "bg-[#FFF4EF] text-[#8a4520] border-[#ffd9c7]",
+  CONFIRMED: "bg-[#EEF7EF] text-[#2c6b34] border-[#cfe6d3]",
+  PREPARING: "bg-[#EEF3FA] text-[#2b4d7a] border-[#cfdcee]",
+  SHIPPED: "bg-[#EEF3FA] text-[#2b4d7a] border-[#cfdcee]",
+  DELIVERED: "bg-[#EEF7EF] text-[#2c6b34] border-[#cfe6d3]",
+  CANCELLED: "bg-[#f5f3f0] text-[#6b6b6b] border-[#e2ddd6]",
 };
 
-export function EstadoPedido({ status }: { status: OrderStatus }) {
-  const e = ESTADO[status];
+export async function EstadoPedido({ status }: { status: OrderStatus }) {
+  const t = await getMessages();
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-[12px] font-semibold whitespace-nowrap ${e.clase}`}
+      className={`rounded-full border px-3 py-1 text-[12px] font-semibold whitespace-nowrap ${CLASE_ESTADO[status]}`}
     >
-      {e.texto}
+      {t.pedido.estado[status]}
     </span>
   );
 }
 
-
-const fechaCorta = (d: Date) =>
-  new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long" }).format(d);
+const TONO: Record<OrderStatus, string> = {
+  PENDING: "text-[#b25a12]",
+  CONFIRMED: "text-[#2c6b34]",
+  PREPARING: "text-[#2c6b34]",
+  SHIPPED: "text-[#2c6b34]",
+  DELIVERED: "text-[#2c6b34]",
+  CANCELLED: "text-[#6b6b6b]",
+};
 
 /**
  * El estado del pedido dicho como lo diría una persona: qué pasa y cuándo.
@@ -44,27 +54,18 @@ const fechaCorta = (d: Date) =>
 export function fraseDeEstado(
   status: OrderStatus,
   cuando: Date,
+  t: Messages,
 ): { corta: string; titulo: string; detalle: string | null; tono: string } {
-  switch (status) {
-    case "PENDING":
-      return { corta: "Por confirmar", titulo: "Estamos esperando tu pago", detalle: "Se acuerda por WhatsApp. Retoma la conversación para confirmarlo.", tono: "text-[#b25a12]" };
-    case "CONFIRMED":
-      return { corta: "Pago confirmado", titulo: `Confirmado el ${fechaCorta(cuando)}`, detalle: "Estamos armando tu pedido.", tono: "text-[#2c6b34]" };
-    case "PREPARING":
-      return { corta: "En preparación", titulo: "Estamos preparando tu paquete", detalle: `Desde el ${fechaCorta(cuando)}.`, tono: "text-[#2c6b34]" };
-    case "SHIPPED":
-      return { corta: "En camino", titulo: `Enviado el ${fechaCorta(cuando)}`, detalle: "Te avisamos por correo cuando llegue.", tono: "text-[#2c6b34]" };
-    case "DELIVERED":
-      return { corta: "Entregado", titulo: `Llegó el ${fechaCorta(cuando)}`, detalle: null, tono: "text-[#2c6b34]" };
-    case "CANCELLED":
-      return { corta: "Cancelado", titulo: `Cancelado el ${fechaCorta(cuando)}`, detalle: "Si usaste cashback, ya volvió a tu saldo.", tono: "text-[#6b6b6b]" };
-  }
+  const fecha = new Intl.DateTimeFormat(t.comun.formatoFecha, { day: "numeric", month: "long" }).format(cuando);
+  const f = t.pedido.frase[status];
+  return { corta: f.corta, titulo: f.titulo(fecha), detalle: f.detalle(fecha), tono: TONO[status] };
 }
 
 /**
  * Los pasos del recorrido de un pedido, en orden, cada uno con su icono: en
  * la línea de tiempo un punto dice "hubo algo aquí"; el icono dice QUÉ.
- * Cancelado no es un paso: es una salida.
+ * Cancelado no es un paso: es una salida. La etiqueta visible sale de
+ * `pedido.pasos` en el diccionario; `label` queda como referencia en español.
  */
 export const PASOS_PEDIDO: { status: OrderStatus; label: string; Icono: LucideIcon }[] = [
   { status: "PENDING", label: "Recibido", Icono: ClipboardCheck },

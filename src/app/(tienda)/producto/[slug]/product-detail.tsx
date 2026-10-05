@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Lightbox } from "./lightbox";
-import { tallaUnica } from "@/modules/storefront/talla";
+import { etiquetaVariante, tallaUnica } from "@/modules/storefront/talla";
+import { useLocale, useMessages } from "@/modules/i18n/provider";
 import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
 import { formatMoney, resolvePrice, type Currency } from "@/modules/pricing";
 import { PriceTag } from "@/modules/storefront/price-tag";
@@ -31,6 +32,8 @@ export function ProductDetail({
 }) {
   const router = useRouter();
   const cart = useCart();
+  const locale = useLocale();
+  const t = useMessages().producto;
   const [variantId, setVariantId] = useState(
     // Arranca en la primera variante con cupo online; si no hay, la primera.
     product.variants.find((v) => v.onlineUnits > 0)?.id ?? product.variants[0]?.id,
@@ -66,7 +69,7 @@ export function ProductDetail({
   const agotado = units === 0;
   const sinPrecioEnMoneda = !price?.available;
   const soldOut = agotado || sinPrecioEnMoneda;
-  const motivoNoDisponible = agotado ? "Agotado" : `No disponible en ${currency}`;
+  const motivoNoDisponible = agotado ? t.agotado : t.noDisponibleEn(currency);
   const image = product.images[imageIndex];
 
   // Nunca se puede pedir más que el cupo publicado online.
@@ -127,7 +130,7 @@ export function ProductDetail({
         <div
           role={image ? "button" : undefined}
           tabIndex={image ? 0 : undefined}
-          aria-label={image ? "Ver la foto en grande" : undefined}
+          aria-label={image ? t.verFotoGrande : undefined}
           onClick={() => { if (image) { setEligioFoto(true); setVisor(true); } }}
           onKeyDown={(e) => { if (image && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setEligioFoto(true); setVisor(true); } }}
           className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] sm:aspect-auto sm:h-[430px] sm:rounded-[18px] ${image ? "cursor-zoom-in" : ""}`}
@@ -181,7 +184,7 @@ export function ProductDetail({
                   setImageIndex(i);
                   setEligioFoto(true);
                 }}
-                aria-label={`Ver imagen ${i + 1}`}
+                aria-label={t.verImagen(i + 1)}
                 aria-current={i === imageIndex}
                 className={`relative h-[86px] overflow-hidden rounded-xl border-2 bg-[#f7f4f0] ${
                   i === imageIndex ? "border-kora-coral" : "border-[#e2ddd6]"
@@ -212,10 +215,10 @@ export function ProductDetail({
           {product.name}
         </h1>
         <p className="mt-2 text-[13px] text-[#8a8f98]">
-          Vendido por <span className="font-semibold text-kora-coral">KORA</span>
+          {t.vendidoPor} <span className="font-semibold text-kora-coral">KORA</span>
         </p>
 
-        <div className="mt-5">{price && <PriceTag price={price} size="detail" />}</div>
+        <div className="mt-5">{price && <PriceTag price={price} size="detail" locale={locale} />}</div>
 
         <div className="my-6 h-px bg-[#efe9e1]" />
 
@@ -224,18 +227,18 @@ export function ProductDetail({
             quiere saber. Se enseña como dato. */}
         {tallaUnica(product) && (
           <div className="mb-6 flex items-center gap-3">
-            <span className="text-[12.5px] font-semibold text-[#6b6f78]">Talla</span>
+            <span className="text-[12.5px] font-semibold text-[#6b6f78]">{t.talla}</span>
             <span className="rounded-[11px] border-[1.6px] border-kora-black bg-kora-black px-[18px] py-2 text-[13.5px] font-semibold text-white">
               {tallaUnica(product)!.replace(/^Talla\s+/i, "")}
             </span>
-            <span className="text-[12px] text-[#9aa0ab]">Pieza única</span>
+            <span className="text-[12px] text-[#9aa0ab]">{t.piezaUnica}</span>
           </div>
         )}
 
         {product.variants.length > 1 && (
           <div className="mb-6">
             <p className="mb-2.5 text-[12.5px] font-semibold text-[#6b6f78]">
-              Elige una opción
+              {t.eligeOpcion}
             </p>
             <div className="flex flex-wrap gap-2.5">
               {product.variants.map((v) => {
@@ -253,7 +256,7 @@ export function ProductDetail({
                         : "border-[#d9d4cc] bg-white text-kora-black hover:border-kora-coral"
                     } ${agotada ? "line-through opacity-50" : ""}`}
                   >
-                    {v.name}
+                    {etiquetaVariante(v.name, locale)}
                   </button>
                 );
               })}
@@ -272,17 +275,17 @@ export function ProductDetail({
           <p className="text-[13.5px] font-semibold text-kora-black">
             {soldOut ? (
               agotado ? (
-                "Agotado en la tienda online"
+                t.agotadoOnline
               ) : (
-                `No disponible en ${currency}`
+                t.noDisponibleEn(currency)
               )
             ) : (
               <>
-                Quedan {units} {units === 1 ? "unidad" : "unidades"}
+                {t.quedan(units)}
                 {units <= 8 && (
                   <span className="font-semibold text-kora-coral">
                     {" "}
-                    · ¡Últimas unidades!
+                    · {t.ultimasUnidades}
                   </span>
                 )}
               </>
@@ -298,7 +301,7 @@ export function ProductDetail({
                 type="button"
                 onClick={() => setQty((q) => clampQty(q - 1))}
                 disabled={qty <= 1}
-                aria-label="Quitar una unidad"
+                aria-label={t.quitarUnidad}
                 className="flex size-11 items-center justify-center text-kora-black hover:bg-[#faf8f5] disabled:opacity-40"
               >
                 <Minus className="size-4" />
@@ -313,13 +316,13 @@ export function ProductDetail({
                 type="button"
                 onClick={() => setQty((q) => clampQty(q + 1))}
                 disabled={qty >= maxQty}
-                aria-label="Agregar una unidad"
+                aria-label={t.agregarUnidad}
                 className="flex size-11 items-center justify-center text-kora-black hover:bg-[#faf8f5] disabled:opacity-40"
               >
                 <Plus className="size-4" />
               </button>
             </div>
-            <span className="text-[12.5px] text-[#8a8f98]">Cantidad</span>
+            <span className="text-[12.5px] text-[#8a8f98]">{t.cantidad}</span>
           </div>
         )}
 
@@ -338,11 +341,11 @@ export function ProductDetail({
             >
               {justAdded ? (
                 <>
-                  <Check className="size-[18px]" /> Agregado al carrito
+                  <Check className="size-[18px]" /> {t.agregadoAlCarrito}
                 </>
               ) : (
                 <>
-                  <ShoppingCart className="size-[18px]" /> Agregar al carrito
+                  <ShoppingCart className="size-[18px]" /> {t.agregarAlCarrito}
                 </>
               )}
             </button>
@@ -353,17 +356,17 @@ export function ProductDetail({
             disabled={soldOut}
             className="bg-kora-gradient flex w-full items-center justify-center rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
           >
-            {soldOut ? motivoNoDisponible : "Comprar ahora"}
+            {soldOut ? motivoNoDisponible : t.comprarAhora}
           </button>
         </div>
         {/* La explicación del flujo solo tiene sentido cuando hay flujo. Bajo un
             botón que dice "Agotado", prometer WhatsApp lo contradice. */}
         <p className="mt-2.5 text-center text-[11.5px] text-[#8a8f98]">
           {!soldOut
-            ? "Completas tus datos y finalizas el pedido por WhatsApp."
+            ? t.ayudaComprar
             : agotado
-              ? "Escríbenos por WhatsApp si quieres saber cuándo vuelve."
-              : "Cambia la moneda arriba para ver si está disponible en pesos."}
+              ? t.ayudaAgotado
+              : t.ayudaSinMoneda}
         </p>
 
         {/* Las mismas tres del home, desde una sola lista: lo que no puede
@@ -384,7 +387,11 @@ export function ProductDetail({
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11.5px] text-[#8a8f98]">
-              {soldOut ? motivoNoDisponible : variant?.name ? variant.name : product.name}
+              {soldOut
+                ? motivoNoDisponible
+                : variant?.name
+                  ? etiquetaVariante(variant.name, locale)
+                  : product.name}
             </p>
             {price?.available && (
               <p className="text-[17px] leading-tight font-extrabold text-kora-black">
@@ -396,7 +403,7 @@ export function ProductDetail({
             <button
               type="button"
               onClick={addToCart}
-              aria-label="Agregar al carrito"
+              aria-label={t.agregarAlCarrito}
               className="flex size-12 shrink-0 items-center justify-center rounded-full border-[1.8px] border-kora-black bg-white text-kora-black"
             >
               {justAdded ? <Check className="size-5" /> : <ShoppingCart className="size-5" />}
@@ -408,7 +415,7 @@ export function ProductDetail({
             disabled={soldOut}
             className="bg-kora-gradient flex min-h-12 shrink-0 items-center rounded-full px-6 text-[14.5px] font-bold text-white disabled:opacity-45"
           >
-            {soldOut ? (agotado ? "Agotado" : "No disponible") : "Comprar"}
+            {soldOut ? (agotado ? t.agotado : t.noDisponible) : t.comprar}
           </button>
         </div>
       </div>

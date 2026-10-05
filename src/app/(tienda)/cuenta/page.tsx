@@ -11,8 +11,11 @@ import { CuentaMovil } from "./cuenta-movil";
 import { seccionDe } from "./secciones";
 import { Direcciones } from "./direcciones";
 import { listAddresses } from "@/modules/customers/addresses";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = { title: "Mi cuenta · KORA" };
+export async function generateMetadata() {
+  return { title: (await getMessages()).cuenta.meta.cuenta };
+}
 
 export default async function CuentaPage({
   searchParams,
@@ -24,6 +27,7 @@ export default async function CuentaPage({
   // y que lo parezca.
   const buyer = await requireBuyer("/cuenta");
   const seccion = seccionDe((await searchParams).seccion);
+  const t = (await getMessages()).cuenta;
 
   const [resumen, pedidos, cliente, direcciones] = await Promise.all([
     cashbackSummary(buyer.customerId),
@@ -59,7 +63,7 @@ export default async function CuentaPage({
             />
             <PasswordForm />
             <div className="pt-2">
-              <h3 className="mb-3 text-[15px] font-extrabold text-kora-black">Mis direcciones</h3>
+              <h3 className="mb-3 text-[15px] font-extrabold text-kora-black">{t.secciones.direcciones}</h3>
               <Direcciones direcciones={direcciones} />
             </div>
           </div>
@@ -68,7 +72,7 @@ export default async function CuentaPage({
 
       <div className="mx-auto hidden w-full max-w-[1100px] px-5 py-8 lg:block lg:py-10">
       <h1 className="mb-6 text-[26px] leading-tight font-extrabold tracking-tight text-kora-black lg:text-[30px]">
-        Hola, {buyer.name.split(" ")[0]}
+        {t.hola(buyer.name.split(" ")[0])}
       </h1>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-7">
@@ -80,14 +84,14 @@ export default async function CuentaPage({
 
         <div className="min-w-0 flex-1">
           {seccion === "pedidos" && (
-            <section aria-label="Mis pedidos">
-              <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">Mis pedidos</h2>
+            <section aria-label={t.secciones.pedidos}>
+              <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">{t.secciones.pedidos}</h2>
 
               {pedidos.length === 0 ? (
                 <p className="rounded-[14px] border border-[#eee9e2] bg-white px-5 py-6 text-[14px] text-muted-foreground">
-                  Todavía no has hecho ningún pedido.{" "}
+                  {t.sinPedidos}{" "}
                   <Link href="/catalogo" className="font-semibold text-kora-black underline">
-                    Ver el catálogo
+                    {t.verCatalogo}
                   </Link>
                 </p>
               ) : (
@@ -101,22 +105,22 @@ export default async function CuentaPage({
           )}
 
           {seccion === "cashback" && (
-            <section aria-label="Kora Cashback">
-              <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">Kora Cashback</h2>
+            <section aria-label={t.secciones.cashback}>
+              <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">{t.secciones.cashback}</h2>
               <CashbackPanel resumen={resumen} />
             </section>
           )}
 
           {seccion === "direcciones" && (
-            <section aria-label="Mis direcciones" className="space-y-4">
-              <h2 className="text-[17px] font-extrabold text-kora-black">Mis direcciones</h2>
+            <section aria-label={t.secciones.direcciones} className="space-y-4">
+              <h2 className="text-[17px] font-extrabold text-kora-black">{t.secciones.direcciones}</h2>
               <Direcciones direcciones={direcciones} />
             </section>
           )}
 
           {seccion === "datos" && (
-            <section aria-label="Mis datos" className="space-y-4">
-              <h2 className="text-[17px] font-extrabold text-kora-black">Mis datos</h2>
+            <section aria-label={t.secciones.datos} className="space-y-4">
+              <h2 className="text-[17px] font-extrabold text-kora-black">{t.secciones.datos}</h2>
               <DatosForm
                 defaults={{
                   name: cliente?.name ?? buyer.name,

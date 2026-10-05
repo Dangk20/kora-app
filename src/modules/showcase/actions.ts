@@ -27,6 +27,8 @@ export async function updateSection(
   key: string,
   data: {
     title?: string;
+    /** Tienda en inglés; "" lo borra (= vuelve al título por omisión). */
+    titleEn?: string;
     active?: boolean;
     mode?: "MANUAL" | "AUTO";
     autoRule?: "BEST_SELLERS" | "NEWEST" | "ONLINE_DEAL" | "FEATURED";
@@ -42,6 +44,7 @@ export async function updateSection(
     where: { key },
     data: {
       ...(title !== undefined ? { title } : {}),
+      ...(data.titleEn !== undefined ? { titleEn: data.titleEn.trim() || null } : {}),
       ...(data.active !== undefined ? { active: data.active } : {}),
       ...(data.mode ? { mode: data.mode } : {}),
       ...(data.autoRule ? { autoRule: data.autoRule } : {}),

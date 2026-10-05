@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import type { ResolvedBanner } from "@/modules/showcase/queries";
+import { useMessages } from "@/modules/i18n/provider";
 
 const ROTATE_MS = 5000;
 
@@ -20,6 +21,7 @@ export function BannerCarousel({
   placeholderLabel: string;
 }) {
   // En la tienda solo se ven las piezas activas y con imagen.
+  const t = useMessages().tienda;
   const slides = banners.filter((b) => b.active && b.imageUrl);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -109,7 +111,7 @@ export function BannerCarousel({
                 {/* El botón aclara que la pieza lleva a algún lado: sin él,
                     la imagen no se lee como enlace. */}
                 <span className="pointer-events-none absolute right-4 bottom-4 flex translate-y-1 items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-[13.5px] font-bold text-kora-black opacity-0 shadow-[0_8px_22px_rgba(0,0,0,0.25)] transition-all duration-200 group-hover/banner:translate-y-0 group-hover/banner:opacity-100">
-                  Ver producto
+                  {t.verProducto}
                   <ArrowRight className="size-4" />
                 </span>
               </Link>
@@ -124,7 +126,7 @@ export function BannerCarousel({
         <>
           <button
             type="button"
-            aria-label="Anterior"
+            aria-label={t.carrusel.anterior}
             onClick={() => go(index - 1)}
             className="absolute top-1/2 left-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-kora-black opacity-0 transition-opacity group-hover/carousel:opacity-100"
           >
@@ -132,7 +134,7 @@ export function BannerCarousel({
           </button>
           <button
             type="button"
-            aria-label="Siguiente"
+            aria-label={t.carrusel.siguiente}
             onClick={() => go(index + 1)}
             className="absolute top-1/2 right-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-kora-black opacity-0 transition-opacity group-hover/carousel:opacity-100"
           >
@@ -144,7 +146,7 @@ export function BannerCarousel({
               <button
                 key={b.id}
                 type="button"
-                aria-label={`Ver pieza ${i + 1} de ${slides.length}`}
+                aria-label={t.banners.verPieza(i + 1, slides.length)}
                 aria-current={i === index}
                 onClick={() => go(i)}
                 className={`h-2 rounded-full transition-all ${

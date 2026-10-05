@@ -15,8 +15,11 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { resubscribe, unsubscribeByLink } from "@/modules/consent/subscription";
 import { verifyUnsubscribeToken } from "@/modules/consent/token";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = { title: "Suscripción · KORA" };
+export async function generateMetadata() {
+  return { title: (await getMessages()).cuenta.meta.baja };
+}
 export const dynamic = "force-dynamic";
 
 async function volverASuscribirse(formData: FormData) {
@@ -38,15 +41,15 @@ export default async function BajaPage({
 }) {
   const { t = "", re } = await searchParams;
   const customerId = verifyUnsubscribeToken(t);
+  const tb = (await getMessages()).cuenta.baja;
 
   // Un enlace manipulado no surte efecto y NO revela si el cliente existe: el
   // mensaje es el mismo que vería alguien con un enlace caducado o mal copiado.
   if (!customerId) {
     return (
-      <Marco titulo="No pudimos procesar el enlace">
+      <Marco titulo={tb.invalidoTitulo}>
         <p className="text-[14.5px] leading-relaxed text-muted-foreground">
-          El enlace no es válido o se copió incompleto. Si quieres dejar de recibir nuestros
-          correos, escríbenos por WhatsApp y lo hacemos por ti.
+          {tb.invalido}
         </p>
       </Marco>
     );
@@ -58,9 +61,9 @@ export default async function BajaPage({
   });
   if (!cliente) {
     return (
-      <Marco titulo="Listo">
+      <Marco titulo={tb.listo}>
         <p className="text-[14.5px] leading-relaxed text-muted-foreground">
-          No volverás a recibir promociones de KORA.
+          {tb.noRecibiras}
         </p>
       </Marco>
     );
@@ -73,17 +76,15 @@ export default async function BajaPage({
   const suscrito = re ? true : false;
 
   return (
-    <Marco titulo={suscrito ? "Vuelves a estar suscrito" : "Listo, ya no recibirás promociones"}>
+    <Marco titulo={suscrito ? tb.resuscritoTitulo : tb.bajaTitulo}>
       {suscrito ? (
         <p className="text-[14.5px] leading-relaxed text-muted-foreground">
-          Volverás a recibir nuestras ofertas y novedades. Puedes darte de baja cuando quieras
-          desde cualquier correo.
+          {tb.resuscrito}
         </p>
       ) : (
         <>
           <p className="text-[14.5px] leading-relaxed text-muted-foreground">
-            No volverás a recibir promociones de KORA. Los mensajes sobre tus pedidos siguen
-            llegando: no dependen de esta suscripción.
+            {tb.bajaCuerpo}
           </p>
 
           {/* La re-suscripción es la ÚNICA vía de reactivación, y solo por
@@ -94,7 +95,7 @@ export default async function BajaPage({
               type="submit"
               className="rounded-[10px] border-[1.6px] border-[#e2ddd6] px-4 py-2.5 text-[13.5px] font-semibold text-kora-black hover:border-[#ddd6cd]"
             >
-              Me desuscribí sin querer, volver a suscribirme
+              {tb.volverASuscribirme}
             </button>
           </form>
         </>
@@ -102,7 +103,7 @@ export default async function BajaPage({
 
       <p className="mt-6 text-[13px]">
         <Link href="/" className="font-semibold text-kora-black underline">
-          Volver a la tienda
+          {tb.volverTienda}
         </Link>
       </p>
     </Marco>

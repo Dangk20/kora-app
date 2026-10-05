@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function Lightbox({
   images,
@@ -28,6 +29,7 @@ export function Lightbox({
   onClose: () => void;
   nombre: string;
 }) {
+  const t = useMessages().producto.visor;
   const total = images.length;
   const ir = useCallback(
     (delta: -1 | 1) => onIndex((index + delta + total) % total),
@@ -87,7 +89,7 @@ export function Lightbox({
         overlayClassName="z-[80] bg-[rgba(10,10,12,0.92)] duration-300"
         className="z-[90] h-dvh w-screen max-w-none rounded-none border-none bg-transparent p-0 shadow-none duration-300 sm:max-w-none"
       >
-        <DialogTitle className="sr-only">{nombre} — foto {index + 1} de {total}</DialogTitle>
+        <DialogTitle className="sr-only">{t.titulo(nombre, index + 1, total)}</DialogTitle>
 
         {/* `min-w-0` y `overflow-hidden`: en móvil las miniaturas no caben y
             desbordan; como el contenido del diálogo es una rejilla, la columna
@@ -97,7 +99,7 @@ export function Lightbox({
           {/* Barra superior: contador y cerrar */}
           <div className="flex items-center justify-between px-4 py-3 text-white sm:px-6" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <span className="text-[13px] tabular-nums opacity-80">{index + 1} / {total}</span>
-            <button type="button" onClick={onClose} aria-label="Cerrar"
+            <button type="button" onClick={onClose} aria-label={t.cerrar}
               className="flex size-10 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20">
               <X className="size-5" />
             </button>
@@ -119,11 +121,11 @@ export function Lightbox({
 
           {total > 1 && (
             <>
-              <button type="button" onClick={() => ir(-1)} aria-label="Foto anterior"
+              <button type="button" onClick={() => ir(-1)} aria-label={t.anterior}
                 className="absolute top-1/2 left-3 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25 sm:flex">
                 <ChevronLeft className="size-6" />
               </button>
-              <button type="button" onClick={() => ir(1)} aria-label="Foto siguiente"
+              <button type="button" onClick={() => ir(1)} aria-label={t.siguiente}
                 className="absolute top-1/2 right-3 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25 sm:flex">
                 <ChevronRight className="size-6" />
               </button>
@@ -134,7 +136,7 @@ export function Lightbox({
                   overflow, centrar dejaría inalcanzables las de la izquierda. */}
               <div className="flex gap-2 overflow-x-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] [-ms-overflow-style:none] [scrollbar-width:none] sm:justify-center [&::-webkit-scrollbar]:hidden" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
                 {images.map((m, i) => (
-                  <button key={m.url} type="button" onClick={() => onIndex(i)} aria-label={`Foto ${i + 1}`}
+                  <button key={m.url} type="button" onClick={() => onIndex(i)} aria-label={t.foto(i + 1)}
                     aria-current={i === index}
                     className={`relative size-12 shrink-0 overflow-hidden rounded-lg border-2 bg-[#1c1a1f] transition-opacity ${i === index ? "border-kora-coral" : "border-transparent opacity-60 hover:opacity-100"}`}>
                     <Image src={m.url} alt="" fill sizes="48px" className="object-contain" unoptimized />

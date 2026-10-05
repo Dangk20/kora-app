@@ -20,12 +20,14 @@ export default async function CategoriesPage() {
         .map((child) => ({
           id: child.id,
           name: child.name,
+          nameEn: child.nameEn,
           icon: child.icon,
           productCount: child._count.products,
         }));
       return {
         id: parent.id,
         name: parent.name,
+        nameEn: parent.nameEn,
         color: parent.color,
         icon: parent.icon,
         // Los productos viven casi siempre en la SUBCATEGORÍA (así los asigna

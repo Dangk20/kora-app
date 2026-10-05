@@ -30,6 +30,7 @@ import {
 import { sendResetCode } from "@/modules/buyer/reset-email";
 import { sendWelcomeEmail } from "@/modules/buyer/welcome-email";
 import { ipDeConfianza } from "@/modules/geo/ip";
+import { getMessages } from "@/modules/i18n/server";
 
 export type FormState = { error?: string; ok?: boolean } | null;
 
@@ -52,22 +53,25 @@ function destinoSeguro(volver: unknown): string {
 }
 
 export async function entrar(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { errores } = await getMessages();
   const ip = await origen();
   const limite = comprobarLimite(ip);
   if (!limite.permitido) {
     // No se dice si el correo existe ni cuántos intentos van: solo que espere.
     const min = Math.ceil(limite.esperaSegundos / 60);
-    return { error: `Demasiados intentos. Vuelve a intentarlo en ${min} minuto${min === 1 ? "" : "s"}.` };
+    return { error: errores.demasiadosIntentos(min) };
   }
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) return { error: MENSAJE_ACCESO };
+  // Los mensajes de las reglas se traducen en el borde (`errores.traducir`):
+  // el de acceso sigue siendo el MISMO haya o no cuenta, en cada idioma.
+  if (!email || !password) return { error: errores.traducir(MENSAJE_ACCESO) };
 
   const r = await verifyBuyer(email, password);
   if (!r.ok) {
     registrarFallo(ip);
-    return { error: r.error };
+    return { error: errores.traducir(r.error) };
   }
 
   limpiarIntentos(ip);
@@ -77,6 +81,7 @@ export async function entrar(_prev: FormState, formData: FormData): Promise<Form
 }
 
 export async function crearCuenta(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { errores } = await getMessages();
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
 
@@ -86,7 +91,7 @@ export async function crearCuenta(_prev: FormState, formData: FormData): Promise
     password,
     phone: String(formData.get("phone") ?? "") || null,
   });
-  if (!r.ok) return { error: r.error };
+  if (!r.ok) return { error: errores.traducir(r.error) };
 
   // La bienvenida sale SOLO si de verdad se creó o activó una cuenta.
   // `customerId` es null cuando el correo ya tenía cuenta y no se tocó nada:
@@ -108,9 +113,7 @@ export async function crearCuenta(_prev: FormState, formData: FormData): Promise
   // Quien acaba de crearla entra; quien ya la tenía con otra contraseña, no.
   const login = await verifyBuyer(email, password);
   if (!login.ok) {
-    return {
-      error: "Ya existe una cuenta con ese correo. Entra con tu contraseña o escríbenos por WhatsApp.",
-    };
+    return { error: errores.yaExisteCuenta };
   }
 
   const h = await headers();
@@ -125,9 +128,10 @@ export async function salir(): Promise<void> {
 
 export async function actualizarDatos(_prev: FormState, formData: FormData): Promise<FormState> {
   const buyer = await requireBuyer();
+  const { errores } = await getMessages();
 
   const name = String(formData.get("name") ?? "").trim();
-  if (name.length < 3) return { error: "Escribe tu nombre completo." };
+  if (name.length < 3) return { error: errores.nombreCompleto };
 
   // El teléfono se guarda en E.164, igual que el checkout y el registro. Sin
   // normalizar, el MISMO número queda escrito de dos formas según por dónde
@@ -135,7 +139,7 @@ export async function actualizarDatos(_prev: FormState, formData: FormData): Pro
   const escrito = String(formData.get("phone") ?? "").trim();
   const phone = escrito ? normalizarTelefono(escrito) : null;
   if (escrito && !phone) {
-    return { error: "Ese número de WhatsApp no parece válido. Revísalo." };
+    return { error: errores.whatsappInvalido };
   }
 
   // `phone` es ÚNICO en la base: guardar el de otro cliente lanzaría una
@@ -147,7 +151,7 @@ export async function actualizarDatos(_prev: FormState, formData: FormData): Pro
       select: { id: true },
     });
     if (deOtro) {
-      return { error: "Ese número ya está registrado en otra cuenta." };
+      return { error: errores.whatsappDeOtro };
     }
   }
 
@@ -165,13 +169,14 @@ export async function actualizarDatos(_prev: FormState, formData: FormData): Pro
 
 export async function cambiarPassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const buyer = await requireBuyer();
+  const { errores } = await getMessages();
 
   const r = await changePassword(
     buyer.customerId,
     String(formData.get("actual") ?? ""),
     String(formData.get("nueva") ?? ""),
   );
-  if (!r.ok) return { error: r.error };
+  if (!r.ok) return { error: errores.traducir(r.error) };
 
   // Quien cambia su contraseña sospecha que otra persona entró: si las sesiones
   // abiertas siguieran valiendo, el gesto no serviría de nada. Se conserva la
@@ -194,11 +199,12 @@ export async function cambiarPassword(_prev: FormState, formData: FormData): Pro
  * que más despacio.
  */
 export async function pedirCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { errores } = await getMessages();
   const ip = await origen();
   const limite = comprobarLimite(ip);
   if (!limite.permitido) {
     const min = Math.ceil(limite.esperaSegundos / 60);
-    return { error: `Demasiados intentos. Espera ${min} minuto(s) y vuelve a probar.` };
+    return { error: errores.demasiadosIntentosEspera(min) };
   }
 
   const email = String(formData.get("email") ?? "");
@@ -214,16 +220,17 @@ export async function pedirCodigo(_prev: FormState, formData: FormData): Promise
     registrarFallo(ip);
   }
 
-  return { ok: true, error: MENSAJE_ENVIO };
+  return { ok: true, error: errores.traducir(MENSAJE_ENVIO) };
 }
 
 /** Cambia la contraseña con el código. Al lograrlo cierra todas las sesiones. */
 export async function confirmarCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { errores } = await getMessages();
   const ip = await origen();
   const limite = comprobarLimite(ip);
   if (!limite.permitido) {
     const min = Math.ceil(limite.esperaSegundos / 60);
-    return { error: `Demasiados intentos. Espera ${min} minuto(s) y vuelve a probar.` };
+    return { error: errores.demasiadosIntentosEspera(min) };
   }
 
   const r = await confirmPasswordReset(
@@ -234,7 +241,7 @@ export async function confirmarCodigo(_prev: FormState, formData: FormData): Pro
 
   if (!r.ok) {
     registrarFallo(ip);
-    return { error: r.error };
+    return { error: errores.traducir(r.error) };
   }
 
   limpiarIntentos(ip);

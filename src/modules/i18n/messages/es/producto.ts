@@ -1,2 +1,54 @@
-// Área "producto" de la tienda. `en/producto.ts` debe tener exactamente la misma forma.
-export const producto = {};
+// Área "producto": ficha, precio, galería y botón de compra. `en/producto.ts`
+// debe tener exactamente la misma forma.
+export const producto = {
+  inicio: "Inicio",
+  vendidoPor: "Vendido por",
+  verFotoGrande: "Ver la foto en grande",
+  verImagen: (i: number) => `Ver imagen ${i}`,
+  /** Etiqueta del dato de talla en una pieza única. */
+  talla: "Talla",
+  piezaUnica: "Pieza única",
+  eligeOpcion: "Elige una opción",
+  agotado: "Agotado",
+  agotadoOnline: "Agotado en la tienda online",
+  noDisponible: "No disponible",
+  noDisponibleEn: (moneda: string) => `No disponible en ${moneda}`,
+  quedan: (n: number) => `Quedan ${n} ${n === 1 ? "unidad" : "unidades"}`,
+  ultimasUnidades: "¡Últimas unidades!",
+  quitarUnidad: "Quitar una unidad",
+  agregarUnidad: "Agregar una unidad",
+  cantidad: "Cantidad",
+  agregarAlCarrito: "Agregar al carrito",
+  agregadoAlCarrito: "Agregado al carrito",
+  comprarAhora: "Comprar ahora",
+  comprar: "Comprar",
+  ayudaComprar: "Completas tus datos y finalizas el pedido por WhatsApp.",
+  ayudaAgotado: "Escríbenos por WhatsApp si quieres saber cuándo vuelve.",
+  ayudaSinMoneda: "Cambia la moneda arriba para ver si está disponible en pesos.",
+  precioEspecialOnline: "Precio especial online",
+  descripcion: "Descripción",
+  especificaciones: "Especificaciones",
+  relacionados: "Productos relacionados",
+  specs: {
+    marca: "Marca",
+    categoria: "Categoría",
+    variantes: "Variantes",
+    sku: "SKU",
+    vendedor: "Vendedor",
+  },
+  visor: {
+    titulo: (nombre: string, i: number, total: number) => `${nombre} — foto ${i} de ${total}`,
+    cerrar: "Cerrar",
+    anterior: "Foto anterior",
+    siguiente: "Foto siguiente",
+    foto: (i: number) => `Foto ${i}`,
+  },
+  /** Botón compacto de compra (`AddToCartButton`). */
+  boton: {
+    agotado: "Agotado",
+    agregado: "Agregado",
+    verOpciones: "Ver opciones",
+    agregar: "Agregar",
+    productoAgotado: "Producto agotado",
+  },
+};

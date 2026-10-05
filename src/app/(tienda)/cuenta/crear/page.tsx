@@ -3,16 +3,20 @@ import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { crearCuenta } from "../actions";
 import { CrearForm } from "../auth-form";
 import { Marco } from "../marco";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = { title: "Crear mi cuenta · KORA" };
+export async function generateMetadata() {
+  return { title: (await getMessages()).cuenta.meta.crear };
+}
 
 export default async function CrearPage() {
   if (await currentBuyer()) redirect("/cuenta");
+  const t = (await getMessages()).cuenta;
 
   return (
     <Marco
-      titulo="Crear mi cuenta"
-      bajada="Guarda tus pedidos y sigue tu Kora Cashback: el 3 % de lo que pagas vuelve a ti."
+      titulo={t.crear.titulo}
+      bajada={t.crear.bajada}
     >
       <CrearForm action={crearCuenta} />
     </Marco>

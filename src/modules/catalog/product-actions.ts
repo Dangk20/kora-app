@@ -64,6 +64,17 @@ const productSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v ? v : undefined)),
+  /** Versión para la tienda en inglés; vacía = se muestra el español. */
+  nameEn: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  descriptionEn: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
   active: z.boolean(),
   featured: z.boolean(),
   variants: z.array(variantSchema).min(1, "El producto necesita al menos una variante"),
@@ -132,6 +143,8 @@ export async function upsertProduct(
         brand: data.brand ?? null,
         categoryId: data.categoryId,
         description: data.description ?? null,
+        nameEn: data.nameEn ?? null,
+        descriptionEn: data.descriptionEn ?? null,
         active: data.active,
         featured: data.featured,
       };

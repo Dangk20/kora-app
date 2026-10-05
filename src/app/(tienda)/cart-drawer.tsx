@@ -13,11 +13,13 @@ import { getResolvedCart } from "@/modules/cart/actions";
 import type { ResolvedCart } from "@/modules/cart/resolve";
 import { formatMoney } from "@/modules/pricing";
 import { CategoryTile } from "@/modules/catalog/tiles";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function CartDrawer() {
   const { lines, ready, drawerOpen, closeDrawer, setQty, remove } = useCart();
   const [cart, setCart] = useState<ResolvedCart | null>(null);
   const [loading, startLoading] = useTransition();
+  const t = useMessages();
 
   // Se resuelve solo cuando el panel está abierto: no gastamos consultas
   // por cada visitante que nunca lo abre.
@@ -43,12 +45,12 @@ export function CartDrawer() {
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Tu carrito"
+        aria-label={t.carrito.titulo}
       >
         <header className="flex items-center justify-between border-b border-[#f0ece6] px-6 py-5">
           <div className="flex items-center gap-2.5">
             <ShoppingCart className="size-[22px] text-kora-coral" />
-            <h2 className="text-lg font-bold text-kora-black">Tu carrito</h2>
+            <h2 className="text-lg font-bold text-kora-black">{t.carrito.titulo}</h2>
             {cart && cart.itemCount > 0 && (
               <span className="rounded-full bg-[#FFE9DD] px-2.5 py-0.5 text-xs font-bold text-kora-coral">
                 {cart.itemCount}
@@ -58,7 +60,7 @@ export function CartDrawer() {
           <button
             type="button"
             onClick={closeDrawer}
-            aria-label="Cerrar carrito"
+            aria-label={t.carrito.cerrarCarrito}
             className="flex size-[34px] items-center justify-center rounded-full bg-[#f5f3f0] text-[#8a8f98] hover:text-kora-black"
           >
             <X className="size-[18px]" />
@@ -73,17 +75,17 @@ export function CartDrawer() {
           <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
             <ShoppingCart className="size-14 text-[#e2ddd6]" />
             <p className="mt-4 text-[17px] font-semibold text-kora-black">
-              Tu carrito está vacío
+              {t.carrito.vacioTitulo}
             </p>
             <p className="mt-1 text-[13px] text-[#8a8f98]">
-              Agrega productos y aparecerán aquí.
+              {t.carrito.vacioTextoPanel}
             </p>
             <Link
               href="/catalogo"
               onClick={closeDrawer}
               className="mt-5 rounded-full bg-kora-black px-5 py-3 text-[13.5px] font-bold text-white hover:bg-kora-orange"
             >
-              Explorar productos
+              {t.carrito.explorarProductos}
             </Link>
           </div>
         ) : (
@@ -131,14 +133,14 @@ export function CartDrawer() {
 
                   {line.unavailable ? (
                     <p className="mt-1 text-[11.5px] font-semibold text-destructive">
-                      {line.onlineUnits === 0 ? "Agotado" : `No disponible en ${currency}`}
+                      {line.onlineUnits === 0 ? t.carrito.agotado : t.carrito.noDisponibleEn(currency)}
                     </p>
                   ) : (
                     <div className="mt-1.5 flex items-center justify-between gap-2">
                       <div className="flex items-center overflow-hidden rounded-[9px] border border-[#e2ddd6]">
                         <button
                           type="button"
-                          aria-label="Quitar una unidad"
+                          aria-label={t.carrito.quitarUnaUnidad}
                           onClick={() => setQty(line.variantId, line.qtyAvailable - 1)}
                           className="flex h-[30px] w-7 items-center justify-center hover:bg-[#faf8f5]"
                         >
@@ -149,7 +151,7 @@ export function CartDrawer() {
                         </span>
                         <button
                           type="button"
-                          aria-label="Agregar una unidad"
+                          aria-label={t.carrito.agregarUnaUnidad}
                           disabled={line.qtyAvailable >= line.onlineUnits}
                           onClick={() => setQty(line.variantId, line.qtyAvailable + 1)}
                           className="flex h-[30px] w-7 items-center justify-center hover:bg-[#faf8f5] disabled:opacity-40"
@@ -178,13 +180,13 @@ export function CartDrawer() {
         {items.length > 0 && (
           <footer className="border-t border-[#f0ece6] px-5 py-4">
             <div className="mb-1 flex items-baseline justify-between">
-              <span className="text-[13.5px] font-semibold text-[#6b6f78]">Subtotal</span>
+              <span className="text-[13.5px] font-semibold text-[#6b6f78]">{t.carrito.subtotal}</span>
               <span className="text-[22px] font-extrabold text-kora-black">
                 {formatMoney(cart?.subtotal ?? 0, currency)}
               </span>
             </div>
             <p className="mb-3.5 text-[11.5px] text-[#8a8f98]">
-              El envío se acuerda contigo por WhatsApp al confirmar el pedido.
+              {t.carrito.envioAcordadoPanel}
             </p>
 
             <Link
@@ -197,14 +199,14 @@ export function CartDrawer() {
                   : "hover:bg-kora-orange"
               }`}
             >
-              Ir a pagar
+              {t.carrito.irAPagar}
             </Link>
             <Link
               href="/carrito"
               onClick={closeDrawer}
               className="mt-2.5 flex w-full items-center justify-center rounded-[13px] border-[1.6px] border-[#e2ddd6] px-6 py-3 text-[14px] font-semibold text-kora-black hover:border-kora-coral"
             >
-              Ver carrito completo
+              {t.carrito.verCarritoCompleto}
             </Link>
           </footer>
         )}

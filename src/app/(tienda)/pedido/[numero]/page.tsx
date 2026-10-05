@@ -16,13 +16,16 @@ import { formatOrderNumber, whatsappUrl } from "@/modules/orders/message";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import { verifyTrackingToken, parseOrderNumber } from "@/modules/orders/tracking";
 import { EstadoPedido, money } from "../../cuenta/ui";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = {
-  title: "Tu pedido · KORA",
-  // Un pedido no se indexa. `noindex` además de que haga falta un token: las
-  // dos cosas fallan de formas distintas y no se cubren la una a la otra.
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  return {
+    title: (await getMessages()).pedido.meta.publico,
+    // Un pedido no se indexa. `noindex` además de que haga falta un token: las
+    // dos cosas fallan de formas distintas y no se cubren la una a la otra.
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function PedidoPublicoPage({
   params,
@@ -43,6 +46,8 @@ export default async function PedidoPublicoPage({
   // la página mostraría un pedido distinto del que dice la dirección.
   if (!pedido || pedido.number !== esperado) notFound();
 
+  const msgs = await getMessages();
+  const tp = msgs.pedido;
   const whatsapp =
     pedido.vigente && pedido.whatsappMessage
       ? whatsappUrl(await whatsappNumberFor(pedido.currency), pedido.whatsappMessage)
@@ -51,7 +56,7 @@ export default async function PedidoPublicoPage({
   return (
     <main className="mx-auto w-full max-w-[760px] px-5 py-10">
       <Link href="/" className="text-[13px] text-muted-foreground underline">
-        ← Volver a la tienda
+        {tp.seguimiento.volverTienda}
       </Link>
 
       <div className="mt-4 mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -60,7 +65,7 @@ export default async function PedidoPublicoPage({
             {formatOrderNumber(pedido.number, pedido.createdAt)}
           </h1>
           <p className="mt-1 text-[13.5px] text-muted-foreground">
-            {new Intl.DateTimeFormat("es-CO", { dateStyle: "long" }).format(pedido.createdAt)}
+            {new Intl.DateTimeFormat(msgs.comun.formatoFecha, { dateStyle: "long" }).format(pedido.createdAt)}
           </p>
         </div>
         <EstadoPedido status={pedido.status} />
@@ -71,8 +76,7 @@ export default async function PedidoPublicoPage({
           {whatsapp ? (
             <>
               <p className="text-[14px] text-kora-black">
-                Tu pedido está registrado y el pago se acuerda por WhatsApp. Retoma la conversación
-                para confirmarlo.
+                {tp.registrado}
               </p>
               <a
                 href={whatsapp}
@@ -80,13 +84,12 @@ export default async function PedidoPublicoPage({
                 rel="noopener noreferrer"
                 className="bg-kora-gradient mt-3 inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-[14px] font-semibold text-white"
               >
-                <MessageCircle className="size-4" /> Continuar por WhatsApp
+                <MessageCircle className="size-4" /> {tp.continuarWhatsapp}
               </a>
             </>
           ) : (
             <p className="text-[14px] text-kora-black">
-              Este pedido superó su vigencia sin confirmarse. Si todavía lo quieres, vuelve a
-              armarlo desde el catálogo.
+              {tp.vencido}
             </p>
           )}
         </div>
@@ -113,18 +116,18 @@ export default async function PedidoPublicoPage({
         </ul>
 
         <div className="border-t border-[#f0ece6] px-5 py-4">
-          <Fila label="Subtotal" valor={money(pedido.subtotal, pedido.currency)} />
+          <Fila label={tp.subtotal} valor={money(pedido.subtotal, pedido.currency)} />
           {pedido.discountTotal > 0 && (
-            <Fila label="Descuento" valor={`− ${money(pedido.discountTotal, pedido.currency)}`} />
+            <Fila label={tp.descuento} valor={`− ${money(pedido.discountTotal, pedido.currency)}`} />
           )}
           {pedido.cashbackApplied > 0 && (
             <Fila
-              label="Kora Cashback"
+              label={tp.cashback}
               valor={`− ${money(pedido.cashbackApplied, pedido.currency)}`}
             />
           )}
           <div className="mt-2 flex justify-between border-t border-[#f0ece6] pt-3">
-            <span className="text-[15px] font-bold text-kora-black">Total</span>
+            <span className="text-[15px] font-bold text-kora-black">{tp.total}</span>
             <span className="text-[17px] font-extrabold text-kora-black">
               {money(pedido.total, pedido.currency)}
             </span>
@@ -133,11 +136,11 @@ export default async function PedidoPublicoPage({
       </section>
 
       <p className="mt-6 text-[13px] text-muted-foreground">
-        Guarda este enlace para volver a consultar tu pedido.{" "}
+        {tp.seguimiento.guardaEnlace}{" "}
         <Link href="/cuenta/crear" className="underline">
-          Crea una cuenta
+          {tp.seguimiento.creaCuenta}
         </Link>{" "}
-        y tendrás aquí todos tus pedidos y tu saldo de Kora Cashback.
+        {tp.seguimiento.creaCuentaResto}
       </p>
     </main>
   );

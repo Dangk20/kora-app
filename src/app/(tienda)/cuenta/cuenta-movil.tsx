@@ -14,6 +14,7 @@ import type { CashbackSummary } from "@/modules/cashback/balance";
 import { formatearCashback } from "@/modules/cashback/money";
 import type { BuyerOrderRow } from "@/modules/buyer/orders";
 import { bolsasVisibles } from "./bolsas";
+import { getMessages } from "@/modules/i18n/server";
 
 /** Dos iniciales, como el diseño ("Laura Martinez" → "LM"). */
 function iniciales(nombre: string): string {
@@ -24,7 +25,7 @@ function iniciales(nombre: string): string {
   return (primera + segunda).toUpperCase();
 }
 
-export function CuentaMovil({
+export async function CuentaMovil({
   nombre,
   email,
   resumen,
@@ -39,6 +40,7 @@ export function CuentaMovil({
   salir: React.ReactNode;
   datos: React.ReactNode;
 }) {
+  const t = (await getMessages()).cuenta;
   const bolsas = bolsasVisibles(resumen.available);
   const varias = bolsas.length > 1;
 
@@ -82,13 +84,13 @@ export function CuentaMovil({
               }`}
             >
               <p className="mb-1 text-[12.5px] opacity-90">
-                Kora Cashback disponible{varias ? ` · ${moneda}` : ""}
+                {t.cashback.disponibleMovil}{varias ? ` · ${moneda}` : ""}
               </p>
               <p className="text-[30px] leading-none font-extrabold tracking-[-0.5px]">
                 {formatearCashback(valor, moneda)}
               </p>
               <p className="mt-1.5 text-[11.5px] opacity-85">
-                Ganas 3% en cada pedido confirmado
+                {t.cashback.ganas}
               </p>
             </div>
           ))}
@@ -103,17 +105,17 @@ export function CuentaMovil({
             ]
               .filter(Boolean)
               .join(" · ")}{" "}
-            pendiente — se acredita cuando confirmemos tu pedido.
+            {t.cashback.pendienteMovil}
           </p>
         )}
 
-        <h2 className="mb-2.5 text-[16px] font-extrabold text-kora-black">Mis pedidos</h2>
+        <h2 className="mb-2.5 text-[16px] font-extrabold text-kora-black">{t.secciones.pedidos}</h2>
 
         {pedidos.length === 0 ? (
           <div className="rounded-[14px] bg-white px-[18px] py-7 text-center text-[13px] text-[#8a8f98]">
-            Aún no tienes pedidos.{" "}
+            {t.sinPedidosMovil}{" "}
             <Link href="/catalogo" className="font-semibold text-kora-black underline">
-              Ver el catálogo
+              {t.verCatalogo}
             </Link>
           </div>
         ) : (
@@ -129,7 +131,7 @@ export function CuentaMovil({
             consulta y lo que más ocupa. */}
         <details className="group mt-5 rounded-[14px] bg-white p-4">
           <summary className="flex cursor-pointer list-none items-center justify-between text-[15px] font-extrabold text-kora-black [&::-webkit-details-marker]:hidden">
-            Mis datos
+            {t.secciones.datos}
             <span className="text-[#b3b8c0] transition-transform group-open:rotate-180" aria-hidden>
               ⌄
             </span>

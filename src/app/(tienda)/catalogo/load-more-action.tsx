@@ -30,7 +30,9 @@ export async function cargarMasProductos(params: {
   const desde = Math.max(0, Math.floor(params.desde));
   const siguientes = products.slice(desde, desde + POR_PAGINA);
   return {
-    tarjetas: siguientes.map((p) => <ProductCard key={p.id} product={p} currency={currency} />),
+    tarjetas: siguientes.map((p) => (
+      <ProductCard key={p.id} product={p} currency={currency} locale={locale} />
+    )),
     mostrados: desde + siguientes.length,
     quedan: Math.max(0, products.length - desde - siguientes.length),
   };

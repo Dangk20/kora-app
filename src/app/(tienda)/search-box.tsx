@@ -19,6 +19,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 import { formatMoney } from "@/modules/pricing";
+import { useMessages } from "@/modules/i18n/provider";
 import {
   SEARCH_MAX_LENGTH,
   SEARCH_MIN_LENGTH,
@@ -39,6 +40,7 @@ const VACIO: SearchSuggestions = { query: "", items: [], total: 0 };
 export function SearchBox() {
   const router = useRouter();
   const [value, setValue] = useState("");
+  const t = useMessages().buscador;
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<SearchSuggestions>(VACIO);
   const [cargando, setCargando] = useState(false);
@@ -135,8 +137,8 @@ export function SearchBox() {
                 inputRef.current?.blur();
               }
             }}
-            placeholder="Buscar productos, marcas y más…"
-            aria-label="Buscar en la tienda"
+            placeholder={t.placeholder}
+            aria-label={t.aria}
             // `combobox` y no el rol implícito de `textbox`: es lo que hace que
             // un lector de pantalla anuncie que abajo aparecieron sugerencias.
             // Sin él, `aria-expanded` no significa nada y el desplegable es
@@ -152,7 +154,7 @@ export function SearchBox() {
           />
           <button
             type="submit"
-            aria-label="Buscar"
+            aria-label={t.buscar}
             className="bg-kora-gradient flex size-[42px] shrink-0 items-center justify-center rounded-full text-white hover:opacity-90"
           >
             <Search className="size-5" />
@@ -167,7 +169,7 @@ export function SearchBox() {
               active, y el desplegable se cierra sin navegar. */}
           <button
             type="button"
-            aria-label="Cerrar sugerencias"
+            aria-label={t.cerrarSugerencias}
             tabIndex={-1}
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-[90] cursor-default"
@@ -181,16 +183,16 @@ export function SearchBox() {
               <div className="px-5 py-[34px] text-center">
                 <Search className="mx-auto size-[42px] text-[#e2ddd6]" aria-hidden />
                 <p className="mt-3 mb-1 text-sm font-semibold text-kora-black">
-                  Sin resultados para “{data.query}”
+                  {t.sinResultados(data.query)}
                 </p>
                 <p className="text-[12.5px] text-[#8a8f98]">
-                  Prueba con otra palabra o explora las categorías.
+                  {t.sinResultadosAyuda}
                 </p>
               </div>
             ) : (
               <>
                 <p className="px-2.5 pt-1.5 pb-2 text-[10.5px] font-bold tracking-[0.5px] text-[#9aa0ab] uppercase">
-                  Resultados para “{data.query}”
+                  {t.resultadosPara(data.query)}
                 </p>
 
                 <div className="flex flex-col gap-0.5">
@@ -246,7 +248,7 @@ export function SearchBox() {
                   onClick={irAlCatalogo}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-[11px] bg-kora-black p-3 text-[13px] font-bold text-white hover:bg-[#FF5A1F]"
                 >
-                  Ver todos los resultados ({data.total})
+                  {t.verTodos(data.total)}
                   <ArrowRight className="size-[15px]" aria-hidden />
                 </button>
               </>

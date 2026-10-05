@@ -33,6 +33,7 @@ import { ItemPicker } from "./item-picker";
 export type SectionState = {
   key: string;
   title: string;
+  titleEn: string | null;
   active: boolean;
   mode: "MANUAL" | "AUTO";
   autoRule: string;
@@ -57,6 +58,7 @@ export function SectionModal({
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [title, setTitle] = useState(section.title);
+  const [titleEn, setTitleEn] = useState(section.titleEn ?? "");
 
   const isCategories = def.key === "top_categorias";
 
@@ -118,6 +120,30 @@ export function SectionModal({
                 type="button"
                 disabled={pending || title.trim() === section.title}
                 onClick={() => run(() => updateSection(section.key, { title }))}
+                className="rounded-[11px] bg-kora-black px-4 py-2.5 text-[13px] font-bold text-white hover:bg-kora-gray-dark disabled:opacity-40"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+
+          {/* Título para la tienda en inglés (quien entra desde el exterior). */}
+          <div>
+            <label className="mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]">
+              Título en inglés{" "}
+              <span className="font-normal text-[#9aa0ab]">· vacío = «{def.titleEn}»</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={titleEn}
+                onChange={(e) => setTitleEn(e.target.value)}
+                placeholder={def.titleEn}
+                className="flex-1 rounded-[11px] border-[1.6px] border-[#e2ddd6] px-3.5 py-2.5 text-[13.5px] outline-none focus:border-kora-coral"
+              />
+              <button
+                type="button"
+                disabled={pending || titleEn.trim() === (section.titleEn ?? "")}
+                onClick={() => run(() => updateSection(section.key, { titleEn }))}
                 className="rounded-[11px] bg-kora-black px-4 py-2.5 text-[13px] font-bold text-white hover:bg-kora-gray-dark disabled:opacity-40"
               >
                 Guardar

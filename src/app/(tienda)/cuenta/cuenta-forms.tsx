@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MIN_PASSWORD } from "@/modules/buyer/password";
 import { actualizarDatos, cambiarPassword, salir, type FormState } from "./actions";
+import { useMessages } from "@/modules/i18n/provider";
 
-function Guardar({ texto = "Guardar" }: { texto?: string }) {
+function Guardar({ texto }: { texto?: string }) {
   const { pending } = useFormStatus();
+  const t = useMessages().cuenta;
   return (
     <Button type="submit" variant="brand" className="mt-1 w-full" disabled={pending}>
-      {pending ? "Guardando…" : texto}
+      {pending ? t.guardando : (texto ?? t.guardar)}
     </Button>
   );
 }
@@ -87,6 +89,7 @@ function Tarjeta({
   onAlternar: () => void;
   children: React.ReactNode;
 }) {
+  const t = useMessages().cuenta;
   return (
     <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6">
       <header className="mb-4 flex items-center justify-between gap-3">
@@ -97,7 +100,7 @@ function Tarjeta({
           className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-coral transition-colors hover:bg-[#FFF4EF]"
         >
           {editando ? (
-            "Cancelar"
+            t.cancelar
           ) : (
             <>
               <Pencil className="size-[14px]" aria-hidden /> {accion}
@@ -112,6 +115,7 @@ function Tarjeta({
 
 /** Una línea de la vista de lectura. */
 function Fila({ label, valor }: { label: string; valor?: string | null }) {
+  const t = useMessages().cuenta;
   return (
     <div className="border-b border-[#f3efe9] py-3 last:border-0">
       <p className="text-[12px] text-[#8a8f98]">{label}</p>
@@ -122,7 +126,7 @@ function Fila({ label, valor }: { label: string; valor?: string | null }) {
             : "mt-0.5 text-[14px] text-[#b3b8c0] italic"
         }
       >
-        {valor || "Sin registrar"}
+        {valor || t.sinRegistrar}
       </p>
     </div>
   );
@@ -140,6 +144,7 @@ export function DatosForm({
 }) {
   const [state, action] = useActionState(actualizarDatos, null);
   const [editando, setEditando] = useState(false);
+  const t = useMessages().cuenta;
 
   // Guardado con éxito: la tarjeta vuelve a leerse sola. La acción revalida
   // /cuenta, así que los valores que se leen ya son los nuevos.
@@ -150,21 +155,21 @@ export function DatosForm({
   if (!editando) {
     return (
       <Tarjeta
-        titulo="Mi información"
-        accion="Editar"
+        titulo={t.miInformacion}
+        accion={t.editar}
         editando={false}
         onAlternar={() => setEditando(true)}
       >
-        <Fila label="Nombre completo" valor={defaults.name} />
+        <Fila label={t.nombreCompleto} valor={defaults.name} />
         {/* El correo se enseña porque es CON LO QUE SE ENTRA, y no se edita
             aquí: cambiarlo es cambiar la credencial de acceso. */}
-        <Fila label="Correo (con este entras)" valor={defaults.email} />
-        <Fila label="WhatsApp" valor={defaults.phone} />
+        <Fila label={t.correoConEsteEntras} valor={defaults.email} />
+        <Fila label={t.whatsapp} valor={defaults.phone} />
         {/* Ciudad y dirección viven en "Mis direcciones" desde el 1 sep 2026.
             Dejar aquí una dirección suelta mientras existe la libreta serían
             dos respuestas distintas a la misma pregunta. */}
         {state?.ok && (
-          <p className="pt-3 text-[12.5px] text-[#2c6b34]">Datos actualizados.</p>
+          <p className="pt-3 text-[12.5px] text-[#2c6b34]">{t.datosActualizados}</p>
         )}
       </Tarjeta>
     );
@@ -172,18 +177,18 @@ export function DatosForm({
 
   return (
     <Tarjeta
-      titulo="Mi información"
-      accion="Editar"
+      titulo={t.miInformacion}
+      accion={t.editar}
       editando
       onAlternar={() => setEditando(false)}
     >
       <form action={action} className="grid gap-3">
-        <Campo id="name" label="Nombre completo" defaultValue={defaults.name} autoComplete="name" />
-        <Campo id="phone" label="WhatsApp" defaultValue={defaults.phone} autoComplete="tel" />
-        <Aviso state={state} exito="Datos actualizados." />
+        <Campo id="name" label={t.nombreCompleto} defaultValue={defaults.name} autoComplete="name" />
+        <Campo id="phone" label={t.whatsapp} defaultValue={defaults.phone} autoComplete="tel" />
+        <Aviso state={state} exito={t.datosActualizados} />
         <Guardar />
         <p className="text-[11.5px] text-muted-foreground">
-          Tus pedidos anteriores conservan los datos con los que se hicieron.
+          {t.pedidosConservan}
         </p>
       </form>
     </Tarjeta>
@@ -193,6 +198,7 @@ export function DatosForm({
 export function PasswordForm() {
   const [state, action] = useActionState(cambiarPassword, null);
   const [editando, setEditando] = useState(false);
+  const t = useMessages().cuenta;
 
   useEffect(() => {
     if (state?.ok) setEditando(false);
@@ -201,15 +207,15 @@ export function PasswordForm() {
   if (!editando) {
     return (
       <Tarjeta
-        titulo="Contraseña"
-        accion="Cambiar"
+        titulo={t.contrasena}
+        accion={t.cambiar}
         editando={false}
         onAlternar={() => setEditando(true)}
       >
-        <Fila label="Contraseña" valor="••••••••" />
+        <Fila label={t.contrasena} valor="••••••••" />
         {state?.ok && (
           <p className="pt-3 text-[12.5px] text-[#2c6b34]">
-            Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos.
+            {t.contrasenaCambiada}
           </p>
         )}
       </Tarjeta>
@@ -217,17 +223,17 @@ export function PasswordForm() {
   }
 
   return (
-    <Tarjeta titulo="Contraseña" accion="Cambiar" editando onAlternar={() => setEditando(false)}>
+    <Tarjeta titulo={t.contrasena} accion={t.cambiar} editando onAlternar={() => setEditando(false)}>
       <form action={action} className="grid gap-3">
-        <PasswordField id="actual" label="Contraseña actual" autoComplete="current-password" inputClassName="pr-11" labelClassName="text-[12.5px]" />
-        <PasswordField id="nueva" label="Contraseña nueva" autoComplete="new-password" inputClassName="pr-11" labelClassName="text-[12.5px]" hint={`Mínimo ${MIN_PASSWORD} caracteres.`} />
+        <PasswordField id="actual" label={t.contrasenaActual} autoComplete="current-password" inputClassName="pr-11" labelClassName="text-[12.5px]" />
+        <PasswordField id="nueva" label={t.contrasenaNueva} autoComplete="new-password" inputClassName="pr-11" labelClassName="text-[12.5px]" hint={t.minimoCaracteres(MIN_PASSWORD)} />
         <Aviso
           state={state}
-          exito="Contraseña cambiada. Se cerraron tus sesiones en otros dispositivos."
+          exito={t.contrasenaCambiada}
         />
-        <Guardar texto="Cambiar contraseña" />
+        <Guardar texto={t.cambiarContrasena} />
         <p className="text-[11.5px] text-muted-foreground">
-          Al cambiarla se cierran tus sesiones en otros dispositivos.
+          {t.alCambiarla}
         </p>
       </form>
     </Tarjeta>
@@ -235,6 +241,7 @@ export function PasswordForm() {
 }
 
 export function SalirButton({ compacto = false }: { compacto?: boolean }) {
+  const t = useMessages().cuenta;
   // En móvil va dentro de la franja oscura del usuario y es solo el icono,
   // como el diseño (§07): ahí el ancho lo necesitan el nombre y el correo.
   if (compacto) {
@@ -242,7 +249,7 @@ export function SalirButton({ compacto = false }: { compacto?: boolean }) {
       <form action={salir}>
         <button
           type="submit"
-          aria-label="Cerrar sesión"
+          aria-label={t.cerrarSesion}
           className="flex size-[30px] items-center justify-center text-[#A0A4AD] hover:text-white"
         >
           <LogOut className="size-[18px]" />
@@ -254,7 +261,7 @@ export function SalirButton({ compacto = false }: { compacto?: boolean }) {
   return (
     <form action={salir}>
       <Button type="submit" variant="outline" size="sm">
-        Cerrar sesión
+        {t.cerrarSesion}
       </Button>
     </form>
   );

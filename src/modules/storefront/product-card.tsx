@@ -9,7 +9,9 @@ import { resolvePrice, type Currency } from "@/modules/pricing";
 import { CategoryTile, inkFor } from "@/modules/catalog/tiles";
 import { availableUnits, productAmounts, type StoreProduct } from "./queries";
 import { PriceTag } from "./price-tag";
-import { tallaUnica } from "./talla";
+import { etiquetaVariante, tallaUnica } from "./talla";
+import type { Locale } from "@/modules/i18n";
+import { MESSAGES } from "@/modules/i18n/messages";
 
 /**
  * Tarjeta de producto: toda ella es el enlace a la ficha.
@@ -29,9 +31,16 @@ export function ProductCard({
   product,
   currency,
   preview = false,
+  locale = "es",
 }: {
   product: StoreProduct;
   currency: Currency;
+  /**
+   * Idioma de la tarjeta. Llega como dato y no se lee aquí: la tarjeta se
+   * pinta en servidor (catálogo, "Cargar más") y en la vista previa del
+   * panel, que se queda en español.
+   */
+  locale?: Locale;
   /**
    * Vista previa de Vitrina: la tarjeta se ve igual pero NO navega.
    *
@@ -42,6 +51,7 @@ export function ProductCard({
    */
   preview?: boolean;
 }) {
+  const t = MESSAGES[locale].catalogo.tarjeta;
   const units = availableUnits(product);
   const soldOut = units === 0;
   const amounts = productAmounts(product, currency);
@@ -155,17 +165,17 @@ export function ProductCard({
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
           {soldOut && (
             <span className="rounded-full bg-[#8a8f98] px-2 py-1 text-[10.5px] font-semibold text-white">
-              Agotado
+              {t.agotado}
             </span>
           )}
           {product.featured && !soldOut && (
             <span className="rounded-full bg-kora-black px-2 py-1 text-[10.5px] font-semibold text-white">
-              Destacado
+              {t.destacado}
             </span>
           )}
           {price?.hasOnlineDiscount && !soldOut && (
             <span className="bg-kora-gradient rounded-full px-2 py-1 text-[10.5px] font-bold text-white">
-              Precio online
+              {t.precioOnline}
             </span>
           )}
         </div>
@@ -201,7 +211,7 @@ export function ProductCard({
               "[@media(hover:hover)_and_(pointer:fine)]:block"
             }
           >
-            Ver producto
+            {t.verProducto}
           </span>
         )}
       </div>
@@ -219,15 +229,17 @@ export function ProductCard({
             piezas de una sola talla el comprador elige mirando, y "Talla M"
             aquí le ahorra abrir cinco fichas para descartar cuatro. */}
         {tallaUnica(product) && (
-          <p className="mb-2 -mt-1 text-[11.5px] font-semibold text-[#6b6f78]">{tallaUnica(product)}</p>
+          <p className="mb-2 -mt-1 text-[11.5px] font-semibold text-[#6b6f78]">
+            {etiquetaVariante(tallaUnica(product)!, locale)}
+          </p>
         )}
 
         <div className="mt-auto">
           <div className="space-y-1">
-            {price && <PriceTag price={price} />}
+            {price && <PriceTag price={price} locale={locale} />}
             {multiPrice && price?.available && (
               <p className="text-[11px] text-[#8a8f98]">
-                Desde · {product.variants.length} variantes
+                {t.desdeVariantes(product.variants.length)}
               </p>
             )}
           </div>

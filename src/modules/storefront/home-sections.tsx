@@ -12,6 +12,8 @@ import type { ResolvedBanner } from "@/modules/showcase/queries";
 import { BannerCarousel } from "./banner-carousel";
 import { productAmounts, type StoreProduct } from "./queries";
 import { ProductCard } from "./product-card";
+import type { Locale } from "@/modules/i18n";
+import { MESSAGES } from "@/modules/i18n/messages";
 
 /** Contenedor de 1320px del prototipo. */
 // 16 px de aire lateral en móvil y 22 en escritorio: 22 por lado en una
@@ -157,11 +159,14 @@ export function DealsPanel({
   title,
   products,
   currency,
+  locale = "es",
 }: {
   title: string;
   products: StoreProduct[];
   currency: Currency;
+  locale?: Locale;
 }) {
+  const t = MESSAGES[locale].tienda;
   return (
     <div className="relative overflow-hidden rounded-3xl bg-kora-black p-5 sm:p-8">
       <span
@@ -178,7 +183,7 @@ export function DealsPanel({
             href="/catalogo"
             className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-[14px] font-bold text-kora-black transition-transform hover:-translate-y-0.5"
           >
-            Ver todo <ArrowRight className="size-4" />
+            {t.verTodo} <ArrowRight className="size-4" />
           </Link>
         </div>
 
@@ -244,12 +249,15 @@ export function ProductGrid({
   products,
   currency,
   preview = false,
+  locale = "es",
 }: {
   title: string;
   products: StoreProduct[];
   currency: Currency;
   preview?: boolean;
+  locale?: Locale;
 }) {
+  const t = MESSAGES[locale].tienda;
   return (
     <section>
       <div className="mb-4 flex items-end justify-between">
@@ -258,14 +266,14 @@ export function ProductGrid({
           href="/catalogo"
           className="flex items-center gap-1.5 text-[13px] font-bold text-kora-coral hover:opacity-80"
         >
-          Ver todo <ArrowRight className="size-4" />
+          {t.verTodo} <ArrowRight className="size-4" />
         </Link>
       </div>
       {/* Sin carrusel a propósito: esta parrilla crece hacia abajo y la
           página entera ya hace scroll (decisión de Daniel, 19 jul). */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} currency={currency} preview={preview} />
+          <ProductCard key={p.id} product={p} currency={currency} preview={preview} locale={locale} />
         ))}
       </div>
     </section>
@@ -273,36 +281,37 @@ export function ProductGrid({
 }
 
 /** Franja de marca del cierre (§7.5). */
-export function BrandBand() {
+export function BrandBand({ locale = "es" }: { locale?: Locale }) {
+  const t = MESSAGES[locale].tienda.franja;
   return (
     <div className="flex flex-wrap items-center justify-between gap-6 rounded-3xl bg-[linear-gradient(120deg,#FFE9DD,#FBEFD6)] p-10">
       <div>
         <h2 className="text-[34px] leading-tight font-extrabold tracking-[-0.5px] text-kora-black">
-          KORA, todo en un{" "}
-          <span className="font-accent text-kora-coral italic">solo lugar</span>
+          {t.tituloAntes}{" "}
+          <span className="font-accent text-kora-coral italic">{t.tituloAcento}</span>
         </h2>
         <p className="mt-2 max-w-[460px] text-[15px] text-[#6b6f78]">
-          Explora el catálogo, arma tu pedido y lo cerramos juntos por WhatsApp.
+          {t.texto}
         </p>
       </div>
       <Link
         href="/catalogo"
         className="flex items-center gap-2 rounded-full bg-kora-black px-6 py-3.5 text-[14.5px] font-semibold text-white transition-transform hover:-translate-y-0.5"
       >
-        Empieza a comprar <ArrowRight className="size-4" />
+        {t.boton} <ArrowRight className="size-4" />
       </Link>
     </div>
   );
 }
 
 /** Aviso que ocupa el lugar de una sección vacía mientras se edita. */
-export function EmptySection({ label }: { label: string }) {
+export function EmptySection({ label, locale = "es" }: { label: string; locale?: Locale }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-[#e2ddd6] bg-white/60 px-6 py-10 text-center">
       <PackagePlus className="size-8 text-[#d9d4cc]" />
       <p className="text-[13px] font-semibold text-kora-black">{label}</p>
       <p className="text-[11.5px] text-[#9aa0ab]">
-        Usa el lápiz para agregar productos. Vacía, no se muestra en la tienda.
+        {MESSAGES[locale].tienda.seccionVacia}
       </p>
     </div>
   );
