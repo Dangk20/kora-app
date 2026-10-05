@@ -215,6 +215,19 @@ export default async function StoreLayout({
             ))}
           </ul>
         </div>
+
+        {/* Firma de quien diseñó y desarrolló la tienda. */}
+        <p className="mx-auto mt-6 max-w-[1320px] border-t border-[#22252b] pt-5 text-center text-xs text-[#6b7078]">
+          {t.layout.firma}{" "}
+          <a
+            href="https://dangk.framer.website/"
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-[#A0A4AD] underline underline-offset-2 hover:text-white"
+          >
+            Dangk
+          </a>
+        </p>
       </footer>
 
       {/* La barra inferior es fija: sin este hueco, lo último de cada página

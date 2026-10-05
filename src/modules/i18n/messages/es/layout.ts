@@ -9,6 +9,8 @@ export const layout = {
   escribenosWhatsapp: "Escríbenos por WhatsApp",
   seguimientoPedido: "Seguimiento de tu pedido",
   accesoEquipo: "Acceso al equipo",
+  /** Firma del pie: "Diseño y desarrollo por" + enlace a Dangk. */
+  firma: "Diseño y desarrollo por",
   /** Por ruta: las páginas legales siguen en español (fuera de esta entrega). */
   legales: {
     "/legal/datos-personales": "Tratamiento de datos",
