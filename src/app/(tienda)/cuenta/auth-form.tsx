@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MIN_PASSWORD } from "@/modules/buyer/password";
 import type { FormState } from "./actions";
+import { useMessages } from "@/modules/i18n/provider";
 
 function Enviar({ texto, enviando }: { texto: string; enviando: string }) {
   const { pending } = useFormStatus();
@@ -40,6 +41,7 @@ export function EntrarForm({
   volver?: string;
 }) {
   const [state, formAction] = useActionState(action, null);
+  const t = useMessages().cuenta;
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -47,7 +49,7 @@ export function EntrarForm({
       <Error mensaje={state?.error} />
 
       <div className="grid gap-2">
-        <Label htmlFor="email">Correo</Label>
+        <Label htmlFor="email">{t.correo}</Label>
         <Input
           id="email"
           name="email"
@@ -58,9 +60,9 @@ export function EntrarForm({
         />
       </div>
 
-      <PasswordField id="password" name="password" label="Contraseña" autoComplete="current-password" />
+      <PasswordField id="password" name="password" label={t.contrasena} autoComplete="current-password" />
 
-      <Enviar texto="Entrar" enviando="Entrando…" />
+      <Enviar texto={t.entrar.boton} enviando={t.entrar.enviando} />
 
       {/* El enlace vuelve el 28 ago 2026, cuando el dominio pudo enviar correo.
           Antes decía "escríbenos por WhatsApp y te ayudamos": un apaño que
@@ -68,13 +70,13 @@ export function EntrarForm({
           persona, que es justo lo que un sistema de cuentas debe evitar. */}
       <p className="text-center text-[12.5px]">
         <Link href="/cuenta/recuperar" className="text-muted-foreground underline">
-          ¿Olvidaste tu contraseña?
+          {t.entrar.olvidaste}
         </Link>
       </p>
       <p className="text-center text-[13px]">
-        ¿No tienes cuenta?{" "}
+        {t.entrar.sinCuenta}{" "}
         <Link href="/cuenta/crear" className="font-semibold text-kora-black underline">
-          Créala aquí
+          {t.entrar.creala}
         </Link>
       </p>
     </form>
@@ -87,18 +89,19 @@ export function CrearForm({
   action: (prev: FormState, data: FormData) => Promise<FormState>;
 }) {
   const [state, formAction] = useActionState(action, null);
+  const t = useMessages().cuenta;
 
   return (
     <form action={formAction} className="grid gap-5">
       <Error mensaje={state?.error} />
 
       <div className="grid gap-2">
-        <Label htmlFor="name">Nombre completo</Label>
+        <Label htmlFor="name">{t.crear.nombre}</Label>
         <Input id="name" name="name" autoComplete="name" required className="h-11 rounded-xl" />
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="email">Correo</Label>
+        <Label htmlFor="email">{t.correo}</Label>
         <Input
           id="email"
           name="email"
@@ -110,27 +113,27 @@ export function CrearForm({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="phone">WhatsApp (opcional)</Label>
+        <Label htmlFor="phone">{t.crear.whatsappOpcional}</Label>
         <Input id="phone" name="phone" autoComplete="tel" className="h-11 rounded-xl" />
         <p className="text-[12px] text-muted-foreground">
-          Es por donde confirmamos los pedidos.
+          {t.crear.whatsappAyuda}
         </p>
       </div>
 
       <PasswordField
         id="password"
         name="password"
-        label="Contraseña"
+        label={t.contrasena}
         autoComplete="new-password"
-        hint={`Mínimo ${MIN_PASSWORD} caracteres.`}
+        hint={t.minimoCaracteres(MIN_PASSWORD)}
       />
 
-      <Enviar texto="Crear cuenta" enviando="Creando…" />
+      <Enviar texto={t.crear.boton} enviando={t.crear.enviando} />
 
       <p className="text-center text-[13px]">
-        ¿Ya tienes cuenta?{" "}
+        {t.crear.yaTienes}{" "}
         <Link href="/cuenta/entrar" className="font-semibold text-kora-black underline">
-          Entra aquí
+          {t.crear.entraAqui}
         </Link>
       </p>
     </form>

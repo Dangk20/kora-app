@@ -19,13 +19,11 @@
 
 import { useEffect, useState } from "react";
 import { ClipboardCheck, MessageCircle, ShieldCheck, Wallet } from "lucide-react";
+import { useMessages } from "@/modules/i18n/provider";
 
-const PASOS = [
-  { texto: "Guardando tu pedido", detalle: "Estamos registrando tus productos", Icono: ClipboardCheck },
-  { texto: "Confirmando disponibilidad", detalle: "Revisamos precios y existencias", Icono: ShieldCheck },
-  { texto: "Aplicando tus beneficios", detalle: "Descuentos y Kora Cashback", Icono: Wallet },
-  { texto: "Casi listo", detalle: "Te conectamos con un asesor por WhatsApp", Icono: MessageCircle },
-] as const;
+// Los textos de cada paso viven en el diccionario (`checkout.pasos`), en el
+// mismo orden; aquí solo el icono.
+const PASOS = [ClipboardCheck, ShieldCheck, Wallet, MessageCircle] as const;
 
 /**
  * Cada paso se enseña un momento antes de pasar al siguiente.
@@ -41,6 +39,7 @@ const CIRCUNFERENCIA = 2 * Math.PI * RADIO;
 
 export function PantallaProceso({ onListo }: { onListo?: () => void }) {
   const [paso, setPaso] = useState(0);
+  const tc = useMessages().checkout;
 
   // Subir arriba al entrar. El comprador pulsa el botón desde el FINAL de un
   // formulario largo, y la posición del scroll sobrevive al cambio de pantalla:
@@ -65,7 +64,8 @@ export function PantallaProceso({ onListo }: { onListo?: () => void }) {
     return () => clearTimeout(t);
   }, [paso, onListo]);
 
-  const { texto, detalle, Icono } = PASOS[paso];
+  const Icono = PASOS[paso];
+  const { texto, detalle } = tc.pasos[paso];
   // El último paso no llega al 100 %: el círculo se cierra cuando el servidor
   // responde de verdad, no cuando se acaba el guion.
   const avance = (paso + 1) / (PASOS.length + 0.35);
@@ -142,7 +142,7 @@ export function PantallaProceso({ onListo }: { onListo?: () => void }) {
         </div>
 
         <p className="mt-9 text-[12.5px] text-muted-foreground">
-          No cierres esta ventana. Tardamos unos segundos.
+          {tc.noCierres}
         </p>
       </div>
 

@@ -6,18 +6,24 @@
 // precio online, sin señales de descuento.
 import { Flame } from "lucide-react";
 import { formatMoney, type ResolvedPrice } from "@/modules/pricing";
+import type { Locale } from "@/modules/i18n";
+import { MESSAGES } from "@/modules/i18n/messages";
 
 export function PriceTag({
   price,
   size = "card",
+  locale = "es",
 }: {
   price: ResolvedPrice;
   size?: "card" | "detail";
+  /** Llega como dato: la etiqueta se pinta en servidor y en la ficha (cliente). */
+  locale?: Locale;
 }) {
+  const t = MESSAGES[locale].producto;
   if (!price.available) {
     return (
       <p className="text-[13px] font-semibold text-[#8a8f98]">
-        No disponible en {price.currency}
+        {t.noDisponibleEn(price.currency)}
       </p>
     );
   }
@@ -48,7 +54,7 @@ export function PriceTag({
       {/* El badge completo vive en la ficha; en las cards basta el tachado. */}
       {price.hasOnlineDiscount && isDetail && (
         <span className="bg-kora-gradient inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold text-white">
-          <Flame className="size-3.5" /> Precio especial online
+          <Flame className="size-3.5" /> {t.precioEspecialOnline}
         </span>
       )}
     </div>

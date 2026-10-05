@@ -4,6 +4,8 @@ import { useTransition } from "react";
 import { Globe } from "lucide-react";
 import { setCurrency } from "@/modules/pricing/currency-actions";
 import type { Currency } from "@/modules/pricing";
+import { useMessages } from "@/modules/i18n/provider";
+import { LanguageSwitch } from "./language-switch";
 
 /**
  * Selector de moneda del header (TIE_HU001 §2). El prototipo tiene aquí un
@@ -12,6 +14,7 @@ import type { Currency } from "@/modules/pricing";
  */
 export function CurrencySwitch({ current }: { current: Currency }) {
   const [pending, startTransition] = useTransition();
+  const t = useMessages();
 
   const choose = (currency: Currency) => {
     if (currency === current) return;
@@ -24,11 +27,12 @@ export function CurrencySwitch({ current }: { current: Currency }) {
     <div className="flex items-center gap-2.5">
       <Globe className="size-5 text-kora-orange" aria-hidden />
       <div>
-        <p className="text-[11px] leading-tight text-[#6b7078]">Ver precios en</p>
+        <p className="text-[11px] leading-tight text-[#6b7078]">{t.comun.verPreciosEn}</p>
+        <div className="mt-0.5 flex items-center gap-1.5">
         <div
-          className="mt-0.5 flex items-center gap-0.5 rounded-full bg-[#0E0F12] p-0.5"
+          className="flex items-center gap-0.5 rounded-full bg-[#0E0F12] p-0.5"
           role="group"
-          aria-label="Moneda"
+          aria-label={t.comun.moneda}
         >
           {(["COP", "USD"] as const).map((c) => (
             <button
@@ -46,6 +50,9 @@ export function CurrencySwitch({ current }: { current: Currency }) {
               {c}
             </button>
           ))}
+        </div>
+        {/* El idioma va junto a la moneda: los dos siguen al mismo origen. */}
+        <LanguageSwitch />
         </div>
       </div>
     </div>

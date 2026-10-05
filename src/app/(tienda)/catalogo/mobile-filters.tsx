@@ -15,13 +15,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownUp, Check, SlidersHorizontal, X } from "lucide-react";
+import { useMessages } from "@/modules/i18n/provider";
 
-const ORDENES = [
-  { value: "relevancia", label: "Relevancia" },
-  { value: "precioAsc", label: "Menor precio" },
-  { value: "precioDesc", label: "Mayor precio" },
-  { value: "nombre", label: "Nombre (A-Z)" },
-] as const;
+const ORDENES = ["relevancia", "precioAsc", "precioDesc", "nombre"] as const;
 
 export type CategoriaChip = {
   id: string;
@@ -43,6 +39,7 @@ function Sheet({
   title: string;
   children: React.ReactNode;
 }) {
+  const t = useMessages().catalogo;
   useEffect(() => {
     if (!open) return;
     const previo = document.body.style.overflow;
@@ -83,7 +80,7 @@ function Sheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t.cerrar}
             className="flex size-9 items-center justify-center rounded-full bg-[#f5f3f0] text-kora-black"
           >
             <X className="size-[18px]" />
@@ -109,6 +106,7 @@ export function MobileFilters({
   const router = useRouter();
   const params = useSearchParams();
   const [abierta, setAbierta] = useState<"filtros" | "orden" | null>(null);
+  const t = useMessages().catalogo;
 
   /** Conserva el resto de parámetros y reinicia cuántos se ven. */
   const url = (cambios: Record<string, string | null>) => {
@@ -128,7 +126,7 @@ export function MobileFilters({
     router.push(url(cambios));
   };
 
-  const ordenActual = ORDENES.find((o) => o.value === orden) ?? ORDENES[0];
+  const ordenActual = ORDENES.find((o) => o === orden) ?? ORDENES[0];
   const hayFiltro = Boolean(categoriaActiva);
 
   return (
@@ -147,7 +145,7 @@ export function MobileFilters({
                 : "border-[#e2ddd6] bg-white text-[#3c3c3c]"
             }`}
           >
-            Todas
+            {t.todas}
           </Link>
           {categorias.map((c) => {
             const activa =
@@ -177,7 +175,7 @@ export function MobileFilters({
           className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] border border-[#e2ddd6] bg-white text-[13.5px] font-semibold text-kora-black"
         >
           <SlidersHorizontal className="size-4" />
-          Filtros
+          {t.filtros}
           {hayFiltro && <span className="size-1.5 rounded-full bg-kora-coral" aria-hidden />}
         </button>
         <button
@@ -186,11 +184,11 @@ export function MobileFilters({
           className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] border border-[#e2ddd6] bg-white text-[13.5px] font-semibold text-kora-black"
         >
           <ArrowDownUp className="size-4" />
-          {ordenActual.label}
+          {t.orden[ordenActual]}
         </button>
       </div>
 
-      <Sheet open={abierta === "filtros"} onClose={() => setAbierta(null)} title="Filtros">
+      <Sheet open={abierta === "filtros"} onClose={() => setAbierta(null)} title={t.filtros}>
         <div className="px-3 pb-2">
           <button
             type="button"
@@ -199,7 +197,7 @@ export function MobileFilters({
               !categoriaActiva ? "bg-[#FFE9DD] font-semibold text-kora-coral" : "text-kora-black"
             }`}
           >
-            Todas las categorías
+            {t.todasLasCategorias}
             <span className="text-[12px] text-[#b3b8c0]">{total}</span>
           </button>
 
@@ -243,19 +241,19 @@ export function MobileFilters({
         </div>
       </Sheet>
 
-      <Sheet open={abierta === "orden"} onClose={() => setAbierta(null)} title="Ordenar por">
+      <Sheet open={abierta === "orden"} onClose={() => setAbierta(null)} title={t.ordenarPor}>
         <div className="px-3 pb-2">
           {ORDENES.map((o) => (
             <button
-              key={o.value}
+              key={o}
               type="button"
-              onClick={() => ir({ orden: o.value })}
+              onClick={() => ir({ orden: o })}
               className={`flex min-h-12 w-full items-center justify-between rounded-[12px] px-3 text-[14px] ${
-                o.value === orden ? "font-semibold text-kora-coral" : "text-kora-black"
+                o === orden ? "font-semibold text-kora-coral" : "text-kora-black"
               }`}
             >
-              {o.label}
-              {o.value === orden && <Check className="size-[18px]" />}
+              {t.orden[o]}
+              {o === orden && <Check className="size-[18px]" />}
             </button>
           ))}
         </div>

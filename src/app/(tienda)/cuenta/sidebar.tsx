@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { SECCIONES, seccionDe } from "./secciones";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function CuentaSidebar({
   nombre,
@@ -26,6 +27,7 @@ export function CuentaSidebar({
   const pathname = usePathname();
   const params = useSearchParams();
   const activa = seccionDe(params.get("seccion") ?? undefined);
+  const t = useMessages().cuenta;
 
   return (
     <aside className="lg:w-[264px] lg:shrink-0">
@@ -44,11 +46,12 @@ export function CuentaSidebar({
         </div>
 
         <nav
-          aria-label="Secciones de la cuenta"
+          aria-label={t.seccionesAria}
           // Fila desplazable en móvil, columna en escritorio.
           className="mt-5 -mx-1 flex gap-1 overflow-x-auto px-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0"
         >
           {SECCIONES.map(({ id, label, icon: Icono }) => {
+            // La etiqueta visible sale del diccionario; `label` es la española.
             const esActiva = id === activa;
             return (
               <Link
@@ -63,7 +66,7 @@ export function CuentaSidebar({
                 }`}
               >
                 <Icono className="size-[17px]" aria-hidden />
-                {label}
+                {t.secciones[id] ?? label}
               </Link>
             );
           })}

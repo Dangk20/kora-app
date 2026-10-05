@@ -2,6 +2,9 @@
 // conteo, orden a la derecha, sidebar de filtros 262px + grid de 4 columnas.
 // Los filtros de marca/precio/descuento del mock llegan en S6 junto con la
 // búsqueda avanzada; aquí van categoría y orden, que es lo que S5 pide.
+import type { Metadata } from "next";
+import { activeLocale } from "@/modules/i18n/server";
+import { MESSAGES } from "@/modules/i18n/messages";
 import Link from "next/link";
 import { ChevronRight, Flame, SlidersHorizontal } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
@@ -13,12 +16,12 @@ import { MobileFilters } from "./mobile-filters";
 import { CatalogGrid } from "./catalog-grid";
 import { POR_PAGINA, normalizarOrden } from "./paginacion";
 
-export const metadata = storeMetadata({
-  title: "Catálogo",
-  description:
-    "Explora todo el catálogo de KORA por categoría, marca y precio. Compra en línea y coordina tu pedido por WhatsApp.",
-  path: "/catalogo",
-});
+// Generada por petición: el título y la descripción siguen el idioma del visitante.
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await activeLocale();
+  const t = MESSAGES[locale].catalogo.meta;
+  return storeMetadata({ title: t.titulo, description: t.descripcion, path: "/catalogo", locale });
+}
 
 export default async function CatalogoPage({
   searchParams,
@@ -28,10 +31,12 @@ export default async function CatalogoPage({
   const { categoria, q, orden, ver } = await searchParams;
   const sort = normalizarOrden(orden);
   const currency = await activeCurrency();
+  const locale = await activeLocale();
+  const t = MESSAGES[locale].catalogo;
 
   const [categories, products] = await Promise.all([
-    listCategories(),
-    listProducts({ categorySlug: categoria, search: q, sort, currency }),
+    listCategories(locale),
+    listProducts({ categorySlug: categoria, search: q, sort, currency, locale }),
   ]);
 
   const active = categories.find(
@@ -50,14 +55,14 @@ export default async function CatalogoPage({
   const quedan = products.length - mostrados.length;
 
   const title = q
-    ? `Resultados para "${q}"`
-    : (activeChild?.name ?? active?.name ?? "Todos los productos");
+    ? t.resultadosPara(q)
+    : (activeChild?.name ?? active?.name ?? t.todosLosProductos);
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 pt-4 pb-12 sm:px-[22px] sm:pt-6 sm:pb-16">
       <nav className="mb-4 flex items-center gap-1.5 text-[12.5px] text-[#8a8f98]">
         <Link href="/" className="hover:text-kora-black">
-          Inicio
+          {t.inicio}
         </Link>
         <ChevronRight className="size-3.5" aria-hidden />
         {active ? (
@@ -77,7 +82,7 @@ export default async function CatalogoPage({
           </>
         ) : (
           <span className="font-semibold text-kora-black">
-            {q ? "Búsqueda" : "Catálogo"}
+            {q ? t.busqueda : t.catalogo}
           </span>
         )}
       </nav>
@@ -88,8 +93,7 @@ export default async function CatalogoPage({
             {title}
           </h1>
           <p className="mt-0.5 text-[13px] text-[#8a8f98]">
-            {products.length}{" "}
-            {products.length === 1 ? "producto" : "productos"}
+            {t.conteo(products.length)}
           </p>
         </div>
         {/* En móvil el orden vive en su hoja inferior, no en un <select> que
@@ -111,14 +115,14 @@ export default async function CatalogoPage({
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="size-[18px] text-kora-coral" />
-              <span className="text-base font-semibold text-kora-black">Categorías</span>
+              <span className="text-base font-semibold text-kora-black">{t.categorias}</span>
             </div>
             {(categoria || q) && (
               <Link
                 href="/catalogo"
                 className="text-xs font-semibold text-kora-coral hover:opacity-80"
               >
-                Limpiar
+                {t.limpiar}
               </Link>
             )}
           </div>
@@ -132,7 +136,7 @@ export default async function CatalogoPage({
                   : "text-[#3a3f48] hover:bg-[#faf8f5]"
               }`}
             >
-              Todas
+              {t.todas}
             </Link>
             {categories.map((c) => (
               <div key={c.id}>
@@ -180,23 +184,23 @@ export default async function CatalogoPage({
             filtros={{ categoria, q, orden }}
           >
             {mostrados.map((p) => (
-              <ProductCard key={p.id} product={p} currency={currency} />
+              <ProductCard key={p.id} product={p} currency={currency} locale={locale} />
             ))}
           </CatalogGrid>
         ) : (
           <div className="rounded-[18px] bg-white px-6 py-12 text-center sm:p-16">
             <Flame className="mx-auto size-14 text-[#e2ddd6]" />
             <p className="mt-4 text-lg font-semibold text-kora-black">
-              No encontramos productos con esos filtros
+              {t.vacio.titulo}
             </p>
             <p className="mt-1 text-[13.5px] text-[#8a8f98]">
-              Prueba quitando alguno.
+              {t.vacio.texto}
             </p>
             <Link
               href="/catalogo"
               className="bg-kora-gradient mt-5 inline-block rounded-full px-5 py-3 text-[13.5px] font-bold text-white hover:opacity-90"
             >
-              Ver todo el catálogo
+              {t.vacio.boton}
             </Link>
           </div>
         )}

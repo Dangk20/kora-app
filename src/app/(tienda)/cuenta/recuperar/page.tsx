@@ -5,19 +5,23 @@
 // un apaño: obligaba a que una persona del negocio cambiara la contraseña de
 // otra, que es exactamente lo que un sistema de cuentas debe evitar.
 import { RecuperarForm } from "./recuperar-form";
+import { getMessages } from "@/modules/i18n/server";
 
-export const metadata = {
-  title: "Recuperar tu contraseña · KORA",
-  // No se indexa: no aporta nada a la tienda y sí es un objetivo cómodo.
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  return {
+    title: (await getMessages()).cuenta.meta.recuperar,
+    // No se indexa: no aporta nada a la tienda y sí es un objetivo cómodo.
+    robots: { index: false, follow: false },
+  };
+}
 
-export default function RecuperarPage() {
+export default async function RecuperarPage() {
+  const t = (await getMessages()).cuenta.recuperar;
   return (
     <main className="mx-auto w-full max-w-[460px] px-5 py-14">
-      <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">Recuperar tu contraseña</h1>
+      <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">{t.titulo}</h1>
       <p className="mt-2 text-[15px] text-muted-foreground">
-        Te enviamos un código de 6 dígitos al correo de tu cuenta.
+        {t.bajada}
       </p>
 
       <div className="mt-7 rounded-[16px] border border-[#e2ddd6] bg-white p-5 sm:p-6">

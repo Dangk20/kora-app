@@ -16,6 +16,7 @@ import {
   legalDocument,
   type LegalBlock,
 } from "@/modules/legal/content";
+import { getMessages } from "@/modules/i18n/server";
 
 // Son tres slugs conocidos y su contenido no toca la base, así que la tentación
 // es prerrenderarlos. NO se puede: el texto interpola los datos del comerciante
@@ -44,10 +45,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** Fecha ISO → "7 de agosto de 2026". */
-function fechaLarga(iso: string): string {
+/** Fecha ISO → "7 de agosto de 2026" (o "August 7, 2026" en inglés). */
+function fechaLarga(iso: string, formato: string): string {
   const [year, month, day] = iso.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("es-CO", {
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(formato, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -85,6 +86,10 @@ export default async function LegalPage({ params }: Props) {
 
   const m = merchant();
   const doc = legalDocument(slug, m);
+  // Solo el MARCO se traduce: el documento sigue en español (fuera de la
+  // entrega en inglés) y en inglés se avisa con una nota.
+  const msgs = await getMessages();
+  const tl = msgs.cuenta.legal;
   const otros = allLegalDocuments(m).filter((d) => d.slug !== slug);
 
   return (
@@ -92,21 +97,28 @@ export default async function LegalPage({ params }: Props) {
       <div className="mx-auto max-w-[860px]">
         <nav className="mb-5 text-[13px] text-[#7c828c]">
           <Link href="/" className="hover:text-kora-black">
-            Inicio
+            {tl.inicio}
           </Link>
           <span className="mx-2">/</span>
           <span className="text-kora-black">{doc.title}</span>
         </nav>
 
-        <article className="rounded-[18px] bg-white p-6 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-9 lg:p-11">
+        {/* `lang="es"`: el documento sigue en español aunque la tienda esté en
+            inglés, y un lector de pantalla tiene que leerlo como español. */}
+        <article lang="es" className="rounded-[18px] bg-white p-6 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-9 lg:p-11">
           <header className="border-b border-[#f0ece6] pb-6">
             <h1 className="text-[26px] leading-tight font-bold text-kora-black sm:text-[32px]">
               {doc.title}
             </h1>
             <p className="mt-2.5 text-[15px] leading-relaxed text-[#5a6069]">{doc.summary}</p>
             <p className="mt-4 text-[13px] text-[#9aa0ab]">
-              Última actualización: {fechaLarga(doc.updatedAt)}
+              {tl.actualizado(fechaLarga(doc.updatedAt, msgs.comun.formatoFecha))}
             </p>
+            {tl.soloEspanol && (
+              <p className="mt-3 rounded-[13px] bg-[#f5f3f0] px-4 py-2.5 text-[13.5px] text-[#4a4f58]" lang="en">
+                {tl.soloEspanol}
+              </p>
+            )}
           </header>
 
           {/* En desarrollo los datos del comerciante son marcadores. En
@@ -114,8 +126,7 @@ export default async function LegalPage({ params }: Props) {
               arrancado (src/modules/legal/config.ts). */}
           {m.incompleto && (
             <p className="mt-6 rounded-[13px] border border-dashed border-[#d9534f] bg-[#fdf2f2] px-4 py-3 text-[14px] text-[#a33]">
-              <strong>Borrador:</strong> faltan los datos del comerciante (razón social, NIT,
-              domicilio y correo de contacto). Este documento no puede publicarse así.
+              <strong>{tl.borradorTitulo}</strong> {tl.borrador}
             </p>
           )}
 

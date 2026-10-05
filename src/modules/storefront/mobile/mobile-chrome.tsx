@@ -23,6 +23,7 @@ import type { Currency } from "@/modules/pricing";
 import { setCurrency } from "@/modules/pricing/currency-actions";
 import { NAV_ITEMS } from "./nav-items";
 import { useBuyBarVisible } from "./bars-context";
+import { useMessages } from "@/modules/i18n/provider";
 
 /** Alto de la barra inferior sin contar el área segura de iOS. */
 const NAV_H = 56;
@@ -92,6 +93,7 @@ export function MobileHeader({
     return () => obs.disconnect();
   }, []);
   const router = useRouter();
+  const t = useMessages();
   const [q, setQ] = useState("");
 
   const buscar = () => {
@@ -124,7 +126,7 @@ export function MobileHeader({
             <img src="/logo-kora.png" alt="KORA" className="h-[26px] w-auto" />
           </Link>
 
-          <div className="flex rounded-full bg-white/8 p-0.5" role="group" aria-label="Moneda">
+          <div className="flex rounded-full bg-white/8 p-0.5" role="group" aria-label={t.comun.moneda}>
             {(["COP", "USD"] as const).map((c) => (
               <button
                 key={c}
@@ -143,7 +145,7 @@ export function MobileHeader({
           <button
             type="button"
             onClick={openDrawer}
-            aria-label={`Abrir carrito${count > 0 ? `: ${count} artículos` : " (vacío)"}`}
+            aria-label={t.movil.abrirCarrito(count)}
             className="relative flex size-[38px] items-center justify-center rounded-full bg-white/8 text-white"
           >
             <ShoppingCart className="size-[19px]" />
@@ -157,11 +159,11 @@ export function MobileHeader({
           <button
             type="button"
             onClick={onOpenMenu}
-            aria-label="Abrir menú"
+            aria-label={t.movil.abrirMenu}
             className="flex min-h-[38px] items-center gap-1.5 text-[12.5px] font-bold text-white"
           >
             <Menu className="size-[19px]" />
-            Menú
+            {t.movil.menu}
           </button>
         </div>
       </div>
@@ -180,13 +182,13 @@ export function MobileHeader({
             name="q"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar productos, marcas…"
-            aria-label="Buscar en la tienda"
+            placeholder={t.movil.buscarPlaceholder}
+            aria-label={t.movil.buscarEnTienda}
             className="min-w-0 flex-1 bg-transparent text-[13.5px] text-kora-black outline-none placeholder:text-[#9aa0ab]"
           />
           <button
             type="submit"
-            aria-label="Buscar"
+            aria-label={t.movil.buscar}
             className="bg-kora-gradient flex size-9 shrink-0 items-center justify-center rounded-full text-white"
           >
             <Search className="size-[17px]" />
@@ -199,6 +201,7 @@ export function MobileHeader({
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const t = useMessages();
   const { count, ready } = useCart();
   // Cuando la ficha saca su barra de compra, esta se aparta: el diseño dice
   // que nunca se superponen, y dos barras fijas en 390 px se comen la pantalla.
@@ -208,7 +211,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      aria-label="Navegación principal"
+      aria-label={t.movil.navegacionPrincipal}
       className="fixed inset-x-0 bottom-0 z-40 flex border-t border-[#f0ece6] bg-white px-1.5 pt-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] lg:hidden"
       // El área segura de iOS se suma al relleno inferior: sin esto, en un
       // iPhone con barra de gestos los cuatro accesos quedan debajo de ella.
@@ -240,7 +243,7 @@ export function MobileBottomNav() {
                 activo ? "font-extrabold text-kora-coral" : "font-semibold text-[#8a8f98]"
               }`}
             >
-              {item.label}
+              {t.movil.nav[item.href] ?? item.label}
             </span>
 
             {item.href === "/carrito" && ready && count > 0 && (

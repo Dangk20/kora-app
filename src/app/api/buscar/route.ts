@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { activeCurrency } from "@/modules/pricing/currency";
 import { searchSuggestions } from "@/modules/storefront/search";
+import { activeLocale } from "@/modules/i18n/server";
 
 // La moneda activa vive en una cookie: sin esto, Next intentaría prerrenderizar
 // la ruta y todos verían el precio del primero que buscó.
@@ -17,6 +18,6 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams.get("q");
   const currency = await activeCurrency();
-  const data = await searchSuggestions(q, currency);
+  const data = await searchSuggestions(q, currency, await activeLocale());
   return NextResponse.json(data);
 }

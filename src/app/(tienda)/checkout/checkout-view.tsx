@@ -30,6 +30,7 @@ import { OrderBridge } from "./order-bridge";
 import { PantallaProceso } from "./pantalla-proceso";
 import { InvitacionCuenta } from "./invitacion-cuenta";
 import { guardarDireccionDelPedido } from "../cuenta/direcciones-actions";
+import { useMessages } from "@/modules/i18n/provider";
 
 // `min-h-12` = 48 px: el mínimo táctil del diseño (§05). Y `text-base` en
 // móvil no es estética — iOS hace zoom automático sobre cualquier campo con
@@ -64,6 +65,8 @@ export function CheckoutView({
   buyer?: BuyerDefaults;
 }) {
   const { lines, ready, clear } = useCart();
+  const t = useMessages();
+  const tc = t.checkout;
   const [cart, setCart] = useState<ResolvedCart | null>(null);
   const [loading, startLoading] = useTransition();
   const [submitting, startSubmit] = useTransition();
@@ -316,7 +319,8 @@ export function CheckoutView({
           cashbackPrevisto: result.cashbackPrevisto,
         });
       } else {
-        setError({ message: result.error, field: result.field });
+        // Traducido en el borde: las reglas del pedido no saben de idiomas.
+        setError({ message: tc.errorServidor(result.error), field: result.field });
       }
     });
   };
@@ -367,11 +371,10 @@ export function CheckoutView({
     <div className="mx-auto mb-6 flex max-w-[1040px] flex-col gap-3 rounded-2xl border border-[#ffd9c2] bg-[#FFF4EF] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="text-[14px] font-bold text-kora-black">
-          Tu pedido {pendiente.orderNumber} ya está creado
+          {tc.pedidoYaCreado(pendiente.orderNumber)}
         </p>
         <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#6b6f78]">
-          Todavía no lo enviaste por WhatsApp. Ábrelo para confirmarlo con un
-          asesor; no hace falta volver a llenar nada.
+          {tc.pedidoYaCreadoTexto}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
@@ -391,7 +394,7 @@ export function CheckoutView({
           }}
           className="bg-kora-gradient inline-flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-bold whitespace-nowrap text-white hover:opacity-90"
         >
-          <MessageCircle className="size-4" aria-hidden /> Abrir WhatsApp
+          <MessageCircle className="size-4" aria-hidden /> {tc.abrirWhatsapp}
         </a>
         <button
           type="button"
@@ -401,7 +404,7 @@ export function CheckoutView({
           }}
           className="text-[12.5px] font-semibold whitespace-nowrap text-[#8a8f98] hover:text-kora-black"
         >
-          Descartar
+          {tc.descartar}
         </button>
       </div>
     </div>
@@ -422,15 +425,15 @@ export function CheckoutView({
     return (
       <div className="mx-auto max-w-[1040px] px-4 pt-6 pb-20 text-center sm:px-[22px]">
         {rescate}
-        <h1 className="text-2xl font-bold text-kora-black">No hay nada que pedir</h1>
+        <h1 className="text-2xl font-bold text-kora-black">{tc.nadaQuePedir}</h1>
         <p className="mt-2 text-[13.5px] text-[#8a8f98]">
-          Tu carrito está vacío o los productos ya no están disponibles.
+          {tc.nadaQuePedirTexto}
         </p>
         <Link
           href="/catalogo"
           className="bg-kora-gradient mt-6 inline-block rounded-full px-6 py-3.5 text-[14px] font-bold text-white hover:opacity-90"
         >
-          Ver el catálogo
+          {tc.verCatalogo}
         </Link>
       </div>
     );
@@ -455,11 +458,11 @@ export function CheckoutView({
         href="/carrito"
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-[#8a8f98] hover:text-kora-black"
       >
-        <ArrowLeft className="size-4" /> Volver al carrito
+        <ArrowLeft className="size-4" /> {tc.volverCarrito}
       </Link>
-      <h1 className="mb-1 text-[23px] font-bold text-kora-black sm:text-[30px]">Finalizar pedido</h1>
+      <h1 className="mb-1 text-[23px] font-bold text-kora-black sm:text-[30px]">{tc.titulo}</h1>
       <p className="mb-6 text-[13.5px] text-[#8a8f98]">
-        Completa tus datos y te llevamos a WhatsApp para confirmar el pedido.
+        {tc.subtitulo}
       </p>
 
       {rescate}
@@ -469,10 +472,10 @@ export function CheckoutView({
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-kora-black">
-                {isCO ? "Datos de facturación" : "Billing details"}
+                {tc.facturacionTitulo}
               </h2>
               <label className="flex items-center gap-2 text-[12.5px] text-[#6b6f78]">
-                País
+                {tc.pais}
                 <select
                   value={country}
                   onChange={(e) => {
@@ -481,8 +484,8 @@ export function CheckoutView({
                   }}
                   className="min-h-11 rounded-[9px] border-[1.6px] border-[#e2ddd6] px-2.5 py-1.5 text-[12.5px] font-semibold text-kora-black outline-none focus:border-kora-coral"
                 >
-                  <option value="CO">Colombia</option>
-                  <option value="US">Estados Unidos</option>
+                  <option value="CO">{tc.paisCO}</option>
+                  <option value="US">{tc.paisUS}</option>
                 </select>
               </label>
             </div>
@@ -490,17 +493,17 @@ export function CheckoutView({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="billing.name">
-                  {isCO ? "Nombre completo" : "Full name"}
+                  {tc.nombreCompleto}
                 </label>
                 <input id="billing.name" name="billing.name" required className={inputCls}
                   value={fact.name} onChange={(e) => setF({ name: e.target.value })}
-                  placeholder={isCO ? "Ej. Laura Gómez" : "Ex. John Smith"} />
+                  placeholder={tc.nombreEjemplo[country]} />
                 {fieldError("billing.name")}
               </div>
 
               <div>
                 <label className={labelCls} htmlFor="billing.phone">
-                  {isCO ? "Celular (WhatsApp)" : "Phone"}
+                  {tc.celular[country]}
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="rounded-[11px] bg-[#f5f3f0] px-3 py-3 text-sm font-semibold text-[#6b6f78]">
@@ -516,17 +519,17 @@ export function CheckoutView({
 
               <div>
                 <label className={labelCls} htmlFor="billing.email">
-                  {isCO ? "Correo electrónico" : "Email"}
+                  {tc.correo}
                 </label>
                 <input id="billing.email" name="billing.email" type="email" required className={inputCls}
                   value={fact.email} onChange={(e) => setF({ email: e.target.value })}
                   readOnly={Boolean(buyer)}
-                  placeholder="correo@ejemplo.com" />
+                  placeholder={tc.correoEjemplo} />
                 {/* Con sesión el correo es la credencial de acceso: se cambia
                     desde la cuenta, no aquí. */}
                 {buyer && (
                   <p className="mt-1 text-[11.5px] text-[#9aa0ab]">
-                    Es el correo de tu cuenta. Para cambiarlo, entra a Mi cuenta.
+                    {tc.correoDeCuenta}
                   </p>
                 )}
                 {fieldError("billing.email")}
@@ -535,21 +538,21 @@ export function CheckoutView({
               {isCO && (
                 <div className="sm:col-span-2">
                   <label className={labelCls} htmlFor="billing.document">
-                    Documento de identidad
+                    {tc.documento}
                     <span className="ml-1 font-normal text-[#9aa0ab]">
-                      (lo exigen las transportadoras)
+                      {tc.documentoAyuda}
                     </span>
                   </label>
                   <div className="flex gap-2">
                     <select
                       name="billing.documentType"
-                      aria-label="Tipo de documento"
+                      aria-label={tc.tipoDocumento}
                       value={fact.documentType}
                       onChange={(e) => setF({ documentType: e.target.value })}
                       className="w-24 shrink-0 rounded-[11px] border-[1.6px] border-[#e2ddd6] bg-white px-3 py-3 text-sm outline-none focus:border-kora-coral"
                     >
-                      {DOCUMENT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
+                      {DOCUMENT_TYPES.map((d) => (
+                        <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
                     <input id="billing.document" name="billing.document" required inputMode="numeric"
@@ -576,18 +579,18 @@ export function CheckoutView({
 
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="billing.address">
-                  {isCO ? "Dirección" : "Billing address"}
+                  {tc.direccion[country]}
                 </label>
                 <input id="billing.address" name="billing.address" required className={inputCls}
                   value={fact.address} onChange={(e) => setF({ address: e.target.value })}
-                  placeholder={isCO ? "Ej.: Carrera 7 # 82 - 15" : "Ex. 123 Main St"} />
+                  placeholder={tc.direccionEjemplo[country]} />
                 {fieldError("billing.address")}
               </div>
 
               <div>
                 <label className={labelCls} htmlFor="billing.address2">
-                  {isCO ? "Apto / Torre / Conjunto" : "Apt / Suite"}
-                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                  {tc.apto[country]}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">{tc.opcional}</span>
                 </label>
                 <input id="billing.address2" name="billing.address2" className={inputCls}
                   value={fact.address2} onChange={(e) => setF({ address2: e.target.value })} />
@@ -595,15 +598,15 @@ export function CheckoutView({
 
               {isCO ? (
                 <div>
-                  <label className={labelCls} htmlFor="billing.neighborhood">Barrio</label>
+                  <label className={labelCls} htmlFor="billing.neighborhood">{tc.barrio}</label>
                   <input id="billing.neighborhood" name="billing.neighborhood" required className={inputCls}
                     value={fact.neighborhood} onChange={(e) => setF({ neighborhood: e.target.value })}
-                    placeholder="Ej. Chapinero" />
+                    placeholder={tc.barrioEjemplo} />
                   {fieldError("billing.neighborhood")}
                 </div>
               ) : (
                 <div>
-                  <label className={labelCls} htmlFor="billing.zip">ZIP code</label>
+                  <label className={labelCls} htmlFor="billing.zip">{tc.zip}</label>
                   <input id="billing.zip" name="billing.zip" required className={inputCls}
                     value={fact.zip} onChange={(e) => setF({ zip: e.target.value })}
                     placeholder="33101" />
@@ -615,12 +618,10 @@ export function CheckoutView({
 
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-1 text-lg font-bold text-kora-black">
-              {isCO ? "Datos de envío" : "Shipping details"}
+              {tc.envioTitulo}
             </h2>
             <p className="mb-5 text-[12.5px] text-[#8a8f98]">
-              {isCO
-                ? "Hacemos envíos dentro de Colombia."
-                : "We only ship within Colombia — e.g. to a relative or friend."}
+              {tc.envioNota[country]}
             </p>
 
             {/* Solo con pagador en Colombia. Marcada, PRECARGA los campos de
@@ -637,13 +638,13 @@ export function CheckoutView({
                   }}
                   className="size-[18px] accent-kora-coral"
                 />
-                Usar los mismos datos de facturación
+                {tc.mismosDatos}
               </label>
             )}
 
             {direcciones.length > 0 && (
               <div className="mb-5 space-y-2">
-                <p className="text-[12.5px] font-semibold text-[#6b6f78]">Mis direcciones guardadas</p>
+                <p className="text-[12.5px] font-semibold text-[#6b6f78]">{tc.direccionesGuardadas}</p>
                 {direcciones.map((d) => (
                   <label
                     key={d.id}
@@ -671,20 +672,20 @@ export function CheckoutView({
                     </span>
                     {d.isDefault && (
                       <span className="shrink-0 rounded-full bg-[#FFF4EF] px-2 py-0.5 text-[10.5px] font-bold text-kora-coral">
-                        Predeterminada
+                        {tc.predeterminada}
                       </span>
                     )}
                     {incompleta(d) && (
                       <span className="shrink-0 rounded-full bg-[#FFF4EF] px-2 py-0.5 text-[10.5px] font-bold text-kora-coral">
-                        Falta información
+                        {tc.faltaInformacion}
                       </span>
                     )}
                   </label>
                 ))}
                 <p className="text-[12px] text-[#8a8f98]">
-                  Al elegir una se copian sus datos abajo y puedes ajustarlos. Administra tu libreta en{" "}
+                  {tc.libretaAyuda}{" "}
                   <Link href="/cuenta?seccion=direcciones" className="font-semibold text-kora-coral underline underline-offset-2">
-                    Mis direcciones
+                    {tc.misDirecciones}
                   </Link>
                   .
                 </p>
@@ -693,15 +694,15 @@ export function CheckoutView({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="shipping.name">Nombre de quien recibe</label>
+                <label className={labelCls} htmlFor="shipping.name">{tc.nombreRecibe}</label>
                 <input id="shipping.name" name="shipping.name" required className={inputCls}
                   value={envio.name} onChange={(e) => setE({ name: e.target.value })}
-                  placeholder="Ej. Rosa Gómez" />
+                  placeholder={tc.nombreRecibeEjemplo} />
                 {fieldError("shipping.name")}
               </div>
 
               <div>
-                <label className={labelCls} htmlFor="shipping.phone">Celular de quien recibe</label>
+                <label className={labelCls} htmlFor="shipping.phone">{tc.celularRecibe}</label>
                 <div className="flex items-center gap-2">
                   <span className="rounded-[11px] bg-[#f5f3f0] px-3 py-3 text-sm font-semibold text-[#6b6f78]">+57</span>
                   <input id="shipping.phone" name="shipping.phone" required inputMode="tel" className={inputCls}
@@ -713,8 +714,8 @@ export function CheckoutView({
 
               <div>
                 <label className={labelCls} htmlFor="shipping.document">
-                  Documento de quien recibe
-                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                  {tc.documentoRecibe}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">{tc.opcional}</span>
                 </label>
                 <input id="shipping.document" name="shipping.document" inputMode="numeric" className={inputCls}
                   value={envio.document} onChange={(e) => setE({ document: e.target.value })}
@@ -738,18 +739,18 @@ export function CheckoutView({
 
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="shipping.address">
-                  {isCO ? "Dirección" : "Street address (Colombia)"}
+                  {tc.direccionEnvio[country]}
                 </label>
                 <input id="shipping.address" name="shipping.address" required className={inputCls}
                   value={envio.address} onChange={(e) => setE({ address: e.target.value })}
-                  placeholder="Ej.: Carrera 7 # 82 - 15" />
+                  placeholder={tc.direccionEjemplo.CO} />
                 {fieldError("shipping.address")}
               </div>
 
               <div>
                 <label className={labelCls} htmlFor="shipping.address2">
-                  {isCO ? "Apto / Torre / Conjunto" : "Apt / Tower"}
-                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                  {tc.aptoEnvio[country]}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">{tc.opcional}</span>
                 </label>
                 <input id="shipping.address2" name="shipping.address2" className={inputCls}
                   value={envio.address2} onChange={(e) => setE({ address2: e.target.value })} />
@@ -757,23 +758,23 @@ export function CheckoutView({
 
               <div>
                 <label className={labelCls} htmlFor="shipping.neighborhood">
-                  {isCO ? "Barrio" : "Neighborhood (barrio)"}
+                  {tc.barrioEnvio[country]}
                 </label>
                 <input id="shipping.neighborhood" name="shipping.neighborhood" required className={inputCls}
                   value={envio.neighborhood} onChange={(e) => setE({ neighborhood: e.target.value })}
-                  placeholder="Ej. Chapinero" />
+                  placeholder={tc.barrioEjemplo} />
                 {fieldError("shipping.neighborhood")}
               </div>
 
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="shipping.notes">
-                  {isCO ? "Notas de entrega" : "Delivery notes"}
-                  <span className="ml-1 font-normal text-[#9aa0ab]">(opcional)</span>
+                  {tc.notasEntrega}
+                  <span className="ml-1 font-normal text-[#9aa0ab]">{tc.opcional}</span>
                 </label>
                 <textarea id="shipping.notes" name="shipping.notes" rows={2} className={`${inputCls} resize-y`}
                   value={envio.notes}
                   onChange={(e) => (mismosDatos ? setEnvioPropio((x) => ({ ...x, notes: e.target.value })) : setE({ notes: e.target.value }))}
-                  placeholder={isCO ? "Ej. Dejar en portería" : "Ex. Leave at the front desk"} />
+                  placeholder={tc.notasEjemplo} />
               </div>
 
               {/* Solo con sesión y con una dirección escrita a mano: sin cuenta
@@ -786,7 +787,7 @@ export function CheckoutView({
                     onChange={(e) => setGuardarNueva(e.target.checked)}
                     className="size-4 accent-kora-coral"
                   />
-                  Guardar esta dirección en mi cuenta
+                  {tc.guardarDireccion}
                 </label>
               )}
             </div>
@@ -794,11 +795,10 @@ export function CheckoutView({
 
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-2 text-lg font-bold text-kora-black">
-              {isCO ? "¿Cómo prefieres pagar?" : "Preferred payment"}
+              {tc.pagoTitulo}
             </h2>
             <p className="mb-4 text-[12.5px] text-[#8a8f98]">
-              El pago se coordina contigo por WhatsApp; aquí solo nos dices tu
-              preferencia.
+              {tc.pagoNota}
             </p>
             <div className="grid gap-2.5 sm:grid-cols-2">
               {PAYMENT_METHODS[country].map((method, i) => (
@@ -808,7 +808,8 @@ export function CheckoutView({
                 >
                   <input type="radio" name="paymentPreference" value={method}
                     defaultChecked={i === 0} required className="accent-kora-coral" />
-                  {method}
+                  {/* El valor viaja en español (lo lee el equipo); solo cambia lo que se ve. */}
+                  {tc.metodoPago(method)}
                 </label>
               ))}
             </div>
@@ -825,8 +826,7 @@ export function CheckoutView({
                   checked={aceptaDatos} onChange={(e) => setAceptaDatos(e.target.checked)}
                   className="mt-0.5 size-[18px] shrink-0 accent-kora-coral" />
                 <span>
-                  Autorizo el tratamiento de mis datos personales para gestionar
-                  este pedido, conforme a la{" "}
+                  {tc.autorizoDatos}{" "}
                   {/* En pestaña nueva a propósito: navegar dentro de la misma
                       perdería el formulario a medio llenar y el comprador
                       tendría que empezar de cero por leer lo que autoriza. */}
@@ -836,7 +836,7 @@ export function CheckoutView({
                     rel="noopener noreferrer"
                     className="text-kora-coral underline underline-offset-2 hover:opacity-80"
                   >
-                    política de tratamiento de datos
+                    {tc.politicaDatos}
                   </a>
                   .
                 </span>
@@ -845,30 +845,30 @@ export function CheckoutView({
                 <input type="checkbox" name="acceptsMarketing"
                   className="mt-0.5 size-[18px] shrink-0 accent-kora-coral" />
                 <span>
-                  Quiero recibir novedades y promociones de KORA.
-                  <span className="text-[#9aa0ab]"> (opcional)</span>
+                  {tc.quieroNovedades}
+                  <span className="text-[#9aa0ab]"> {tc.opcional}</span>
                 </span>
               </label>
               {fieldError("acceptsData")}
 
               <p className="pt-1 text-[12px] leading-relaxed text-[#9aa0ab]">
-                Al crear el pedido aceptas nuestros{" "}
+                {tc.aceptasTerminos}{" "}
                 <a
                   href="/legal/terminos"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-[#4a4f58]"
                 >
-                  términos y condiciones
+                  {tc.terminos}
                 </a>{" "}
-                y la{" "}
+                {tc.yLa}{" "}
                 <a
                   href="/legal/cambios"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-[#4a4f58]"
                 >
-                  política de cambios y garantía
+                  {tc.politicaCambios}
                 </a>
                 .
               </p>
@@ -885,7 +885,7 @@ export function CheckoutView({
           className="group rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px] lg:[&>*:not(summary)]:!block"
         >
           <summary className="mb-4 flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black lg:pointer-events-none [&::-webkit-details-marker]:hidden">
-            Tu pedido
+            {tc.tuPedido}
             <span className="flex items-center gap-2 lg:hidden">
               <span className="text-[15px] font-extrabold">{formatMoney(total, currency)}</span>
               <ChevronDown
@@ -947,7 +947,7 @@ export function CheckoutView({
               </div>
               <button
                 type="button"
-                aria-label="Quitar cupón"
+                aria-label={tc.quitarCupon}
                 onClick={() => {
                   setCoupon(null);
                   setCouponError(null);
@@ -960,13 +960,13 @@ export function CheckoutView({
           ) : (
             <div className="mb-3">
               <label className="mb-1.5 block text-[12.5px] font-semibold text-[#6b6f78]">
-                ¿Tienes un cupón?
+                {tc.tienesCupon}
               </label>
               <div className="flex gap-2">
                 <input
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                  placeholder="CÓDIGO"
+                  placeholder={tc.codigo}
                   className="min-w-0 flex-1 rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3 py-2.5 font-mono text-[13px] outline-none focus:border-kora-coral"
                 />
                 <button
@@ -980,13 +980,13 @@ export function CheckoutView({
                       setCoupon({ code: r.code, discount: r.discount });
                       setCouponInput("");
                     } else {
-                      setCouponError(r.error);
+                      setCouponError(tc.errorServidor(r.error));
                     }
                     setCouponPending(false);
                   }}
                   className="shrink-0 rounded-[10px] border-[1.6px] border-[#e2ddd6] px-4 text-[13px] font-semibold text-kora-black disabled:opacity-50"
                 >
-                  {couponPending ? "…" : "Aplicar"}
+                  {couponPending ? "…" : tc.aplicar}
                 </button>
               </div>
               {couponError && (
@@ -1020,15 +1020,15 @@ export function CheckoutView({
                     justo lo que le pasa al saldo que el comprador ya se ganó. */}
                 <Flame className="size-4 shrink-0 text-kora-orange" aria-hidden />
                 <span className="text-[12.5px] text-kora-black">
-                  Usar mi Kora Cashback
+                  {tc.usarCashback}
                   <span className="ml-1.5 font-bold">
-                    ({formatMoney(buyer.cashback, currency)} disponible)
+                    {tc.disponible(formatMoney(buyer.cashback, currency))}
                   </span>
                 </span>
               </label>
               {coupon && (
                 <p className="mt-1.5 text-[12px] text-[#8a8f98]">
-                  No puedes usar un cupón y tu Kora Cashback en la misma compra.
+                  {tc.noCuponYCashback}
                 </p>
               )}
             </div>
@@ -1042,28 +1042,28 @@ export function CheckoutView({
             <div className="mb-3 flex items-start gap-2.5 rounded-[10px] border-[1.6px] border-[#ffd9c7] bg-[#FFF4EF] px-3 py-2.5">
               <Flame className="mt-px size-4 shrink-0 text-kora-orange" aria-hidden />
               <p className="text-[12.5px] leading-relaxed text-kora-black">
-                ¿Tienes Kora Cashback?{" "}
+                {tc.tienesCashback}{" "}
                 <Link
                   href="/cuenta/entrar?volver=/checkout"
                   className="font-bold text-kora-orange underline underline-offset-2"
                 >
-                  Inicia sesión
+                  {tc.iniciaSesion}
                 </Link>{" "}
-                para descontarlo de esta compra.
+                {tc.paraDescontar}
               </p>
             </div>
           )}
 
           {(coupon || cashbackAplicable > 0) && (
             <div className="mb-2 flex items-baseline justify-between text-[13px]">
-              <span className="text-[#6b6f78]">Subtotal</span>
+              <span className="text-[#6b6f78]">{tc.subtotal}</span>
               <span className="text-kora-black">{formatMoney(subtotal, currency)}</span>
             </div>
           )}
 
           {cashbackAplicable > 0 && (
             <div className="mb-2 flex items-baseline justify-between text-[13px]">
-              <span className="text-[#6b6f78]">Kora Cashback</span>
+              <span className="text-[#6b6f78]">{tc.koraCashback}</span>
               <span className="text-kora-black">
                 −{formatMoney(cashbackAplicable, currency)}
               </span>
@@ -1071,13 +1071,13 @@ export function CheckoutView({
           )}
 
           <div className="flex items-baseline justify-between">
-            <span className="text-sm font-bold text-kora-black">Total</span>
+            <span className="text-sm font-bold text-kora-black">{tc.total}</span>
             <span className="text-[22px] font-extrabold text-kora-black">
               {formatMoney(total, currency)} {currency}
             </span>
           </div>
           <p className="mt-1.5 text-[11.5px] text-[#8a8f98]">
-            El envío se acuerda por WhatsApp.
+            {tc.envioPorWhatsapp}
           </p>
 
           <button
@@ -1087,7 +1087,7 @@ export function CheckoutView({
             className="bg-kora-gradient mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:grayscale-[35%]"
           >
             {submitting && <Loader2 className="size-4 animate-spin" />}
-            {submitting ? "Creando pedido…" : "Confirmar y enviar por WhatsApp"}
+            {submitting ? tc.creandoPedido : tc.confirmarYEnviar}
           </button>
 
           {/* Un botón apagado sin explicación es un botón "que no funciona".
@@ -1102,7 +1102,7 @@ export function CheckoutView({
               }}
               className="mt-2.5 w-full text-center text-[12.5px] font-semibold text-kora-coral underline-offset-2 hover:underline"
             >
-              Para continuar, acepta el tratamiento de tus datos
+              {tc.aceptaDatosParaSeguir}
             </button>
           )}
 
@@ -1113,13 +1113,13 @@ export function CheckoutView({
           )}
           {error?.field && (
             <p className="mt-3 text-center text-[12.5px] font-semibold text-destructive">
-              Revisa los datos marcados arriba.
+              {tc.revisaDatos}
             </p>
           )}
 
           <p className="mt-4 flex items-start gap-2 border-t border-[#efe9e1] pt-4 text-[11.5px] text-[#8a8f98]">
             <ShieldCheck className="size-4 shrink-0 text-kora-coral" />
-            Tu pedido queda registrado en KORA antes de abrir WhatsApp.
+            {tc.quedaRegistrado}
           </p>
         </details>
       </form>

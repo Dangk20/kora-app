@@ -3,8 +3,10 @@
 // Reserva el mismo espacio que el listado real —cabecera, filtros y rejilla—
 // para que al llegar los productos nada salte de sitio.
 import { Hueso, RejillaEsqueleto } from "@/modules/storefront/skeleton";
+import { getMessages } from "@/modules/i18n/server";
 
-export default function CargandoCatalogo() {
+export default async function CargandoCatalogo() {
+  const t = await getMessages();
   return (
     <div className="mx-auto max-w-[1320px] px-4 pt-4 pb-12 sm:px-[22px] sm:pt-6 sm:pb-16">
       <Hueso className="mb-4 h-3 w-40" />
@@ -20,7 +22,7 @@ export default function CargandoCatalogo() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[262px_1fr]">
         <Hueso className="hidden h-[320px] rounded-[18px] lg:block" />
-        <RejillaEsqueleto />
+        <RejillaEsqueleto etiqueta={t.catalogo.cargandoProductos} />
       </div>
     </div>
   );

@@ -9,6 +9,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cargarMasProductos } from "./load-more-action";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function CatalogGrid({
   children,
@@ -26,6 +27,7 @@ export function CatalogGrid({
   const [quedan, setQuedan] = useState(quedanIniciales);
   const [error, setError] = useState(false);
   const [cargando, startTransition] = useTransition();
+  const t = useMessages().catalogo;
 
   const url = (ver: number) => {
     const next = new URLSearchParams();
@@ -77,15 +79,15 @@ export function CatalogGrid({
             {cargando ? (
               <>
                 <Loader2 className="size-4 animate-spin" aria-hidden />
-                Cargando…
+                {t.cargando}
               </>
             ) : (
-              `Cargar más (${quedan})`
+              t.cargarMas(quedan)
             )}
           </a>
           {error && (
             <p className="mt-3 text-[13px] text-destructive">
-              No se pudieron cargar más productos. Intenta de nuevo.
+              {t.errorCargarMas}
             </p>
           )}
         </div>

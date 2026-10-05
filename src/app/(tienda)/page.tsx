@@ -1,5 +1,8 @@
 // Página de inicio de la tienda. Toda su estructura y contenido salen del
 // módulo Vitrina: esta página solo pide los datos y los pinta.
+import type { Metadata } from "next";
+import { activeLocale } from "@/modules/i18n/server";
+import { MESSAGES } from "@/modules/i18n/messages";
 import { Flame } from "lucide-react";
 import { activeCurrency } from "@/modules/pricing/currency";
 import {
@@ -11,21 +14,23 @@ import { StoreHomeLayout } from "@/modules/storefront/home-layout";
 import { CONTAINER } from "@/modules/storefront/home-sections";
 import { storeMetadata } from "@/modules/storefront/metadata";
 
-export const metadata = storeMetadata({
-  title: "Todo lo que quieres, en un solo lugar",
-  description:
-    "Tienda online KORA. Compra en línea y coordina tu pedido por WhatsApp, con el mismo inventario de nuestra tienda física.",
-  path: "/",
-});
+// Generada por petición: el título y la descripción siguen el idioma del visitante.
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await activeLocale();
+  const t = MESSAGES[locale].tienda.meta;
+  return storeMetadata({ title: t.titulo, description: t.descripcion, path: "/", locale });
+}
 
 export default async function StoreHome() {
   const currency = await activeCurrency();
+  const locale = await activeLocale();
   const [sections, banners, categories] = await Promise.all([
-    getShowcase(currency),
+    getShowcase(currency, locale),
     getBanners(),
-    getShowcaseCategories(),
+    getShowcaseCategories(8, locale),
   ]);
 
+  const t = MESSAGES[locale].tienda;
   const hasContent = sections.some((s) => s.active && s.products.length > 0);
   if (!hasContent) {
     return (
@@ -33,10 +38,10 @@ export default async function StoreHome() {
         <div className="rounded-[20px] bg-white p-16 text-center">
           <Flame className="mx-auto size-14 text-[#e2ddd6]" />
           <p className="mt-4 text-lg font-semibold text-kora-black">
-            Estamos cargando el catálogo
+            {t.cargandoCatalogo}
           </p>
           <p className="mt-1 text-[13.5px] text-[#8a8f98]">
-            Muy pronto vas a encontrar aquí todos nuestros productos.
+            {t.muyPronto}
           </p>
         </div>
       </section>
@@ -49,6 +54,7 @@ export default async function StoreHome() {
       sections={sections}
       banners={banners}
       categories={categories}
+      locale={locale}
     />
   );
 }

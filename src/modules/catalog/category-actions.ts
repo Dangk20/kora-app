@@ -131,8 +131,16 @@ export async function updateCategory(
     });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const { id, ...data } = parsed.data;
+  // Nombre para la tienda en inglés. Solo se toca si el formulario lo trae;
+  // vacío lo BORRA (= la tienda en inglés vuelve a mostrar el español).
+  const nameEn = formData.has("nameEn")
+    ? String(formData.get("nameEn") ?? "").trim() || null
+    : undefined;
 
-  await db.category.update({ where: { id }, data });
+  await db.category.update({
+    where: { id },
+    data: { ...data, ...(nameEn !== undefined ? { nameEn } : {}) },
+  });
   revalidatePath(CATEGORIES_PATH);
   return { ok: true };
 }

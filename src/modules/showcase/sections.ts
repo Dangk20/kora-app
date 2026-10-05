@@ -18,6 +18,8 @@ export type SectionDef = {
   key: SectionKey;
   /** Nombre por defecto; el operador puede cambiarlo. */
   title: string;
+  /** Título en inglés por omisión (tienda en inglés) si el operador no puso otro. */
+  titleEn: string;
   subtitle?: string;
   /**
    * Cuántos productos se ven A LA VEZ en esa sección. Si hay más, la tienda
@@ -35,30 +37,35 @@ export const SECTIONS: SectionDef[] = [
   {
     key: "top_categorias",
     title: "Top Categorías",
+    titleEn: "Top categories",
     limit: 8,
     hint: "Los accesos redondos del hero. Se arman con tus categorías, no con productos.",
   },
   {
     key: "mejor_semana",
     title: "La mejor elección de la semana",
+    titleEn: "Best picks of the week",
     limit: 4,
     hint: "Fila compacta debajo del hero. Se ven 4 a la vez; si agregas más, rotan solas.",
   },
   {
     key: "ofertas",
     title: "Ofertas que están encendidas",
+    titleEn: "Hot deals",
     limit: 4,
     hint: "Panel oscuro destacado. Se ven 4 a la vez; si agregas más, rotan solas.",
   },
   {
     key: "destacados",
     title: "Productos destacados",
+    titleEn: "Featured products",
     limit: 6,
     hint: "La parrilla grande del centro. Se ven 6 a la vez; si agregas más, rotan solas.",
   },
   {
     key: "mejor_valorados",
     title: "Mejor valorados",
+    titleEn: "Top rated",
     limit: 4,
     hint: "Columna angosta a la izquierda de los destacados.",
   },

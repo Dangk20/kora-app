@@ -2,6 +2,8 @@
 // descripción y especificaciones abajo, relacionados al final.
 // El botón de compra queda anunciado (carrito = S7, pedido por WhatsApp = S8):
 // hasta entonces la ficha ofrece contacto directo, no un carrito falso.
+import { activeLocale } from "@/modules/i18n/server";
+import { MESSAGES, type Messages } from "@/modules/i18n/messages";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -25,28 +27,32 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const locale = await activeLocale();
+  const product = await getProductBySlug(slug, locale);
   if (!product) return {};
 
-  return productMetadata(product);
+  return productMetadata(product, locale);
 }
 
 /** Filas de la tabla de especificaciones, omitiendo las que no aplican. */
-function specs(product: StoreProduct): { key: string; value: string }[] {
+function specs(
+  product: StoreProduct,
+  t: Messages["producto"]["specs"],
+): { key: string; value: string }[] {
   const rows: { key: string; value: string }[] = [];
-  if (product.brand) rows.push({ key: "Marca", value: product.brand });
+  if (product.brand) rows.push({ key: t.marca, value: product.brand });
   rows.push({
-    key: "Categoría",
+    key: t.categoria,
     value: product.parentCategory
       ? `${product.parentCategory.name} · ${product.category.name}`
       : product.category.name,
   });
   rows.push(
     product.variants.length > 1
-      ? { key: "Variantes", value: String(product.variants.length) }
-      : { key: "SKU", value: product.variants[0]?.sku ?? "—" },
+      ? { key: t.variantes, value: String(product.variants.length) }
+      : { key: t.sku, value: product.variants[0]?.sku ?? "—" },
   );
-  rows.push({ key: "Vendedor", value: "KORA" });
+  rows.push({ key: t.vendedor, value: "KORA" });
   return rows;
 }
 
@@ -56,18 +62,20 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const locale = await activeLocale();
+  const t = MESSAGES[locale].producto;
+  const product = await getProductBySlug(slug, locale);
   if (!product) notFound();
 
   const currency = await activeCurrency();
-  const related = await getRelatedProducts(product);
+  const related = await getRelatedProducts(product, 4, locale);
   const categoryLink = product.parentCategory ?? product.category;
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 pt-4 pb-12 sm:px-[22px] sm:pt-6 sm:pb-16">
       <nav className="mb-5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-[#8a8f98]">
         <Link href="/" className="hover:text-kora-black">
-          Inicio
+          {t.inicio}
         </Link>
         <ChevronRight className="size-3.5" aria-hidden />
         <Link
@@ -108,10 +116,10 @@ export default async function ProductPage({
           relleno se ve peor que no tenerlo (pedido de Daniel). */}
       {(() => {
         const descripcion = product.description?.trim();
-        const filas = specs(product);
+        const filas = specs(product, t.specs);
         const bloques = [
           descripcion && {
-            titulo: "Descripción",
+            titulo: t.descripcion,
             contenido: (
               <p className="text-[14.5px] leading-[1.7] whitespace-pre-line text-[#4a4f58]">
                 {descripcion}
@@ -119,7 +127,7 @@ export default async function ProductPage({
             ),
           },
           filas.length > 0 && {
-            titulo: "Especificaciones",
+            titulo: t.especificaciones,
             contenido: (
               <dl className="text-[13.5px]">
                 {filas.map(({ key, value }) => (
@@ -168,11 +176,11 @@ export default async function ProductPage({
       {related.length > 0 && (
         <section className="mt-8 sm:mt-10">
           <h2 className="mb-4 text-xl font-bold text-kora-black sm:text-2xl">
-            Productos relacionados
+            {t.relacionados}
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} currency={currency} />
+              <ProductCard key={p.id} product={p} currency={currency} locale={locale} />
             ))}
           </div>
         </section>

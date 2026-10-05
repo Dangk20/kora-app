@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { ciudadesDe, listaCerrada } from "@/modules/geo/places";
 import { DEPARTAMENTOS_CO, US_STATES } from "@/modules/orders/geo";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function SelectorDivisionCiudad({
   country,
@@ -43,6 +44,7 @@ export function SelectorDivisionCiudad({
   prefijo?: string;
 }) {
   const isCO = country === "CO";
+  const tc = useMessages().checkout;
   const idState = `${prefijo ?? ""}state`;
   const idCity = `${prefijo ?? ""}city`;
   const idLista = `${prefijo ?? ""}ciudades-sugeridas`;
@@ -60,11 +62,11 @@ export function SelectorDivisionCiudad({
   return (
     <>
       <div>
-        <label className={labelCls} htmlFor={idState}>{isCO ? "Departamento" : "State"}</label>
+        <label className={labelCls} htmlFor={idState}>{tc.division[country]}</label>
         <select id={idState} name={idState} required value={state}
           onChange={(e) => { setTocado(true); onState(e.target.value); if (cerrada) onCity(""); }}
           className={inputCls}>
-          <option value="">{isCO ? "Selecciona…" : "Select…"}</option>
+          <option value="">{tc.selecciona}</option>
           {isCO
             ? DEPARTAMENTOS_CO.map((d) => <option key={d} value={d}>{d}</option>)
             : US_STATES.map((s) => <option key={s.code} value={s.name}>{s.name}</option>)}
@@ -73,7 +75,7 @@ export function SelectorDivisionCiudad({
       </div>
 
       <div>
-        <label className={labelCls} htmlFor={idCity}>{isCO ? "Ciudad / Municipio" : "City"}</label>
+        <label className={labelCls} htmlFor={idCity}>{tc.ciudad[country]}</label>
         {cerrada ? (
           <select id={idCity} name={idCity} required value={city} onChange={(e) => onCity(e.target.value)}
             disabled={!state} className={`${inputCls} disabled:opacity-60`}>
@@ -82,14 +84,14 @@ export function SelectorDivisionCiudad({
                 la primera ciudad de la lista —"Altamonte Springs" al elegir
                 Florida— y un lugar equivocado queda con aspecto de elegido. */}
             <option value="">
-              {!state ? (isCO ? "Primero el departamento" : "Select a state first") : isCO ? "Selecciona…" : "Select…"}
+              {!state ? tc.primeroDivision[country] : tc.selecciona}
             </option>
             {ciudades.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         ) : (
           <>
             <input id={idCity} name={idCity} required value={city} onChange={(e) => onCity(e.target.value)}
-              className={inputCls} list={idLista} placeholder="Ex. Miami" autoComplete="address-level2" />
+              className={inputCls} list={idLista} placeholder={tc.ciudadEjemplo} autoComplete="address-level2" />
             <datalist id={idLista}>
               {ciudades.map((c) => <option key={c} value={c} />)}
             </datalist>

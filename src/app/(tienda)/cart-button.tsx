@@ -2,6 +2,7 @@
 
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
+import { useMessages } from "@/modules/i18n/provider";
 
 /**
  * Ícono de carrito del header (patrón del prototipo §3). Abre el panel
@@ -9,12 +10,13 @@ import { useCart } from "@/modules/cart/cart-context";
  */
 export function CartButton() {
   const { count, ready, openDrawer } = useCart();
+  const t = useMessages();
 
   return (
     <button
       type="button"
       onClick={openDrawer}
-      aria-label={`Abrir carrito${count > 0 ? `: ${count} artículos` : " (vacío)"}`}
+      aria-label={t.carrito.abrirCarrito(count)}
       className="relative flex size-[46px] shrink-0 items-center justify-center rounded-[13px] border border-[#2a2e36] bg-[#0E0F12] text-[#F5F5F7] hover:border-kora-coral"
     >
       <ShoppingCart className="size-[22px]" />

@@ -53,6 +53,7 @@ export default async function VitrinaPage() {
             section={{
               key: section.key,
               title: section.title,
+              titleEn: section.titleEn,
               active: section.active,
               mode: section.mode,
               autoRule: section.autoRule,

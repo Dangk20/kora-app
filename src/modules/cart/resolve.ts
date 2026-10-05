@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { storage } from "@/modules/storage";
 import { resolvePrice, toNumber, type Currency } from "@/modules/pricing";
 import type { CartLine } from "./cart-context";
+import { enIdioma, type Locale } from "@/modules/i18n";
 
 export type ResolvedLine = {
   variantId: string;
@@ -44,6 +45,12 @@ export type ResolvedCart = {
 export async function resolveCart(
   lines: CartLine[],
   currency: Currency,
+  /**
+   * Idioma del NOMBRE que se muestra. Solo la vista del carrito lo pasa: el
+   * pedido se crea con el valor por omisión, español, porque su snapshot lo
+   * lee el equipo de KORA en WhatsApp, el panel y el comprobante.
+   */
+  locale: Locale = "es",
 ): Promise<ResolvedCart> {
   const clean = lines.filter((l) => l.qty > 0);
   if (clean.length === 0) {
@@ -89,7 +96,7 @@ export async function resolveCart(
       categoryId: variant.product.categoryId,
       qty: line.qty,
       qtyAvailable,
-      productName: variant.product.name,
+      productName: enIdioma(locale, variant.product.name, variant.product.nameEn),
       productSlug: variant.product.slug,
       variantName: variant.name,
       sku: variant.sku,

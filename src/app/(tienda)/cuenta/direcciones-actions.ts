@@ -8,6 +8,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireBuyer } from "@/modules/buyer/guard";
+import { getMessages } from "@/modules/i18n/server";
 import {
   createAddress,
   deleteAddress,
@@ -49,10 +50,12 @@ export async function guardarDireccion(
   formData: FormData,
 ): Promise<DireccionState> {
   const buyer = await requireBuyer();
+  const { errores } = await getMessages();
   const datos = leer(formData);
 
+  // La regla escribe en español; se traduce aquí, en el borde.
   const falla = problema(datos);
-  if (falla) return { error: falla };
+  if (falla) return { error: errores.traducir(falla) };
 
   const id = String(formData.get("id") ?? "").trim();
   const predeterminada = formData.get("isDefault") === "on";
@@ -61,7 +64,7 @@ export async function guardarDireccion(
     const hecho = await updateAddress(buyer.customerId, id, datos, predeterminada);
     // `false` = esa dirección no es suya. Se responde igual que si no existiera:
     // decir "no es tuya" confirmaría que existe.
-    if (!hecho) return { error: "No encontramos esa dirección." };
+    if (!hecho) return { error: errores.direccionNoEncontrada };
   } else {
     await createAddress(buyer.customerId, datos, predeterminada);
   }

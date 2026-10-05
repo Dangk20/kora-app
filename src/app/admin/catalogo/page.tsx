@@ -159,6 +159,8 @@ export default async function CatalogPage({
       brand: editing.brand ?? "",
       categoryId: editing.categoryId,
       description: editing.description ?? "",
+      nameEn: editing.nameEn ?? "",
+      descriptionEn: editing.descriptionEn ?? "",
       active: editing.active,
       featured: editing.featured,
       images: editing.images.map((img) => ({

@@ -11,12 +11,14 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { BuyerOrderRow } from "@/modules/buyer/orders";
 import { formatOrderNumber, variantDetails } from "@/modules/orders/message";
+import { getMessages } from "@/modules/i18n/server";
 import { fraseDeEstado, money } from "./ui";
 
-const fecha = (d: Date) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long" }).format(d);
-
-export function PedidoCard({ p }: { p: BuyerOrderRow }) {
-  const estado = fraseDeEstado(p.status, p.statusAt);
+export async function PedidoCard({ p }: { p: BuyerOrderRow }) {
+  const t = await getMessages();
+  const fecha = (d: Date) =>
+    new Intl.DateTimeFormat(t.comun.formatoFecha, { day: "numeric", month: "long" }).format(d);
+  const estado = fraseDeEstado(p.status, p.statusAt, t);
   const [primera, ...resto] = p.lineas;
   return (
     <Link
@@ -45,14 +47,14 @@ export function PedidoCard({ p }: { p: BuyerOrderRow }) {
             <p className="mt-2.5 truncate text-[13px] text-[#4a4f58]">
               {primera.productName}
               <span className="text-muted-foreground">
-                {" · "}{primera.qty} u.
+                {" · "}{t.pedido.unidades(primera.qty)}
                 {variantDetails(primera.variantName).length > 0 && ` · ${variantDetails(primera.variantName).join(", ")}`}
               </span>
             </p>
           )}
           {resto.length > 0 && (
             <p className="text-[12px] text-muted-foreground">
-              y {resto.length} producto{resto.length === 1 ? "" : "s"} más
+              {t.pedido.yMas(resto.length)}
             </p>
           )}
         </div>
@@ -60,7 +62,7 @@ export function PedidoCard({ p }: { p: BuyerOrderRow }) {
         <div className="hidden shrink-0 flex-col items-end justify-between sm:flex">
           <span className="text-[15px] font-bold text-kora-black">{money(p.total, p.currency)}</span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-kora-black px-4 py-2 text-[12.5px] font-semibold text-white">
-            Ver pedido <ArrowRight className="size-3.5" />
+            {t.pedido.verPedido} <ArrowRight className="size-3.5" />
           </span>
         </div>
       </div>
@@ -68,7 +70,7 @@ export function PedidoCard({ p }: { p: BuyerOrderRow }) {
       <div className="flex items-center justify-between border-t border-[#f0ece6] px-4 py-2.5 sm:hidden">
         <span className="text-[14px] font-bold text-kora-black">{money(p.total, p.currency)}</span>
         <span className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-kora-coral">
-          Ver pedido <ArrowRight className="size-3.5" />
+          {t.pedido.verPedido} <ArrowRight className="size-3.5" />
         </span>
       </div>
     </Link>

@@ -36,12 +36,19 @@ export function TarjetaEsqueleto() {
 }
 
 /** Rejilla de carga del catálogo. */
-export function RejillaEsqueleto({ cantidad = 8 }: { cantidad?: number }) {
+export function RejillaEsqueleto({
+  cantidad = 8,
+  etiqueta = "Cargando productos",
+}: {
+  cantidad?: number;
+  /** Lo que anuncia el lector de pantalla; lo pasa la página en su idioma. */
+  etiqueta?: string;
+}) {
   return (
     <div
       className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4"
       role="status"
-      aria-label="Cargando productos"
+      aria-label={etiqueta}
     >
       {Array.from({ length: cantidad }, (_, i) => (
         <TarjetaEsqueleto key={i} />

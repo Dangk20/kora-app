@@ -137,8 +137,13 @@ describe("lo que ve un visitante del exterior cuando falta el precio en su moned
     expect(ficha).toContain("const sinPrecioEnMoneda = !price?.available;");
   });
 
-  it("el motivo que se enseña nombra la moneda", () => {
-    expect(ficha).toContain("`No disponible en ${currency}`");
+  it("el motivo que se enseña nombra la moneda", async () => {
+    // Desde la tienda en inglés el texto vive en el diccionario: la ficha
+    // pide el de la moneda, y los dos idiomas la nombran.
+    expect(ficha).toContain("noDisponibleEn(currency)");
+    const { MESSAGES } = await import("@/modules/i18n/messages");
+    expect(MESSAGES.es.producto.noDisponibleEn("USD")).toBe("No disponible en USD");
+    expect(MESSAGES.en.producto.noDisponibleEn("USD")).toContain("USD");
   });
 
   it("no imprime el importe de un precio que no está cargado", () => {

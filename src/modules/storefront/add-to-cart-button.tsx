@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Check, ChevronRight, ShoppingCart } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
+import { useMessages } from "@/modules/i18n/provider";
 
 /**
  * Botón de la card del catálogo.
@@ -27,6 +28,7 @@ export function AddToCartButton({
   needsChoice: boolean;
 }) {
   const router = useRouter();
+  const t = useMessages().producto.boton;
   const { add } = useCart();
   const [added, setAdded] = useState(false);
 
@@ -44,12 +46,12 @@ export function AddToCartButton({
   };
 
   const label = soldOut
-    ? "Agotado"
+    ? t.agotado
     : added
-      ? "Agregado"
+      ? t.agregado
       : needsChoice
-        ? "Ver opciones"
-        : "Agregar";
+        ? t.verOpciones
+        : t.agregar;
 
   // Negro de marca por defecto; naranja de marca al agregar.
   // El hover NO usa naranja a propósito: si lo hiciera, pasar el cursor se
@@ -67,7 +69,7 @@ export function AddToCartButton({
       type="button"
       onClick={handle}
       disabled={soldOut}
-      aria-label={soldOut ? "Producto agotado" : label}
+      aria-label={soldOut ? t.productoAgotado : label}
       className={`mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] px-4 py-3 text-[13.5px] font-bold transition-colors ${tone}`}
     >
       {!soldOut && <Icon className="size-[18px] shrink-0" />}

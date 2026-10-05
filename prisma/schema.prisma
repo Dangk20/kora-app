@@ -86,6 +86,8 @@ model RolePermission {
 model Category {
   id            String           @id @default(cuid())
   name          String
+  /// Nombre en inglés; vacío = el español (change `tienda-en-ingles`).
+  nameEn        String?
   slug          String           @unique
   parentId      String?
   parent        Category?        @relation("CategoryTree", fields: [parentId], references: [id])
@@ -105,15 +107,19 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  brand       String?
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  active      Boolean  @default(true)
-  featured    Boolean  @default(false)
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  /// Versión en inglés para la tienda en inglés (change `tienda-en-ingles`).
+  /// Vacía = se muestra la española: un producto sin traducir nunca sale en blanco.
+  nameEn        String?
+  descriptionEn String?
+  brand         String?
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  active        Boolean  @default(true)
+  featured      Boolean  @default(false)
 
   /// Retirado del catálogo, con su motivo en `product_archives`.
   ///
@@ -1000,6 +1006,8 @@ model ShowcaseSection {
    */
   key      String       @id
   title    String
+  /// Título para la tienda en inglés; vacío = la traducción por omisión de la sección.
+  titleEn  String?
   subtitle String?
   active   Boolean      @default(true)
   mode     ShowcaseMode @default(MANUAL)

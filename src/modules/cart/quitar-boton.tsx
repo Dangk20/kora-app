@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function QuitarDelCarrito({
   nombre,
@@ -30,13 +31,14 @@ export function QuitarDelCarrito({
   className?: string;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const t = useMessages();
 
   return (
     <>
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        aria-label={`Quitar ${nombre} del carrito`}
+        aria-label={t.carrito.quitarAria(nombre)}
         className={className}
       >
         <Trash2 className="size-4" />
@@ -57,12 +59,11 @@ export function QuitarDelCarrito({
           <div className="px-6 pt-6">
             <DialogHeader className="space-y-2 text-left">
               <DialogTitle className="text-[17px] font-bold text-kora-black">
-                ¿Quitar este producto?
+                {t.carrito.quitarPregunta}
               </DialogTitle>
               <DialogDescription className="text-[13.5px] leading-relaxed text-[#6b7280]">
                 <span className="font-semibold text-kora-black">{nombre}</span>
-                {variante ? ` · ${variante}` : ""} saldrá de tu carrito. Puedes
-                volver a agregarlo cuando quieras.
+                {variante ? ` · ${variante}` : ""} {t.carrito.quitarSaldra}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -77,7 +78,7 @@ export function QuitarDelCarrito({
               onClick={() => setAbierto(false)}
               className="w-full rounded-full bg-kora-black px-6 py-3.5 text-[14.5px] font-bold text-white transition-colors hover:bg-kora-gray-dark"
             >
-              Cancelar
+              {t.carrito.cancelar}
             </button>
             <button
               type="button"
@@ -87,7 +88,7 @@ export function QuitarDelCarrito({
               }}
               className="w-full rounded-full px-6 py-2.5 text-[13.5px] font-semibold text-destructive transition-colors hover:bg-destructive/10"
             >
-              Sí, quitarlo del carrito
+              {t.carrito.siQuitar}
             </button>
           </div>
         </DialogContent>

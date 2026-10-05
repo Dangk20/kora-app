@@ -13,11 +13,13 @@ import type { ResolvedCart } from "@/modules/cart/resolve";
 import { formatMoney } from "@/modules/pricing";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { useOwnsBottomBar } from "@/modules/storefront/mobile/bars-context";
+import { useMessages } from "@/modules/i18n/provider";
 
 export function CartView() {
   const { lines, ready, setQty, remove } = useCart();
   const [cart, setCart] = useState<ResolvedCart | null>(null);
   const [loading, startLoading] = useTransition();
+  const t = useMessages();
 
   useEffect(() => {
     if (!ready) return;
@@ -39,20 +41,20 @@ export function CartView() {
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-[1140px] px-4 pt-6 pb-16 sm:px-[22px] sm:pt-8 sm:pb-20">
-        <h1 className="mb-6 text-[30px] font-bold text-kora-black">Tu carrito</h1>
+        <h1 className="mb-6 text-[30px] font-bold text-kora-black">{t.carrito.titulo}</h1>
         <div className="rounded-[20px] bg-white p-16 text-center">
           <ShoppingCart className="mx-auto size-16 text-[#e2ddd6]" />
           <p className="mt-4 text-[19px] font-semibold text-kora-black">
-            Tu carrito está vacío
+            {t.carrito.vacioTitulo}
           </p>
           <p className="mt-1 text-[13.5px] text-[#8a8f98]">
-            Explora el catálogo y encuentra productos increíbles.
+            {t.carrito.vacioTextoPagina}
           </p>
           <Link
             href="/catalogo"
             className="bg-kora-gradient mt-6 inline-block rounded-full px-6 py-3.5 text-[14px] font-bold text-white hover:opacity-90"
           >
-            Explorar productos
+            {t.carrito.explorarProductos}
           </Link>
         </div>
       </div>
@@ -64,9 +66,9 @@ export function CartView() {
 
   return (
     <div className="mx-auto max-w-[1140px] px-4 pt-6 pb-16 sm:px-[22px] sm:pt-8 sm:pb-20">
-      <h1 className="text-[30px] font-bold text-kora-black">Tu carrito</h1>
+      <h1 className="text-[30px] font-bold text-kora-black">{t.carrito.titulo}</h1>
       <p className="mt-0.5 mb-6 text-[13.5px] text-[#8a8f98]">
-        {cart!.itemCount} {cart!.itemCount === 1 ? "producto" : "productos"}
+        {t.carrito.productos(cart!.itemCount)}
       </p>
 
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
@@ -119,12 +121,12 @@ export function CartView() {
                 {line.unavailable ? (
                   <p className="mt-1 text-[12.5px] font-semibold text-destructive">
                     {line.onlineUnits === 0
-                      ? "Agotado en la tienda online"
-                      : `No disponible en ${currency}`}
+                      ? t.carrito.agotadoOnline
+                      : t.carrito.noDisponibleEn(currency)}
                   </p>
                 ) : (
                   <p className="mt-0.5 text-[13px] text-[#4a4f58]">
-                    {formatMoney(line.unitPrice, currency)} c/u
+                    {formatMoney(line.unitPrice, currency)} {t.carrito.cadaUno}
                     {line.hasOnlineDiscount && (
                       <span className="ml-1.5 text-[11.5px] text-[#b3b8c0] line-through">
                         {formatMoney(line.storeUnitPrice, currency)}
@@ -134,7 +136,7 @@ export function CartView() {
                 )}
                 {!line.unavailable && line.qtyAvailable < line.qty && (
                   <p className="mt-1 text-[12px] font-semibold text-kora-coral">
-                    Solo quedan {line.onlineUnits}; ajustamos la cantidad.
+                    {t.carrito.soloQuedan(line.onlineUnits)}
                   </p>
                 )}
               </div>
@@ -144,7 +146,7 @@ export function CartView() {
                 <div className="flex items-center overflow-hidden rounded-[10px] border-[1.6px] border-[#e2ddd6]">
                   <button
                     type="button"
-                    aria-label="Quitar una unidad"
+                    aria-label={t.carrito.quitarUnaUnidad}
                     onClick={() => setQty(line.variantId, line.qtyAvailable - 1)}
                     className="flex h-[38px] w-9 items-center justify-center hover:bg-[#faf8f5]"
                   >
@@ -155,7 +157,7 @@ export function CartView() {
                   </span>
                   <button
                     type="button"
-                    aria-label="Agregar una unidad"
+                    aria-label={t.carrito.agregarUnaUnidad}
                     disabled={line.qtyAvailable >= line.onlineUnits}
                     onClick={() => setQty(line.variantId, line.qtyAvailable + 1)}
                     className="flex h-[38px] w-9 items-center justify-center hover:bg-[#faf8f5] disabled:opacity-40"
@@ -187,22 +189,21 @@ export function CartView() {
             barra inferior fija (ver más abajo): con seis artículos, llegar a
             "Continuar compra" exigía recorrer la página entera. */}
         <div className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px]">
-          <h2 className="mb-4 text-[17px] font-bold text-kora-black">Resumen</h2>
+          <h2 className="mb-4 text-[17px] font-bold text-kora-black">{t.carrito.resumen}</h2>
           <div className="flex justify-between text-sm text-[#4a4f58]">
-            <span>Subtotal</span>
+            <span>{t.carrito.subtotal}</span>
             <span className="font-semibold">
               {formatMoney(cart!.subtotal, currency)}
             </span>
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-[#8a8f98]">
-            El costo de envío se acuerda contigo por WhatsApp al confirmar el
-            pedido.
+            {t.carrito.envioAcordadoPagina}
           </p>
 
           <div className="my-4 h-px bg-[#efe9e1]" />
 
           <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-bold text-kora-black">Total</span>
+            <span className="text-[15px] font-bold text-kora-black">{t.carrito.total}</span>
             <span className="text-2xl font-extrabold text-kora-black">
               {formatMoney(cart!.subtotal, currency)} {currency}
             </span>
@@ -217,13 +218,13 @@ export function CartView() {
                 : "hover:opacity-90"
             }`}
           >
-            Continuar compra <ArrowRight className="size-4" />
+            {t.carrito.continuarCompra} <ArrowRight className="size-4" />
           </Link>
           <Link
             href="/catalogo"
             className="mt-3 block text-center text-[13px] font-semibold text-[#8a8f98] hover:text-kora-black"
           >
-            Seguir comprando
+            {t.carrito.seguirComprando}
           </Link>
         </div>
       </div>
@@ -254,6 +255,7 @@ function CarritoBarraMovil({
   habilitado: boolean;
 }) {
   useOwnsBottomBar(habilitado);
+  const t = useMessages();
 
   if (!habilitado) return null;
 
@@ -264,7 +266,7 @@ function CarritoBarraMovil({
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11.5px] text-[#8a8f98]">Total</p>
+          <p className="text-[11.5px] text-[#8a8f98]">{t.carrito.total}</p>
           <p className="truncate text-[17px] leading-tight font-extrabold text-kora-black">
             {total} <span className="text-[12px] font-semibold text-[#8a8f98]">{currency}</span>
           </p>
@@ -273,7 +275,7 @@ function CarritoBarraMovil({
           href="/checkout"
           className="bg-kora-gradient flex min-h-12 shrink-0 items-center gap-2 rounded-full px-6 text-[14.5px] font-bold text-white"
         >
-          Continuar <ArrowRight className="size-4" />
+          {t.carrito.continuar} <ArrowRight className="size-4" />
         </Link>
       </div>
     </div>
