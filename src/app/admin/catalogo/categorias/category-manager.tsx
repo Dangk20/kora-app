@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   createCategory,
   deleteCategory,
@@ -10,15 +10,19 @@ import {
 } from "@/modules/catalog/category-actions";
 import { CATEGORY_ICONS, TILE_PALETTE, inkFor } from "@/modules/catalog/tiles";
 
-type Child = { id: string; name: string; productCount: number };
+type Child = { id: string; name: string; icon: string; productCount: number };
 type Parent = {
   id: string;
   name: string;
   color: string;
   icon: string;
+  /** Incluye los de sus subcategorías. */
   productCount: number;
   children: Child[];
 };
+
+/** Lo que se edita: una categoría padre (con color) o una subcategoría. */
+type Editable = { id: string; name: string; icon: string; color?: string };
 
 const ICON_OPTIONS = Object.keys(CATEGORY_ICONS);
 
@@ -130,16 +134,33 @@ function CategoryCreator() {
 // ── Card de categoría con subcategorías (chips) ─────────────
 function SubcategoryChip({
   sub,
+  canEdit,
   canDelete,
+  onEdit,
 }: {
   sub: Child;
+  canEdit: boolean;
   canDelete: boolean;
+  onEdit: () => void;
 }) {
   const [state, formAction, pending] = useActionState(deleteCategory, null);
+  const SubIcon = CATEGORY_ICONS[sub.icon] ?? CATEGORY_ICONS.package;
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f3f0] py-1.5 pr-2 pl-3 text-[12.5px] font-semibold text-kora-black">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f3f0] py-1.5 pr-2 pl-2.5 text-[12.5px] font-semibold text-kora-black">
+      <SubIcon className="size-3.5 text-[#6b6f78]" strokeWidth={1.8} />
       {sub.name}{" "}
       <span className="font-medium text-[#b3b8c0]">({sub.productCount})</span>
+      {canEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Editar ${sub.name}`}
+          title="Editar nombre e ícono"
+          className="flex size-[18px] items-center justify-center rounded-full bg-[#e7e2da] text-[#8a8f98] hover:bg-[#FFE9DD] hover:text-kora-coral"
+        >
+          <Pencil className="size-[10px]" />
+        </button>
+      )}
       {canDelete && (
         <form action={formAction} className="flex">
           <input type="hidden" name="id" value={sub.id} />
@@ -194,28 +215,137 @@ function AddSubcategory({ parentId }: { parentId: string }) {
   );
 }
 
-function RenameInput({ category }: { category: Parent }) {
-  const [, formAction] = useActionState(updateCategory, null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [value, setValue] = useState(category.name);
+/**
+ * Editar nombre e ícono (y color, en la categoría padre). Reemplaza el
+ * renombrado escribiendo sobre el título, que nadie descubría (4 oct 2026).
+ */
+function CategoryEditModal({ category, onClose }: { category: Editable; onClose: () => void }) {
+  const [state, formAction, pending] = useActionState(updateCategory, null);
+  const [name, setName] = useState(category.name);
+  const [icon, setIcon] = useState(category.icon);
+  const [color, setColor] = useState(category.color);
+  const esPadre = category.color !== undefined;
+
+  useEffect(() => {
+    if (state?.ok) onClose();
+  }, [state, onClose]);
+
+  useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [onClose]);
 
   return (
-    <form ref={formRef} action={formAction} className="min-w-0 flex-1">
-      <input type="hidden" name="id" value={category.id} />
-      <input
-        name="name"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          if (value.trim().length >= 2 && value !== category.name) {
-            formRef.current?.requestSubmit();
-          }
-        }}
-        className="w-full border-none bg-transparent p-0 text-[17px] font-bold text-kora-black outline-none"
-        aria-label={`Renombrar ${category.name}`}
-      />
-      <div className="text-xs text-[#6b5a4a]">{category.productCount} productos</div>
-    </form>
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[rgba(14,15,18,0.55)] p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <form
+        action={formAction}
+        className="w-[480px] max-w-full rounded-[18px] bg-white p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)]"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Editar ${category.name}`}
+      >
+        <input type="hidden" name="id" value={category.id} />
+        <input type="hidden" name="icon" value={icon} />
+        {esPadre && <input type="hidden" name="color" value={color} />}
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-[15px] font-bold text-kora-black">
+            {esPadre ? "Editar categoría" : "Editar subcategoría"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex size-8 items-center justify-center rounded-full bg-[#f5f3f0] text-[#8a8f98] hover:text-kora-black"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <label className="mb-1.5 block text-xs font-semibold text-[#6b6f78]" htmlFor="edit-cat-name">
+          Nombre
+        </label>
+        <input
+          id="edit-cat-name"
+          name="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          autoFocus
+          className="w-full rounded-[10px] border-[1.6px] border-[#e2ddd6] px-3.5 py-3 text-sm outline-none focus:border-kora-coral"
+        />
+
+        {esPadre && (
+          <div className="mt-4">
+            <span className="mb-2 block text-xs font-semibold text-[#6b6f78]">Color</span>
+            <div className="flex flex-wrap gap-2.5">
+              {TILE_PALETTE.map((p) => (
+                <button
+                  key={p.bg}
+                  type="button"
+                  onClick={() => setColor(p.bg)}
+                  aria-label={`Color ${p.bg}`}
+                  className="size-[30px] rounded-full"
+                  style={{
+                    background: p.bg,
+                    boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${color === p.bg ? p.ink : "transparent"}`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <span className="mb-2 block text-xs font-semibold text-[#6b6f78]">Ícono</span>
+          <div className="flex flex-wrap gap-2">
+            {ICON_OPTIONS.map((key) => {
+              const Icon = CATEGORY_ICONS[key];
+              const selected = icon === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setIcon(key)}
+                  aria-label={`Ícono ${key}`}
+                  aria-pressed={selected}
+                  className="flex size-10 items-center justify-center rounded-[11px]"
+                  style={{
+                    background: selected ? (color ?? "#FFE9DD") : "#f5f3f0",
+                    color: selected ? inkFor(color ?? "#FFE9DD") : "#8a8f98",
+                  }}
+                >
+                  <Icon className="size-5" strokeWidth={1.8} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <ErrorText state={state} />
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[11px] px-4 py-2.5 text-[13px] font-semibold text-[#6b6f78] hover:text-kora-black"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={pending || name.trim().length < 2}
+            className="bg-kora-gradient rounded-[11px] px-5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {pending ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -256,9 +386,11 @@ export function CategoryManager({
   canEdit: boolean;
   canDelete: boolean;
 }) {
+  const [editing, setEditing] = useState<Editable | null>(null);
   return (
     <div>
       {canCreate && <CategoryCreator />}
+      {editing && <CategoryEditModal category={editing} onClose={() => setEditing(null)} />}
       <div className="grid gap-4 xl:grid-cols-2">
         {parents.map((cat) => {
           const Icon = CATEGORY_ICONS[cat.icon] ?? CATEGORY_ICONS.package;
@@ -274,17 +406,26 @@ export function CategoryManager({
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/65 text-kora-black">
                   <Icon className="size-6" strokeWidth={1.8} />
                 </span>
-                {canEdit ? (
-                  <RenameInput category={cat} />
-                ) : (
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[17px] font-bold text-kora-black">
-                      {cat.name}
-                    </div>
-                    <div className="text-xs text-[#6b5a4a]">
-                      {cat.productCount} productos
-                    </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[17px] font-bold text-kora-black">
+                    {cat.name}
                   </div>
+                  <div className="text-xs text-[#6b5a4a]">
+                    {cat.productCount} producto{cat.productCount === 1 ? "" : "s"}
+                  </div>
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditing({ id: cat.id, name: cat.name, icon: cat.icon, color: cat.color })
+                    }
+                    aria-label={`Editar ${cat.name}`}
+                    title="Editar nombre, color e ícono"
+                    className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-white/55 text-[#6b6f78] hover:text-kora-coral"
+                  >
+                    <Pencil className="size-[16px]" />
+                  </button>
                 )}
                 {canDelete && <DeleteCategoryButton category={cat} />}
               </div>
@@ -299,7 +440,13 @@ export function CategoryManager({
                     </span>
                   )}
                   {cat.children.map((sub) => (
-                    <SubcategoryChip key={sub.id} sub={sub} canDelete={canDelete} />
+                    <SubcategoryChip
+                      key={sub.id}
+                      sub={sub}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      onEdit={() => setEditing({ id: sub.id, name: sub.name, icon: sub.icon })}
+                    />
                   ))}
                 </div>
                 {canCreate && <AddSubcategory parentId={cat.id} />}

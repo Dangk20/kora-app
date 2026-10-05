@@ -15,18 +15,20 @@ import {
   X,
 } from "lucide-react";
 import {
+  addCategoryToSection,
   addProductToSection,
-  moveProductInSection,
-  removeProductFromSection,
+  moveItemInSection,
+  removeItemFromSection,
   updateSection,
 } from "@/modules/showcase/actions";
+import type { EditorItem } from "@/modules/showcase/queries";
 import {
   MAX_SECTION_ITEMS,
   RULE_LABEL,
   type SectionDef,
 } from "@/modules/showcase/sections";
 import { CategoryTile } from "@/modules/catalog/tiles";
-import { ProductPicker } from "./product-picker";
+import { ItemPicker } from "./item-picker";
 
 export type SectionState = {
   key: string;
@@ -35,13 +37,8 @@ export type SectionState = {
   mode: "MANUAL" | "AUTO";
   autoRule: string;
   limit: number;
-  products: {
-    id: string;
-    name: string;
-    imageUrl: string | null;
-    categoryColor: string;
-    categoryIcon: string;
-  }[];
+  /** Productos sueltos y categorías enteras, en su orden. */
+  items: EditorItem[];
 };
 
 export function SectionModal({
@@ -233,13 +230,12 @@ export function SectionModal({
                 <div>
                   <div className="mb-2.5 flex items-center justify-between">
                     <span className="text-[12.5px] font-semibold text-[#6b6f78]">
-                      Productos ({section.products.length})
+                      Elementos ({section.items.length})
                       <span className="ml-1 font-normal text-[#9aa0ab]">
-                        · se ven {section.limit} a la vez
-                        {section.products.length > section.limit && ", el resto rota solo"}
+                        · se ven {section.limit} productos a la vez; el resto rota solo
                       </span>
                     </span>
-                    {section.products.length < MAX_SECTION_ITEMS && (
+                    {section.items.length < MAX_SECTION_ITEMS && (
                       <button
                         type="button"
                         onClick={() => setPickerOpen(true)}
@@ -250,7 +246,7 @@ export function SectionModal({
                     )}
                   </div>
 
-                  {section.products.length === 0 ? (
+                  {section.items.length === 0 ? (
                     <div className="rounded-[12px] border-2 border-dashed border-[#e2ddd6] px-4 py-8 text-center">
                       <p className="text-[12.5px] text-[#9aa0ab]">
                         Vacía: la sección no se mostrará en la tienda.
@@ -258,14 +254,14 @@ export function SectionModal({
                     </div>
                   ) : (
                     <ul className="space-y-2">
-                      {section.products.map((p, i) => (
+                      {section.items.map((p, i) => (
                         <li
                           key={p.id}
                           className="flex items-center gap-3 rounded-[11px] border border-[#f0ece6] p-2"
                         >
                           <span
                             className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-[9px]"
-                            style={{ background: p.imageUrl ? "#f7f4f0" : p.categoryColor }}
+                            style={{ background: p.imageUrl ? "#f7f4f0" : p.color }}
                           >
                             {p.imageUrl ? (
                               <Image
@@ -279,21 +275,29 @@ export function SectionModal({
                             ) : (
                               <CategoryTile
                                 color="transparent"
-                                icon={p.categoryIcon}
+                                icon={p.icon}
                                 size={44}
                                 radius={0}
                               />
                             )}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-[13px] text-kora-black">
-                            {p.name}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] text-kora-black">
+                              {p.name}
+                            </span>
+                            {p.kind === "category" && (
+                              <span className="block text-[11px] text-[#9aa0ab]">
+                                Categoría · {p.count ?? 0} producto{p.count === 1 ? "" : "s"}
+                                {" "}(los nuevos entran solos)
+                              </span>
+                            )}
                           </span>
                           <button
                             type="button"
                             aria-label="Subir"
                             disabled={pending || i === 0}
                             onClick={() =>
-                              run(() => moveProductInSection(section.key, p.id, "up"))
+                              run(() => moveItemInSection(section.key, p.id, "up"))
                             }
                             className="flex size-7 items-center justify-center rounded bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black disabled:opacity-30"
                           >
@@ -302,9 +306,9 @@ export function SectionModal({
                           <button
                             type="button"
                             aria-label="Bajar"
-                            disabled={pending || i === section.products.length - 1}
+                            disabled={pending || i === section.items.length - 1}
                             onClick={() =>
-                              run(() => moveProductInSection(section.key, p.id, "down"))
+                              run(() => moveItemInSection(section.key, p.id, "down"))
                             }
                             className="flex size-7 items-center justify-center rounded bg-[#f5f3f0] text-[#6b6f78] hover:text-kora-black disabled:opacity-30"
                           >
@@ -315,7 +319,7 @@ export function SectionModal({
                             aria-label={`Quitar ${p.name}`}
                             disabled={pending}
                             onClick={() =>
-                              run(() => removeProductFromSection(section.key, p.id))
+                              run(() => removeItemFromSection(section.key, p.id))
                             }
                             className="flex size-7 items-center justify-center rounded bg-[#faf6f2] text-[#b3b8c0] hover:text-destructive"
                           >
@@ -350,12 +354,16 @@ export function SectionModal({
         </div>
 
         {pickerOpen && (
-          <ProductPicker
-            excludeIds={section.products.map((p) => p.id)}
+          <ItemPicker
+            excludeProductIds={section.items.filter((i) => i.kind === "product").map((i) => i.refId)}
             onClose={() => setPickerOpen(false)}
-            onPick={(product) => {
+            onPickProduct={(productId) => {
               setPickerOpen(false);
-              run(() => addProductToSection(section.key, product.id));
+              run(() => addProductToSection(section.key, productId));
+            }}
+            onPickCategory={(categoryId) => {
+              setPickerOpen(false);
+              run(() => addCategoryToSection(section.key, categoryId));
             }}
           />
         )}

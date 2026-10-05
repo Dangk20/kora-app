@@ -57,13 +57,7 @@ export default async function VitrinaPage() {
               mode: section.mode,
               autoRule: section.autoRule,
               limit: section.limit,
-              products: section.products.map((p) => ({
-                id: p.id,
-                name: p.name,
-                imageUrl: p.images[0]?.url ?? null,
-                categoryColor: p.category.color,
-                categoryIcon: p.category.icon,
-              })),
+              items: section.items,
             }}
           />
         );

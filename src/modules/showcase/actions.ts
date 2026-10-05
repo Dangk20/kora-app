@@ -51,12 +51,11 @@ export async function updateSection(
   return { ok: true };
 }
 
-export async function addProductToSection(
+/** Agrega un elemento (producto o categoría) al final de una sección. */
+async function addItem(
   key: string,
-  productId: string,
+  ref: { productId: string } | { categoryId: string },
 ): Promise<ShowcaseResult> {
-  await requirePermission("catalog:edit");
-
   const section = await db.showcaseSection.findUnique({
     where: { key },
     include: { _count: { select: { items: true } } },
@@ -65,10 +64,7 @@ export async function addProductToSection(
   // El límite no es el diseño (los que sobran rotan en carrusel), solo un tope
   // razonable para que la portada no cargue medio catálogo.
   if (section._count.items >= MAX_SECTION_ITEMS) {
-    return {
-      ok: false,
-      error: `Máximo ${MAX_SECTION_ITEMS} productos por sección.`,
-    };
+    return { ok: false, error: `Máximo ${MAX_SECTION_ITEMS} elementos por sección.` };
   }
 
   const last = await db.showcaseItem.findFirst({
@@ -78,25 +74,37 @@ export async function addProductToSection(
 
   try {
     await db.showcaseItem.create({
-      data: {
-        sectionKey: key,
-        productId,
-        position: (last?.position ?? -1) + 1,
-      },
+      data: { sectionKey: key, ...ref, position: (last?.position ?? -1) + 1 },
     });
   } catch {
-    return { ok: false, error: "Ese producto ya está en la sección" };
+    return {
+      ok: false,
+      error: "productId" in ref ? "Ese producto ya está en la sección" : "Esa categoría ya está en la sección",
+    };
   }
   revalidateAll();
   return { ok: true };
 }
 
-export async function removeProductFromSection(
-  key: string,
-  productId: string,
-): Promise<ShowcaseResult> {
+export async function addProductToSection(key: string, productId: string): Promise<ShowcaseResult> {
   await requirePermission("catalog:edit");
-  await db.showcaseItem.deleteMany({ where: { sectionKey: key, productId } });
+  return addItem(key, { productId });
+}
+
+/**
+ * Agrega una categoría ENTERA (o subcategoría). Se guarda la categoría, no
+ * sus productos: un producto nuevo de esa línea entra solo en la sección.
+ */
+export async function addCategoryToSection(key: string, categoryId: string): Promise<ShowcaseResult> {
+  await requirePermission("catalog:edit");
+  const exists = await db.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+  if (!exists) return { ok: false, error: "La categoría no existe" };
+  return addItem(key, { categoryId });
+}
+
+export async function removeItemFromSection(key: string, itemId: string): Promise<ShowcaseResult> {
+  await requirePermission("catalog:edit");
+  await db.showcaseItem.deleteMany({ where: { sectionKey: key, id: itemId } });
 
   // Cerrar el hueco para que el orden siga siendo 0..n-1.
   const rest = await db.showcaseItem.findMany({
@@ -113,10 +121,10 @@ export async function removeProductFromSection(
   return { ok: true };
 }
 
-/** Mueve un producto una posición arriba o abajo dentro de su sección. */
-export async function moveProductInSection(
+/** Mueve un elemento una posición arriba o abajo dentro de su sección. */
+export async function moveItemInSection(
   key: string,
-  productId: string,
+  itemId: string,
   direction: "up" | "down",
 ): Promise<ShowcaseResult> {
   await requirePermission("catalog:edit");
@@ -125,21 +133,15 @@ export async function moveProductInSection(
     where: { sectionKey: key },
     orderBy: { position: "asc" },
   });
-  const index = items.findIndex((i) => i.productId === productId);
-  if (index === -1) return { ok: false, error: "El producto no está en la sección" };
+  const index = items.findIndex((i) => i.id === itemId);
+  if (index === -1) return { ok: false, error: "El elemento no está en la sección" };
 
   const target = direction === "up" ? index - 1 : index + 1;
   if (target < 0 || target >= items.length) return { ok: true }; // ya está en el borde
 
   await db.$transaction([
-    db.showcaseItem.update({
-      where: { id: items[index].id },
-      data: { position: target },
-    }),
-    db.showcaseItem.update({
-      where: { id: items[target].id },
-      data: { position: index },
-    }),
+    db.showcaseItem.update({ where: { id: items[index].id }, data: { position: target } }),
+    db.showcaseItem.update({ where: { id: items[target].id }, data: { position: index } }),
   ]);
 
   revalidateAll();
@@ -272,6 +274,8 @@ export async function moveBanner(
 /** Buscador de productos del modal de la vitrina. */
 export async function searchProductsForShowcase(
   term: string,
+  /** Filtro de los selectores previos; una categoría padre incluye sus subcategorías. */
+  categoryId?: string,
 ): Promise<{ id: string; name: string; sku: string; imageUrl: string | null }[]> {
   await requirePermission("catalog:view");
   const q = term.trim();
@@ -279,6 +283,9 @@ export async function searchProductsForShowcase(
   const products = await db.product.findMany({
     where: {
       active: true,
+      ...(categoryId
+        ? { category: { OR: [{ id: categoryId }, { parentId: categoryId }] } }
+        : {}),
       ...(q
         ? {
             OR: [
@@ -294,7 +301,7 @@ export async function searchProductsForShowcase(
       variants: { where: { active: true }, take: 1 },
     },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: categoryId ? 60 : 20,
   });
 
   const driver = storage();
@@ -304,4 +311,23 @@ export async function searchProductsForShowcase(
     sku: p.variants[0]?.sku ?? "—",
     imageUrl: p.images[0] ? driver.urlFor(p.images[0].url) : null,
   }));
+}
+
+/** Árbol de categorías para los selectores previos del editor de secciones. */
+export async function categoryTreeForShowcase(): Promise<
+  { id: string; name: string; children: { id: string; name: string }[] }[]
+> {
+  await requirePermission("catalog:view");
+  const all = await db.category.findMany({
+    where: { active: true },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, parentId: true },
+  });
+  return all
+    .filter((c) => !c.parentId)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      children: all.filter((h) => h.parentId === c.id).map((h) => ({ id: h.id, name: h.name })),
+    }));
 }

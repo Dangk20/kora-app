@@ -8,7 +8,23 @@ import { db } from "@/lib/db";
 import { storage } from "@/modules/storage";
 import type { Currency } from "@/modules/pricing";
 import { listProducts, type StoreProduct } from "@/modules/storefront/queries";
+import { expandirElementos, productosDeCategoria, TOPE_POR_CATEGORIA, type ElementoSeccion } from "./expand";
 import { SECTIONS, type BannerSlot, type SectionKey } from "./sections";
+
+/** Un elemento de una sección manual, tal como lo lista el editor del panel. */
+export type EditorItem = {
+  id: string;
+  kind: "product" | "category";
+  /** El producto o la categoría a la que apunta. */
+  refId: string;
+  /** "Mujer › Short" para una subcategoría. */
+  name: string;
+  imageUrl: string | null;
+  color: string;
+  icon: string;
+  /** Solo categoría: cuántos productos aporta hoy a la sección. */
+  count?: number;
+};
 
 export type ResolvedSection = {
   key: SectionKey;
@@ -19,6 +35,8 @@ export type ResolvedSection = {
   autoRule: string;
   limit: number;
   products: StoreProduct[];
+  /** Los elementos guardados (modo manual), para el editor del panel. */
+  items: EditorItem[];
 };
 
 export type ResolvedBanner = {
@@ -109,38 +127,73 @@ export async function getShowcase(currency: Currency): Promise<ResolvedSection[]
     include: {
       items: {
         orderBy: { position: "asc" },
-        select: { productId: true },
+        select: {
+          id: true,
+          productId: true,
+          categoryId: true,
+          product: {
+            select: {
+              name: true,
+              images: { orderBy: { position: "asc" }, take: 1, select: { url: true } },
+              category: { select: { color: true, icon: true } },
+            },
+          },
+          category: {
+            select: { name: true, color: true, icon: true, parent: { select: { name: true } } },
+          },
+        },
       },
     },
   });
   const byKey = new Map(rows.map((r) => [r.key, r]));
 
-  // Un solo viaje al catálogo para todas las secciones manuales.
-  const manualIds = new Set<string>();
-  for (const row of rows) {
-    if (row.mode === "MANUAL") row.items.forEach((i) => manualIds.add(i.productId));
-  }
-  const manualProducts =
-    manualIds.size > 0
-      ? await listProducts({ currency }).then((all) =>
-          new Map(all.filter((p) => manualIds.has(p.id)).map((p) => [p.id, p])),
-        )
-      : new Map<string, StoreProduct>();
+  // Un solo viaje al catálogo para todas las secciones manuales, traigan
+  // productos sueltos o categorías.
+  const hayManuales = rows.some((r) => r.mode === "MANUAL" && r.items.length > 0);
+  const catalogo = hayManuales ? await listProducts({ currency }) : [];
+  const driver = storage();
 
   const resolved: ResolvedSection[] = [];
   for (const def of SECTIONS) {
     const row = byKey.get(def.key);
     if (!row) continue;
 
+    const elementos: ElementoSeccion[] = row.items.map((i) =>
+      i.categoryId
+        ? { kind: "category", categoryId: i.categoryId }
+        : { kind: "product", productId: i.productId! },
+    );
+
     const products =
       row.mode === "MANUAL"
         ? // Todos los elegidos: la tienda rota los que no caben a la vez.
-          row.items
-            .map((i) => manualProducts.get(i.productId))
-            .filter((p): p is StoreProduct => Boolean(p))
+          expandirElementos(elementos, catalogo)
         : // En automático se traen varias "páginas" para que el carrusel tenga
           // qué rotar, sin cargar el catálogo entero.
           await autoProducts(row.autoRule, Math.min(row.limit * 2, 12), currency);
+
+    const items: EditorItem[] = row.items.map((i) =>
+      i.category
+        ? {
+            id: i.id,
+            kind: "category",
+            refId: i.categoryId!,
+            name: i.category.parent ? `${i.category.parent.name} › ${i.category.name}` : i.category.name,
+            imageUrl: null,
+            color: i.category.color,
+            icon: i.category.icon,
+            count: Math.min(productosDeCategoria(i.categoryId!, catalogo).length, TOPE_POR_CATEGORIA),
+          }
+        : {
+            id: i.id,
+            kind: "product",
+            refId: i.productId!,
+            name: i.product?.name ?? "Producto",
+            imageUrl: i.product?.images[0] ? driver.urlFor(i.product.images[0].url) : null,
+            color: i.product?.category.color ?? "#FBE3D3",
+            icon: i.product?.category.icon ?? "package",
+          },
+    );
 
     resolved.push({
       key: def.key,
@@ -151,6 +204,7 @@ export async function getShowcase(currency: Currency): Promise<ResolvedSection[]
       autoRule: row.autoRule,
       limit: row.limit,
       products,
+      items,
     });
   }
   return resolved;

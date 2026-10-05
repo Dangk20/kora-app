@@ -84,21 +84,22 @@ model RolePermission {
 // ─────────────────────────────────────────────────────────────
 
 model Category {
-  id           String           @id @default(cuid())
-  name         String
-  slug         String           @unique
-  parentId     String?
-  parent       Category?        @relation("CategoryTree", fields: [parentId], references: [id])
-  children     Category[]       @relation("CategoryTree")
-  position     Int              @default(0)
-  active       Boolean          @default(true)
+  id            String           @id @default(cuid())
+  name          String
+  slug          String           @unique
+  parentId      String?
+  parent        Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children      Category[]       @relation("CategoryTree")
+  position      Int              @default(0)
+  active        Boolean          @default(true)
   // Identidad visual de la categoría (patrón del prototipo aprobado):
   // fondo pastel del tile + ícono lucide. Los tiles de producto la heredan
   // mientras no haya fotos reales.
-  color        String           @default("#FBE3D3")
-  icon         String           @default("package")
-  products     Product[]
-  couponScopes CouponCategory[]
+  color         String           @default("#FBE3D3")
+  icon          String           @default("package")
+  products      Product[]
+  couponScopes  CouponCategory[]
+  showcaseItems ShowcaseItem[]
 
   @@map("categories")
 }
@@ -1014,15 +1015,22 @@ model ShowcaseSection {
   @@map("showcase_sections")
 }
 
+/// Un elemento de una sección manual: un producto suelto O una categoría entera
+/// (nunca los dos; lo garantiza un CHECK en la migración). La categoría se
+/// guarda como tal, no copiada a productos: así un producto nuevo de esa línea
+/// entra solo en la sección (change `vitrina-por-categoria`, 4 oct 2026).
 model ShowcaseItem {
   id         String          @id @default(cuid())
   sectionKey String
   section    ShowcaseSection @relation(fields: [sectionKey], references: [key], onDelete: Cascade)
-  productId  String
-  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category?       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   position   Int             @default(0)
 
   @@unique([sectionKey, productId])
+  @@unique([sectionKey, categoryId])
   @@index([sectionKey, position])
   @@map("showcase_items")
 }
