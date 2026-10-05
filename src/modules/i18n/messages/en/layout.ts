@@ -10,6 +10,7 @@ export const layout: typeof es = {
   escribenosWhatsapp: "Message us on WhatsApp",
   seguimientoPedido: "Track your order",
   accesoEquipo: "Staff login",
+  firma: "Design & development by",
   // Las páginas están en español: se avisa en el enlace.
   legales: {
     "/legal/datos-personales": "Privacy policy (Spanish)",
