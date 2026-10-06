@@ -118,6 +118,11 @@ export function MobileFilters({
     // Cambiar de filtro empieza de nuevo: mantener "ver=60" tras filtrar
     // dejaría una página larguísima de otra cosa.
     next.delete("ver");
+    // Elegir categoría es una navegación nueva, no un filtro sobre la búsqueda
+    // (Daniel, 6 oct 2026): "polos" + Maquillaje dejaba una página vacía con
+    // el término pegado. Igual que la barra lateral de escritorio. El orden sí
+    // conserva la búsqueda: ordenar resultados no es cambiar de tema.
+    if ("categoria" in cambios) next.delete("q");
     return `/catalogo?${next}`;
   };
 

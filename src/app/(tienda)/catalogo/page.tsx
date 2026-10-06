@@ -129,7 +129,8 @@ export default async function CatalogoPage({
 
           <div className="space-y-1">
             <Link
-              href={q ? `/catalogo?q=${encodeURIComponent(q)}` : "/catalogo"}
+              // Elegir categoría (también "Todas") deja atrás la búsqueda.
+              href="/catalogo"
               className={`block rounded-[9px] px-3 py-2.5 text-[13px] ${
                 !categoria
                   ? "bg-[#FFE9DD] font-semibold text-kora-coral"
