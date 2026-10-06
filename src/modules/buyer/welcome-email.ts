@@ -77,7 +77,12 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
         "Si ya habías comprado con este mismo correo, tus pedidos anteriores y tu cashback " +
         "aparecen solos: no hay nada que reclamar ni que migrar.",
     promo: conCupon
-      ? { codigo: CUPON_BIENVENIDA.codigo, redimirHasta: "31 de octubre de 2026 a las 11:59 p. m. (hora Colombia)" }
+      ? {
+          codigo: CUPON_BIENVENIDA.codigo,
+          // La publicación en redes, recortada antes de su botón (public/email/).
+          imagenUrl: "/email/apertura-kora.jpg",
+          redimirHasta: "31 de octubre de 2026 a las 11:59 p. m. (hora Colombia)",
+        }
       : null,
     footer: conCupon
       ? "Válido una sola vez, solo en tu primera compra. Este cupón es personal: te llegó por " +
