@@ -47,6 +47,13 @@ export type TemplateBlock =
   | { type: "divider" }
   | { type: "spacer"; height: number };
 
+/** Pieza de la campaña de apertura: replica la publicación en redes. */
+export type PromoApertura = {
+  codigo: string;
+  /** "31 de octubre de 2026". */
+  redimirHasta: string;
+};
+
 export type TemplateInput = {
   subject: string;
   /**
@@ -89,7 +96,7 @@ export type TemplateInput = {
    * Va en lugar del bloque de código: es el mismo dato, vestido de fiesta.
    * El código va SIEMPRE también en texto plano.
    */
-  promo?: { etiqueta: string; descuento: string; detalle: string; codigo: string } | null;
+  promo?: PromoApertura | null;
   /**
    * Línea de tiempo del pedido. `current` es el índice del paso en curso.
    *
@@ -246,25 +253,84 @@ function bloqueCodigo(code: string | null | undefined): string {
 }
 
 /**
- * Tarjeta de celebración: degradado de la marca, el descuento enorme y el
- * cupón en un recuadro punteado, como un tiquete. Tablas y estilos en línea
- * como el resto del correo; el degradado lleva color de respaldo porque
- * algunos clientes (Outlook) no pintan `linear-gradient`.
+ * Pieza de la campaña de apertura, hermana de la publicación en redes
+ * (titular a dos tonos, 7 % enorme, +3 % de cashback, cupón tipo tiquete,
+ * fecha límite y dos garantías). Tablas y estilos en línea como el resto del
+ * correo: los íconos son emojis porque una imagen bloqueada por el cliente de
+ * correo dejaría huecos, y el cupón y el descuento NO pueden depender de eso.
  */
-function bloquePromo(p: { etiqueta: string; descuento: string; detalle: string; codigo: string }): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
-      <tr><td align="center" style="background:linear-gradient(135deg,${NARANJA} 0%,#F2357E 55%,${MORADO} 100%);background-color:${NARANJA};border-radius:16px;padding:26px 18px;">
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;letter-spacing:3px;color:#FFFFFF;text-transform:uppercase;">${escapeHtml(p.etiqueta)}</div>
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:56px;line-height:1;font-weight:bold;color:#FFFFFF;margin:10px 0 4px;">${escapeHtml(p.descuento)}</div>
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#FFFFFF;margin-bottom:18px;">${escapeHtml(p.detalle)}</div>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-          <tr><td align="center" style="background:#FFFFFF;border:2px dashed ${NARANJA};border-radius:12px;padding:14px 14px;">
-            <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:2px;color:#8a8f98;text-transform:uppercase;margin-bottom:6px;">Tu cupón</div>
-            <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:1.1;font-weight:bold;letter-spacing:1px;white-space:nowrap;color:${NEGRO};">${escapeHtml(p.codigo)}</div>
-          </td></tr>
-        </table>
-      </td></tr>
-    </table>`;
+const NARANJA_PROMO = "#FF4D12";
+const CREMA = "#FFF3EA";
+const fuente = "font-family:Arial,Helvetica,sans-serif;";
+
+function bloquePromo(p: PromoApertura): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px;">
+    <tr><td align="center" style="padding:4px 0 14px;">
+      <div style="${fuente}font-size:28px;line-height:1.1;font-weight:900;color:${NEGRO};">¡Hoy estrenamos</div>
+      <div style="${fuente}font-size:28px;line-height:1.15;font-weight:900;color:${NARANJA_PROMO};">nuestra tienda online!</div>
+    </td></tr>
+    <tr><td align="center" style="padding-bottom:16px;">
+      <span style="${fuente}display:inline-block;background:${CREMA};border-radius:999px;padding:8px 16px;font-size:13.5px;font-weight:bold;color:${NEGRO};">🎟️ Beneficio exclusivo de lanzamiento</span>
+    </td></tr>
+
+    <tr><td style="background:#FFFFFF;border:1px solid #F1E6DD;border-radius:16px;padding:18px 20px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="middle">
+          <div style="${fuente}font-size:72px;line-height:0.9;font-weight:900;color:${NARANJA_PROMO};">7%</div>
+          <div style="${fuente}font-size:24px;line-height:1.1;font-weight:900;color:${NEGRO};margin-top:6px;">de descuento</div>
+          <div style="${fuente}font-size:16px;color:#4a4f58;">en tu primera compra</div>
+        </td>
+        <td valign="middle" align="right" style="font-size:54px;line-height:1;">💌</td>
+      </tr></table>
+    </td></tr>
+
+    <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
+
+    <tr><td style="background:${CREMA};border-radius:16px;padding:16px 20px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="middle" width="56" style="font-size:40px;line-height:1;">🪙</td>
+        <td valign="middle">
+          <div style="${fuente}font-size:34px;line-height:1;font-weight:900;color:${NARANJA_PROMO};">+ 3%</div>
+          <div style="${fuente}font-size:18px;font-weight:900;color:${NEGRO};">de cashback</div>
+          <div style="${fuente}font-size:14px;color:#4a4f58;">sobre el precio final de tu compra.</div>
+        </td>
+      </tr></table>
+    </td></tr>
+
+    <tr><td style="height:16px;line-height:16px;font-size:0;">&nbsp;</td></tr>
+
+    <tr><td align="center" style="background:linear-gradient(135deg,${NARANJA} 0%,#F2357E 55%,${MORADO} 100%);background-color:${NARANJA_PROMO};border-radius:16px;padding:18px 14px;">
+      <div style="${fuente}font-size:13px;font-weight:bold;letter-spacing:2px;color:#FFFFFF;text-transform:uppercase;margin-bottom:10px;">✨ Tu cupón exclusivo ✨</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+        <tr><td align="center" style="background:#FFFFFF;border:2px dashed ${NARANJA_PROMO};border-radius:12px;padding:14px 14px;">
+          <div class="kora-texto" style="${fuente}font-size:20px;line-height:1.1;font-weight:bold;letter-spacing:1px;white-space:nowrap;color:${NEGRO};">${escapeHtml(p.codigo)}</div>
+        </td></tr>
+      </table>
+      <div style="${fuente}font-size:13px;color:#FFFFFF;margin-top:10px;">Escríbelo en el checkout, en el campo de cupón.</div>
+    </td></tr>
+
+    <tr><td style="height:12px;line-height:12px;font-size:0;">&nbsp;</td></tr>
+
+    <tr><td align="center" style="background:${CREMA};border-radius:12px;padding:12px 14px;">
+      <span style="${fuente}font-size:14px;color:${NEGRO};">📅 Redime tu cupón hasta el <strong>${escapeHtml(p.redimirHasta)}</strong>.</span>
+    </td></tr>
+
+    <tr><td style="padding:14px 0 4px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td width="50%" align="center" style="${fuente}font-size:13.5px;font-weight:bold;color:${NEGRO};">🛒 Compra desde<br/>Colombia o USA</td>
+        <td width="50%" align="center" style="${fuente}font-size:13.5px;font-weight:bold;color:${NEGRO};border-left:1px solid #F1E6DD;">🚚 Envíos a toda<br/>Colombia</td>
+      </tr></table>
+    </td></tr>
+  </table>`;
+}
+
+/** Botón grande con el degradado de la marca, como el "Crea tu cuenta" del afiche. */
+function botonPromo(label: string, url: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 6px;">
+    <tr><td align="center">
+      <a href="${escapeHtml(url)}" style="${fuente}display:inline-block;background:linear-gradient(90deg,${NARANJA} 0%,#F2357E 55%,${MORADO} 100%);background-color:${NARANJA_PROMO};color:#FFFFFF;font-size:18px;font-weight:bold;text-decoration:none;border-radius:999px;padding:15px 34px;">${escapeHtml(label)} ›</a>
+    </td></tr>
+  </table>`;
 }
 
 /**
@@ -417,11 +483,15 @@ export function renderCampaignHtml(input: TemplateInput): string {
   // puede quitar ni mover.
   const cuerpo = input.blocks
     ? bloquesHtml(input.blocks, base)
+    : input.promo
+    ? `${bloquePromo(input.promo)}
+      ${input.footer ? parrafos(input.footer) : ""}
+      ${input.ctaLabel && input.ctaUrl ? botonPromo(input.ctaLabel, input.ctaUrl) : ""}`
     : `<h1 class="kora-texto" style="margin:0 0 14px;font-size:23px;line-height:1.25;color:${NEGRO};">${escapeHtml(
         input.title,
       )}</h1>
       ${parrafos(input.body)}
-      ${input.promo ? bloquePromo(input.promo) : bloqueCodigo(input.code)}
+      ${bloqueCodigo(input.code)}
       ${lineaDeTiempo(input.timeline)}
       ${input.footer ? parrafos(input.footer) : ""}
       ${cta}
@@ -529,7 +599,8 @@ export function renderCampaignText(input: TemplateInput): string {
         lineas.push("");
       }
     }
-  } else {
+  } else if (!input.promo) {
+    // Con la pieza de apertura, el titular y el texto van dentro de ella.
     lineas.push(input.title.toUpperCase(), "");
     lineas.push(input.body.trim(), "");
   }
@@ -540,8 +611,10 @@ export function renderCampaignText(input: TemplateInput): string {
   // correo que no sirve para una parte de quien lo recibe.
   if (input.code) lineas.push(`Tu código: ${input.code}`, "");
   if (input.promo) {
-    lineas.push(`${input.promo.etiqueta} ${input.promo.descuento} — ${input.promo.detalle}`);
-    lineas.push(`Tu cupón: ${input.promo.codigo}`, "");
+    lineas.push("¡HOY ESTRENAMOS NUESTRA TIENDA ONLINE!", "");
+    lineas.push("7 % de descuento en tu primera compra + 3 % de cashback sobre el precio final.");
+    lineas.push(`Tu cupón: ${input.promo.codigo}`);
+    lineas.push(`Redímelo hasta el ${input.promo.redimirHasta}.`, "");
   }
 
   if (input.timeline && input.timeline.steps.length > 0) {

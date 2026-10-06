@@ -39,7 +39,7 @@ const ASUNTO = "Te damos la bienvenida a KORA 🧡";
 
 /**
  * Campaña de lanzamiento (pedido del cliente, 5 oct 2026): quien cree su
- * cuenta entre el 5 oct, 8:00 p. m., y el 6 oct, 8:00 p. m. (hora de
+ * cuenta entre el 5 oct, 8:00 p. m., y el 9 oct, 8:00 p. m. (hora de
  * Colombia), recibe en la bienvenida el cupón BIENVENIDOSAKORA: 7 % en su
  * primera compra, una sola vez, hasta el 31 oct, 11:59 p. m. El cupón vive en
  * el módulo de Cupones con esas reglas (primera compra, 1 por cliente,
@@ -50,7 +50,9 @@ const ASUNTO = "Te damos la bienvenida a KORA 🧡";
 export const CUPON_BIENVENIDA = {
   codigo: "BIENVENIDOSAKORA",
   desde: new Date("2026-10-06T01:00:00Z"), // 5 oct, 8:00 p. m. Colombia
-  hasta: new Date("2026-10-07T01:00:00Z"), // 6 oct, 8:00 p. m. Colombia
+  // La publicación en redes dice "al viernes 9 de octubre · 8:00 p. m." y es
+  // lo que vio la gente: manda sobre las instrucciones iniciales (6 oct).
+  hasta: new Date("2026-10-10T01:00:00Z"), // 9 oct, 8:00 p. m. Colombia
 } as const;
 
 export function recibeCuponBienvenida(ahora: Date = new Date()): boolean {
@@ -75,18 +77,11 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
         "Si ya habías comprado con este mismo correo, tus pedidos anteriores y tu cashback " +
         "aparecen solos: no hay nada que reclamar ni que migrar.",
     promo: conCupon
-      ? {
-          etiqueta: "✨ Regalo de apertura ✨",
-          descuento: "7 % OFF",
-          detalle: "en tu primera compra",
-          codigo: CUPON_BIENVENIDA.codigo,
-        }
+      ? { codigo: CUPON_BIENVENIDA.codigo, redimirHasta: "31 de octubre de 2026 a las 11:59 p. m. (hora Colombia)" }
       : null,
     footer: conCupon
-      ? "Escríbelo en el checkout, en el campo de cupón. Válido una sola vez, solo en tu primera " +
-        "compra, hasta el 31 de octubre a las 11:59 p. m. " +
-        "(hora de Colombia). Además, sigues ganando el 3 % de Kora Cashback sobre el valor final " +
-        "de tu compra.\n\nEste cupón es personal: te llegó por haber creado tu cuenta."
+      ? "Válido una sola vez, solo en tu primera compra. Este cupón es personal: te llegó por " +
+        "haber creado tu cuenta."
       : null,
     products: [],
     // Vacío A PROPÓSITO: esto no es publicidad. La baja de marketing es otra
