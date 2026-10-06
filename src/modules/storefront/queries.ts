@@ -213,15 +213,28 @@ export const PUBLICADO = {
  * magnitud, esto pasa a ser una columna materializada con índice GIN. No se
  * hace hoy porque sería optimizar un problema que no existe.
  */
+/** Apóstrofos rectos, curvos y acentos sueltos: se ignoran al buscar. */
+const APOSTROFOS = /['’‘´]/g;
+
 export async function searchMatchingIds(raw: string): Promise<string[]> {
-  const palabras = raw.trim().split(/\s+/).filter(Boolean);
+  // Los apóstrofos se QUITAN, de la consulta y del texto: el teclado del iPhone
+  // escribe "Women’s" con el curvo (’) y el nombre guardado lleva el recto ('),
+  // así que nunca coincidían y la búsqueda daba 0 (6 oct 2026).
+  const palabras = raw
+    .replace(APOSTROFOS, "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (palabras.length === 0) return [];
 
+  // La categoría PADRE entra al texto: un producto vive en su subcategoría
+  // ("Tops & blouses") y buscar la línea ("Women's clothing", "Ropa Mujer",
+  // "Hombre") no encontraba nada en ningún idioma.
   const filas = await db.$queryRaw<{ id: string }[]>`
     WITH doc AS (
       SELECT
         p.id,
-        unaccent(lower(
+        regexp_replace(unaccent(lower(
           coalesce(p.name, '') || ' ' ||
           coalesce(p."nameEn", '') || ' ' ||
           coalesce(p.brand, '') || ' ' ||
@@ -229,12 +242,15 @@ export async function searchMatchingIds(raw: string): Promise<string[]> {
           coalesce(p."descriptionEn", '') || ' ' ||
           coalesce(c.name, '') || ' ' ||
           coalesce(c."nameEn", '') || ' ' ||
+          coalesce(cp.name, '') || ' ' ||
+          coalesce(cp."nameEn", '') || ' ' ||
           coalesce(string_agg(coalesce(v.sku, '') || ' ' || coalesce(v.name, ''), ' '), '')
-        )) AS texto
+        )), '[''’‘´]', '', 'g') AS texto
       FROM products p
       LEFT JOIN categories c ON c.id = p."categoryId"
+      LEFT JOIN categories cp ON cp.id = c."parentId"
       LEFT JOIN variants v ON v."productId" = p.id
-      GROUP BY p.id, c.name, c."nameEn"
+      GROUP BY p.id, c.name, c."nameEn", cp.name, cp."nameEn"
     )
     SELECT id FROM doc
     WHERE NOT EXISTS (
