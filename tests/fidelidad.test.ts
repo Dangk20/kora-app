@@ -204,3 +204,28 @@ describe("la galería de la ficha rota sola y se funde", () => {
     expect(ficha).toContain("prefers-reduced-motion: reduce");
   });
 });
+
+describe("ninguna rejilla de la tienda se sale de un móvil", () => {
+  it("toda rejilla que solo define columnas desde `lg` fija la columna única de móvil", async () => {
+    // Sin `grid-cols-1` (= minmax(0, 1fr)), en móvil la columna implícita se
+    // estira al ancho mínimo de su contenido más largo: el checkout midió
+    // 515 px en un iPhone de 440 con la tienda en inglés (5 oct 2026).
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const archivos: string[] = [];
+    const recorrer = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const p = join(d, n);
+        if (statSync(p).isDirectory()) recorrer(p);
+        else if (p.endsWith(".tsx")) archivos.push(p);
+      }
+    };
+    recorrer("src/app/(tienda)");
+    const culpables = archivos.flatMap((f) =>
+      [...readFileSync(f, "utf8").matchAll(/className="([^"]*\bgrid\b[^"]*\blg:grid-cols-\[[^"]*)"/g)]
+        .filter((m) => !/\bgrid-cols-1\b|\bsm:grid-cols-|\bmd:grid-cols-|(^|\s)grid-cols-\d/.test(m[1]))
+        .map((m) => `${f}: ${m[1]}`),
+    );
+    expect(culpables).toEqual([]);
+  });
+});

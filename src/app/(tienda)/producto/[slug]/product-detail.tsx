@@ -122,7 +122,7 @@ export function ProductDetail({
   };
 
   return (
-    <div className="-mx-4 grid gap-6 bg-white p-4 sm:mx-0 sm:gap-10 sm:rounded-3xl sm:p-8 sm:shadow-[0_6px_28px_rgba(0,0,0,0.05)] lg:grid-cols-[480px_1fr]">
+    <div className="-mx-4 grid grid-cols-1 gap-6 bg-white p-4 sm:mx-0 sm:gap-10 sm:rounded-3xl sm:p-8 sm:shadow-[0_6px_28px_rgba(0,0,0,0.05)] lg:grid-cols-[480px_1fr]">
       {/* Galería */}
       <div>
         {/* Tocar la foto abre el visor a tamaño completo, en móvil y en

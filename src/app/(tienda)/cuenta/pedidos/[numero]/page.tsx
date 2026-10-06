@@ -64,7 +64,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
       {/* `min-w-0` en la rejilla y en la columna: sin él, la fila de un
           producto (foto + nombre + precio) estira la columna y la página se
           desplaza de lado en móvil (410 px en una de 390, medido). */}
-      <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ══════════ Izquierda ══════════ */}
         <div className="min-w-0 space-y-4">
           {/* En qué va */}

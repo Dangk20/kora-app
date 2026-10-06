@@ -467,8 +467,13 @@ export function CheckoutView({
 
       {rescate}
 
-      <form action={submit} className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+      {/* `grid-cols-1` (= minmax(0, 1fr)) y `min-w-0` en las hijas: sin eso,
+          en móvil la única columna se estira al ancho mínimo de su contenido
+          más largo y la página entera se sale de la pantalla — pasó en un
+          iPhone con la tienda en inglés (515 px en 440; 5 oct 2026). Misma
+          trampa que la portada (ver CLAUDE.md, tienda móvil). */}
+      <form action={submit} className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-kora-black">
@@ -882,7 +887,7 @@ export function CheckoutView({
             va abierto y pegado a la derecha, como siempre. */}
         <details
           open
-          className="group rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px] lg:[&>*:not(summary)]:!block"
+          className="group min-w-0 rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px] lg:[&>*:not(summary)]:!block"
         >
           <summary className="mb-4 flex cursor-pointer list-none items-center justify-between text-[17px] font-bold text-kora-black lg:pointer-events-none [&::-webkit-details-marker]:hidden">
             {tc.tuPedido}

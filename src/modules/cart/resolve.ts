@@ -8,6 +8,7 @@ import { storage } from "@/modules/storage";
 import { resolvePrice, toNumber, type Currency } from "@/modules/pricing";
 import type { CartLine } from "./cart-context";
 import { enIdioma, type Locale } from "@/modules/i18n";
+import { etiquetaVariante } from "@/modules/storefront/talla";
 
 export type ResolvedLine = {
   variantId: string;
@@ -98,7 +99,8 @@ export async function resolveCart(
       qtyAvailable,
       productName: enIdioma(locale, variant.product.name, variant.product.nameEn),
       productSlug: variant.product.slug,
-      variantName: variant.name,
+      // "Talla M" → "Size M" en inglés; el pedido se crea con "es" (lo lee el equipo).
+      variantName: etiquetaVariante(variant.name, locale),
       sku: variant.sku,
       imageUrl: image ? driver.urlFor(image.url) : null,
       categoryColor: variant.product.category.color,

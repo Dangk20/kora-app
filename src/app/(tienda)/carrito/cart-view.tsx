@@ -71,8 +71,11 @@ export function CartView() {
         {t.carrito.productos(cart!.itemCount)}
       </p>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-3">
+      {/* `grid-cols-1` + `min-w-0`: la misma trampa que el checkout — sin
+          ellas la columna única se estira al nombre más largo y la página se
+          sale de un móvil de 375 px (5 oct 2026). */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="min-w-0 space-y-3">
           {items.map((line) => (
             <div
               key={line.variantId}
@@ -188,7 +191,7 @@ export function CartView() {
             final de la lista, así que el total y el botón se repiten en una
             barra inferior fija (ver más abajo): con seis artículos, llegar a
             "Continuar compra" exigía recorrer la página entera. */}
-        <div className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px]">
+        <div className="min-w-0 rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:p-6 lg:sticky lg:top-[140px]">
           <h2 className="mb-4 text-[17px] font-bold text-kora-black">{t.carrito.resumen}</h2>
           <div className="flex justify-between text-sm text-[#4a4f58]">
             <span>{t.carrito.subtotal}</span>
