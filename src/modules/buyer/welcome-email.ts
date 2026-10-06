@@ -60,23 +60,31 @@ export function recibeCuponBienvenida(ahora: Date = new Date()): boolean {
 /** Manda la bienvenida. Devuelve si salió, para el registro — nunca para la pantalla. */
 export async function sendWelcomeEmail(to: string, name: string | null): Promise<boolean> {
   const conCupon = recibeCuponBienvenida();
-  const asunto = conCupon ? "Te damos la bienvenida a KORA 🧡 · Tu cupón de 7 %" : ASUNTO;
+  const asunto = conCupon ? "🎉 ¡KORA abrió sus puertas! Tu cupón de 7 % te espera" : ASUNTO;
   const { html, text } = renderCampaign({
     subject: asunto,
     preheader: conCupon
       ? "Tu cuenta ya está lista y tienes 7 % de descuento en tu primera compra."
       : "Tu cuenta ya está lista.",
-    title: conCupon ? "Tu cuenta está lista: aquí está tu cupón" : "Tu cuenta ya está lista",
+    title: conCupon ? "🎉 ¡Abrimos y tú llegaste primero!" : "Tu cuenta ya está lista",
     body: conCupon
-      ? "Gracias por crear tu cuenta en KORA. Por ser de los primeros, tienes 7 % de descuento " +
-        "en tu primera compra con este cupón. Escríbelo en el checkout, en el campo de cupón:"
+      ? "Hoy celebramos la apertura de nuestra tienda en línea y queremos celebrarla contigo. " +
+        "Tu cuenta ya está lista y, por ser de los primeros en llegar, este regalo es para ti:"
       : "Gracias por crear tu cuenta en KORA. Desde aquí puedes ver el estado de tus pedidos, " +
         "consultar tu historial de compras y llevar el saldo de tu Kora Cashback.\n\n" +
         "Si ya habías comprado con este mismo correo, tus pedidos anteriores y tu cashback " +
         "aparecen solos: no hay nada que reclamar ni que migrar.",
-    code: conCupon ? CUPON_BIENVENIDA.codigo : null,
+    promo: conCupon
+      ? {
+          etiqueta: "✨ Regalo de apertura ✨",
+          descuento: "7 % OFF",
+          detalle: "en tu primera compra",
+          codigo: CUPON_BIENVENIDA.codigo,
+        }
+      : null,
     footer: conCupon
-      ? "Válido una sola vez, solo en tu primera compra, hasta el 31 de octubre a las 11:59 p. m. " +
+      ? "Escríbelo en el checkout, en el campo de cupón. Válido una sola vez, solo en tu primera " +
+        "compra, hasta el 31 de octubre a las 11:59 p. m. " +
         "(hora de Colombia). Además, sigues ganando el 3 % de Kora Cashback sobre el valor final " +
         "de tu compra.\n\nEste cupón es personal: te llegó por haber creado tu cuenta."
       : null,
@@ -85,7 +93,7 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
     // lista, y darse de baja de ella no cancela una cuenta.
     unsubscribeUrl: "",
     recipientName: name,
-    ctaLabel: conCupon ? "Ir a la tienda" : "Ver mi cuenta",
+    ctaLabel: conCupon ? "Estrenar mi cupón" : "Ver mi cuenta",
     ctaUrl: conCupon ? storeUrl() : `${storeUrl()}/cuenta`,
     order: null,
   });

@@ -85,6 +85,12 @@ export type TemplateInput = {
    */
   code?: string | null;
   /**
+   * Tarjeta de celebración con un cupón (campaña de apertura, 5 oct 2026).
+   * Va en lugar del bloque de código: es el mismo dato, vestido de fiesta.
+   * El código va SIEMPRE también en texto plano.
+   */
+  promo?: { etiqueta: string; descuento: string; detalle: string; codigo: string } | null;
+  /**
    * Línea de tiempo del pedido. `current` es el índice del paso en curso.
    *
    * Convierte "tu pedido está confirmado" en una respuesta a la pregunta que
@@ -235,6 +241,28 @@ function bloqueCodigo(code: string | null | undefined): string {
         <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:${tamano}px;line-height:1.1;font-weight:bold;letter-spacing:${espacio}px;word-break:break-all;color:${NEGRO};">${escapeHtml(
           code,
         )}</div>
+      </td></tr>
+    </table>`;
+}
+
+/**
+ * Tarjeta de celebración: degradado de la marca, el descuento enorme y el
+ * cupón en un recuadro punteado, como un tiquete. Tablas y estilos en línea
+ * como el resto del correo; el degradado lleva color de respaldo porque
+ * algunos clientes (Outlook) no pintan `linear-gradient`.
+ */
+function bloquePromo(p: { etiqueta: string; descuento: string; detalle: string; codigo: string }): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr><td align="center" style="background:linear-gradient(135deg,${NARANJA} 0%,#F2357E 55%,${MORADO} 100%);background-color:${NARANJA};border-radius:16px;padding:26px 18px;">
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;letter-spacing:3px;color:#FFFFFF;text-transform:uppercase;">${escapeHtml(p.etiqueta)}</div>
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:56px;line-height:1;font-weight:bold;color:#FFFFFF;margin:10px 0 4px;">${escapeHtml(p.descuento)}</div>
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#FFFFFF;margin-bottom:18px;">${escapeHtml(p.detalle)}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+          <tr><td align="center" style="background:#FFFFFF;border:2px dashed ${NARANJA};border-radius:12px;padding:14px 14px;">
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:2px;color:#8a8f98;text-transform:uppercase;margin-bottom:6px;">Tu cupón</div>
+            <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:1.1;font-weight:bold;letter-spacing:1px;white-space:nowrap;color:${NEGRO};">${escapeHtml(p.codigo)}</div>
+          </td></tr>
+        </table>
       </td></tr>
     </table>`;
 }
@@ -393,7 +421,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
         input.title,
       )}</h1>
       ${parrafos(input.body)}
-      ${bloqueCodigo(input.code)}
+      ${input.promo ? bloquePromo(input.promo) : bloqueCodigo(input.code)}
       ${lineaDeTiempo(input.timeline)}
       ${input.footer ? parrafos(input.footer) : ""}
       ${cta}
@@ -511,6 +539,10 @@ export function renderCampaignText(input: TemplateInput): string {
   // esto. Un correo cuya información esencial solo existe en el HTML es un
   // correo que no sirve para una parte de quien lo recibe.
   if (input.code) lineas.push(`Tu código: ${input.code}`, "");
+  if (input.promo) {
+    lineas.push(`${input.promo.etiqueta} ${input.promo.descuento} — ${input.promo.detalle}`);
+    lineas.push(`Tu cupón: ${input.promo.codigo}`, "");
+  }
 
   if (input.timeline && input.timeline.steps.length > 0) {
     lineas.push("Estado de tu pedido:");
