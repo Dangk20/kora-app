@@ -110,7 +110,7 @@ export default async function CatalogoPage({
         total={products.length}
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[262px_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[262px_1fr]">
         <aside className="hidden rounded-[18px] bg-white p-[22px] shadow-[0_4px_18px_rgba(0,0,0,0.04)] lg:sticky lg:top-[140px] lg:block">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">

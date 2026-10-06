@@ -20,7 +20,7 @@ export default async function CargandoCatalogo() {
         ))}
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[262px_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[262px_1fr]">
         <Hueso className="hidden h-[320px] rounded-[18px] lg:block" />
         <RejillaEsqueleto etiqueta={t.catalogo.cargandoProductos} />
       </div>
