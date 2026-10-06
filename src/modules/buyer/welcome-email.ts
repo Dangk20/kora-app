@@ -79,15 +79,11 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
     promo: conCupon
       ? {
           codigo: CUPON_BIENVENIDA.codigo,
-          // La publicación en redes, recortada antes de su botón (public/email/).
-          imagenUrl: "/email/apertura-kora.jpg",
-          redimirHasta: "31 de octubre de 2026 a las 11:59 p. m. (hora Colombia)",
+          redimirHasta: "31 de octubre de 2026, 11:59 p. m. (hora Colombia)",
         }
       : null,
-    footer: conCupon
-      ? "Válido una sola vez, solo en tu primera compra. Este cupón es personal: te llegó por " +
-        "haber creado tu cuenta."
-      : null,
+    // Con la pieza de apertura las condiciones ya van dentro: nada que repetir.
+    footer: null,
     products: [],
     // Vacío A PROPÓSITO: esto no es publicidad. La baja de marketing es otra
     // lista, y darse de baja de ella no cancela una cuenta.
