@@ -224,9 +224,15 @@ function parrillaProductos(products: TemplateProduct[], base: string): string {
  */
 function bloqueCodigo(code: string | null | undefined): string {
   if (!code) return "";
+  // Un código de 6 dígitos va enorme y espaciado; uno largo —un cupón como
+  // BIENVENIDOSAKORA, 16 letras— a 34 px con 10 px entre letras mide ~700 px y
+  // se sale de un móvil. Largo = más pequeño y apretado, pero igual de visible.
+  const largo = code.length > 8;
+  const tamano = largo ? 24 : 34;
+  const espacio = largo ? 2 : 10;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
       <tr><td align="center" class="kora-caja" style="background:#F4F5F7;border-radius:12px;padding:22px 16px;">
-        <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:34px;line-height:1.1;font-weight:bold;letter-spacing:10px;color:${NEGRO};">${escapeHtml(
+        <div class="kora-texto" style="font-family:Arial,Helvetica,sans-serif;font-size:${tamano}px;line-height:1.1;font-weight:bold;letter-spacing:${espacio}px;word-break:break-all;color:${NEGRO};">${escapeHtml(
           code,
         )}</div>
       </td></tr>

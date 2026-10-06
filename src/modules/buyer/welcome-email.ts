@@ -37,27 +37,59 @@ import { storeUrl } from "@/modules/email/driver";
 // que concuerden con la persona.
 const ASUNTO = "Te damos la bienvenida a KORA 🧡";
 
+/**
+ * Campaña de lanzamiento (pedido del cliente, 5 oct 2026): quien cree su
+ * cuenta entre el 5 oct, 8:00 p. m., y el 6 oct, 8:00 p. m. (hora de
+ * Colombia), recibe en la bienvenida el cupón BIENVENIDOSAKORA: 7 % en su
+ * primera compra, una sola vez, hasta el 31 oct, 11:59 p. m. El cupón vive en
+ * el módulo de Cupones con esas reglas (primera compra, 1 por cliente,
+ * vencimiento); aquí solo se decide QUIÉN lo recibe y cómo se ve.
+ *
+ * Fechas en UTC: Colombia es UTC−5 todo el año (sin horario de verano).
+ */
+export const CUPON_BIENVENIDA = {
+  codigo: "BIENVENIDOSAKORA",
+  desde: new Date("2026-10-06T01:00:00Z"), // 5 oct, 8:00 p. m. Colombia
+  hasta: new Date("2026-10-07T01:00:00Z"), // 6 oct, 8:00 p. m. Colombia
+} as const;
+
+export function recibeCuponBienvenida(ahora: Date = new Date()): boolean {
+  return ahora >= CUPON_BIENVENIDA.desde && ahora < CUPON_BIENVENIDA.hasta;
+}
+
 /** Manda la bienvenida. Devuelve si salió, para el registro — nunca para la pantalla. */
 export async function sendWelcomeEmail(to: string, name: string | null): Promise<boolean> {
+  const conCupon = recibeCuponBienvenida();
+  const asunto = conCupon ? "Te damos la bienvenida a KORA 🧡 · Tu cupón de 7 %" : ASUNTO;
   const { html, text } = renderCampaign({
-    subject: ASUNTO,
-    preheader: "Tu cuenta ya está lista.",
-    title: "Tu cuenta ya está lista",
-    body:
-      "Gracias por crear tu cuenta en KORA. Desde aquí puedes ver el estado de tus pedidos, " +
-      "consultar tu historial de compras y llevar el saldo de tu Kora Cashback.\n\n" +
-      "Si ya habías comprado con este mismo correo, tus pedidos anteriores y tu cashback " +
-      "aparecen solos: no hay nada que reclamar ni que migrar.",
+    subject: asunto,
+    preheader: conCupon
+      ? "Tu cuenta ya está lista y tienes 7 % de descuento en tu primera compra."
+      : "Tu cuenta ya está lista.",
+    title: conCupon ? "Tu cuenta está lista: aquí está tu cupón" : "Tu cuenta ya está lista",
+    body: conCupon
+      ? "Gracias por crear tu cuenta en KORA. Por ser de los primeros, tienes 7 % de descuento " +
+        "en tu primera compra con este cupón. Escríbelo en el checkout, en el campo de cupón:"
+      : "Gracias por crear tu cuenta en KORA. Desde aquí puedes ver el estado de tus pedidos, " +
+        "consultar tu historial de compras y llevar el saldo de tu Kora Cashback.\n\n" +
+        "Si ya habías comprado con este mismo correo, tus pedidos anteriores y tu cashback " +
+        "aparecen solos: no hay nada que reclamar ni que migrar.",
+    code: conCupon ? CUPON_BIENVENIDA.codigo : null,
+    footer: conCupon
+      ? "Válido una sola vez, solo en tu primera compra, hasta el 31 de octubre a las 11:59 p. m. " +
+        "(hora de Colombia). Además, sigues ganando el 3 % de Kora Cashback sobre el valor final " +
+        "de tu compra.\n\nEste cupón es personal: te llegó por haber creado tu cuenta."
+      : null,
     products: [],
     // Vacío A PROPÓSITO: esto no es publicidad. La baja de marketing es otra
     // lista, y darse de baja de ella no cancela una cuenta.
     unsubscribeUrl: "",
     recipientName: name,
-    ctaLabel: "Ver mi cuenta",
-    ctaUrl: `${storeUrl()}/cuenta`,
+    ctaLabel: conCupon ? "Ir a la tienda" : "Ver mi cuenta",
+    ctaUrl: conCupon ? storeUrl() : `${storeUrl()}/cuenta`,
     order: null,
   });
 
-  const r = await emailDriver().send({ to, toName: name ?? undefined, subject: ASUNTO, html, text });
+  const r = await emailDriver().send({ to, toName: name ?? undefined, subject: asunto, html, text });
   return r.ok;
 }
