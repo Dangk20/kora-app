@@ -18,14 +18,14 @@ export const datosPersonales: LegalDocumentFactory = (m) => ({
   title: "Política de tratamiento de datos personales",
   summary:
     "Quién trata tus datos, para qué, y qué puedes exigir en cualquier momento.",
-  updatedAt: "2026-09-12",
+  updatedAt: "2026-10-08",
   sections: [
     {
       heading: "Responsable del tratamiento",
       blocks: [
         {
           kind: "p",
-          text: `${m.razonSocial}, con NIT ${m.nit} y domicilio en ${m.domicilio}, actúa como responsable del tratamiento de los datos personales recogidos a través de esta tienda y de sus canales de atención.`,
+          text: `${m.razonSocial}, sociedad identificada con NIT ${m.nit} y con domicilio en ${m.domicilio}, actúa como responsable del tratamiento de los datos personales recogidos a través de esta tienda y de sus canales de atención.`,
         },
         {
           kind: "p",

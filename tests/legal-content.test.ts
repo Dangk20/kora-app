@@ -183,6 +183,11 @@ describe("política de datos — sostiene el consentimiento del checkout", () =>
     expect(t()).toContain(COMERCIANTE.domicilio);
   });
 
+  it("presenta al responsable como sociedad, no como persona natural", () => {
+    expect(t()).toContain(`sociedad identificada con NIT ${COMERCIANTE.nit}`);
+    expect(texto(doc("terminos"))).toContain(`sociedad identificada con NIT ${COMERCIANTE.nit}`);
+  });
+
   it("publica un canal de atención al titular", () => {
     expect(t()).toContain(COMERCIANTE.email);
   });

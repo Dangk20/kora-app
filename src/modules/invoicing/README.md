@@ -19,7 +19,8 @@ mismo criterio que Email marketing: se enseña qué falta en vez de esconder el
 botón, porque los tres insumos son del cliente.
 
 **No desglosa IVA.** El sistema no tiene una sola tarifa cargada ni sabe si el
-comerciante es responsable de IVA ni si los precios del catálogo lo incluyen. Un
+comerciante es responsable de IVA (el RUT de la S.A.S. dice que sí) ni si los precios
+del catálogo lo incluyen. Un
 desglose sobre una tarifa supuesta no es un dato incompleto: es un dato falso
 con apariencia de dato, y a diferencia de un campo vacío nadie lo revisa. Es
 insumo pendiente del cliente y bloquea también la factura electrónica.
@@ -87,7 +88,8 @@ el código que lo dibuja.
 
 Ninguno bloquea el comprobante; **todos bloquean la factura electrónica**:
 
-1. ¿KORA es responsable de IVA? ¿Los precios del catálogo lo incluyen?
+1. ¿Los precios del catálogo incluyen IVA? (Desde el 8 oct 2026 se sabe que KORA SHOPP S.A.S. es
+   responsable de IVA, responsabilidad 48 del RUT; falta la regla de inclusión y la tarifa.)
 2. Visto bueno de razón social, NIT y domicilio (`KORA_LEGAL_*`) — el mismo
    pendiente que las páginas legales.
 3. Habilitación ante la DIAN y proveedor tecnológico.

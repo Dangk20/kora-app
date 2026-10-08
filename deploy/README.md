@@ -214,6 +214,11 @@ KORA_LEGAL_DOMICILIO=
 KORA_LEGAL_EMAIL=
 ```
 
+Valores vigentes (KORA SHOPP S.A.S., RUT DIAN 141284373798, 8 oct 2026):
+`KORA_LEGAL_RAZON_SOCIAL="KORA SHOPP S.A.S."`, `KORA_LEGAL_NIT="902.114.365-5"`,
+`KORA_LEGAL_DOMICILIO="Calle 25 Sur # 32-23, Neiva, Huila, Colombia"`,
+`KORA_LEGAL_EMAIL="info.kora.shopping@gmail.com"`.
+
 Identifican al responsable del tratamiento en `/legal/datos-personales`, que es
 la política a la que apunta la autorización que el checkout le pide al
 comprador. Publicarlas con marcadores no deja un texto incompleto: deja un

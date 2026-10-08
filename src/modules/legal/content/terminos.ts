@@ -26,14 +26,14 @@ export const terminos: LegalDocumentFactory = (m) => ({
   title: "Términos y condiciones de venta",
   summary:
     "Cómo funciona comprar en KORA: el pedido, el pago por WhatsApp, los precios y el cashback.",
-  updatedAt: "2026-08-07",
+  updatedAt: "2026-10-08",
   sections: [
     {
       heading: "Quiénes somos",
       blocks: [
         {
           kind: "p",
-          text: `Esta tienda es operada por ${m.razonSocial}, NIT ${m.nit}, con domicilio en ${m.domicilio}. Puedes contactarnos en ${m.email} o por WhatsApp desde cualquier página de la tienda.`,
+          text: `Esta tienda es operada por ${m.razonSocial}, sociedad identificada con NIT ${m.nit}, con domicilio en ${m.domicilio}. Puedes contactarnos en ${m.email} o por WhatsApp desde cualquier página de la tienda.`,
         },
         {
           kind: "p",
