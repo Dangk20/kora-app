@@ -63,6 +63,7 @@ export type LegalDocument = {
 export const LEGAL_SLUGS = [
   "terminos",
   "datos-personales",
+  "cookies",
   "cambios",
   "envios",
   "seguridad-pagos",

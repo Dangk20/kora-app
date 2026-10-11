@@ -196,7 +196,8 @@ export default async function StoreLayout({
           NEXT_PUBLIC_*, porque la imagen es la misma en pruebas y producción. */}
       <MeasurementTags
         config={measurementPublicConfig()}
-        privacyUrl={legalUrl(locale, "datos-personales", { ancla: "cookies" })}
+        privacyUrl={legalUrl(locale, "datos-personales")}
+        cookiesUrl={legalUrl(locale, "cookies")}
       />
     </div>
     </MobileBarsProvider>

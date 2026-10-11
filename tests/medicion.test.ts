@@ -268,15 +268,28 @@ describe("compra confirmada → Meta y GA4", () => {
 });
 
 describe("política de privacidad", () => {
-  it("sin medición conserva el texto aprobado; con medición nombra a Meta y Google", () => {
+  it("sin medición conserva el texto aprobado; con medición describe análisis y publicidad sin nombrar proveedores", () => {
     for (const idioma of ["es", "en"] as const) {
       const sin = legalDocument("datos-personales", merchant(), idioma, { medicion: false });
       const con = legalDocument("datos-personales", merchant(), idioma, { medicion: true });
       const cookies = (d: typeof sin) => JSON.stringify(d.sections.find((s) => s.id === "cookies"));
-      expect(cookies(sin)).not.toMatch(/Meta|Google/);
-      expect(cookies(con)).toMatch(/Meta/);
-      expect(cookies(con)).toMatch(/Google/);
-      expect(cookies(con)).toMatch(/SHA-256/);
+      expect(cookies(sin)).not.toMatch(/análisis|analytics/i);
+      expect(cookies(con)).toMatch(/análisis|analytics/i);
+      expect(cookies(con)).toMatch(/cifrad|hashed/i);
+      // Sin nombrar proveedores (decisión de Daniel, 11 oct).
+      expect(cookies(con)).not.toMatch(/Meta|Google|Clarity/);
     }
   });
 });
+
+describe("política de cookies", () => {
+  it("existe en los dos idiomas, dice que cerrar el aviso NO es aceptar, y no nombra proveedores", () => {
+    for (const idioma of ["es", "en"] as const) {
+      const d = legalDocument("cookies", merchant(), idioma);
+      const texto = JSON.stringify(d);
+      expect(texto).toMatch(idioma === "es" ? /solo usamos las cookies necesarias/i : /only use necessary cookies/i);
+      expect(texto).not.toMatch(/Meta|Google|Clarity|Facebook/);
+    }
+  });
+});
+

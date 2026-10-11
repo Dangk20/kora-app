@@ -41,9 +41,9 @@ function texto(doc: LegalDocument): string {
 const doc = (slug: (typeof LEGAL_SLUGS)[number], locale: "es" | "en" = "es") => legalDocument(slug, COMERCIANTE, locale);
 
 describe("documentos legales — estructura", () => {
-  it("los siete documentos existen en los dos idiomas y se resuelven por su slug", () => {
+  it("los ocho documentos existen en los dos idiomas y se resuelven por su slug", () => {
     for (const locale of LOCALES) {
-      expect(allLegalDocuments(COMERCIANTE, locale)).toHaveLength(7);
+      expect(allLegalDocuments(COMERCIANTE, locale)).toHaveLength(8);
       for (const slug of LEGAL_SLUGS) {
         expect(doc(slug, locale).slug).toBe(slug);
       }

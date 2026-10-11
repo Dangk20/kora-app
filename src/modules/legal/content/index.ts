@@ -2,6 +2,7 @@ import type { Locale } from "@/modules/i18n";
 import type { Merchant } from "../config";
 import { cambios } from "./cambios";
 import { comercio } from "./comercio";
+import { cookies } from "./cookies";
 import { datosPersonales } from "./datos-personales";
 import { envios } from "./envios";
 import { promociones } from "./promociones";
@@ -18,6 +19,7 @@ import {
 const DOCUMENTOS: Record<LegalSlug, BilingualDocument> = {
   terminos,
   "datos-personales": datosPersonales,
+  cookies,
   cambios,
   envios,
   "seguridad-pagos": seguridadPagos,

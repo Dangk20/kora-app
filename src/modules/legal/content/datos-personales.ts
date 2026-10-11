@@ -15,8 +15,6 @@ import { PREVALECE_ESPANOL, presentacionEn, presentacionEs } from "./common";
 import type { BilingualDocument } from "./types";
 
 const ACTUALIZADO = "2026-10-11";
-// La versión SIN medición no cambió desde el centro legal: conserva su fecha.
-const ACTUALIZADO_SIN_MEDICION = "2026-10-10";
 
 export const datosPersonales: BilingualDocument = {
   es: (m, c) => ({
@@ -24,7 +22,7 @@ export const datosPersonales: BilingualDocument = {
     title: "Política de privacidad y tratamiento de datos personales",
     shortTitle: "Privacidad y tratamiento de datos",
     summary: "Quién trata tus datos, para qué, con quién se comparten y qué puedes exigir en cualquier momento.",
-    updatedAt: c?.medicion ? ACTUALIZADO : ACTUALIZADO_SIN_MEDICION,
+    updatedAt: ACTUALIZADO,
     sections: [
       {
         id: "responsable",
@@ -37,6 +35,33 @@ export const datosPersonales: BilingualDocument = {
           },
           { kind: "p", text: presentacionEs(m) },
           { kind: "p", text: `Para cualquier asunto relacionado con tus datos personales puedes escribir a ${m.email}.` },
+        ],
+      },
+      {
+        id: "marco-legal",
+        heading: "Marco legal, definiciones y principios",
+        summary: "Tratamos tus datos conforme a la Ley 1581 de 2012 y sus normas reglamentarias, con ocho principios.",
+        blocks: [
+          {
+            kind: "p",
+            text: "Esta política se rige por los artículos 15 y 20 de la Constitución Política de Colombia, la Ley 1581 de 2012, el Decreto 1074 de 2015 (que compila los Decretos 1377 de 2013 y 886 de 2014), la Circular Externa 005 de 2017 de la Superintendencia de Industria y Comercio y las demás normas que las modifiquen o complementen.",
+          },
+          {
+            kind: "list",
+            items: [
+              "Titular: la persona a quien se refieren los datos; en esta tienda, tú.",
+              "Tratamiento: cualquier operación sobre los datos, como recogerlos, guardarlos, usarlos, compartirlos o suprimirlos.",
+              "Autorización: tu consentimiento previo, expreso e informado para el tratamiento.",
+              "Responsable: quien decide sobre el tratamiento; en este caso, KORA.",
+              "Encargado: quien trata los datos por cuenta del responsable, como la transportadora o el proveedor de alojamiento.",
+              "Dato sensible: el que afecta tu intimidad o puede generar discriminación, como el origen racial, la orientación política, las convicciones religiosas, la salud, la vida sexual o los datos biométricos.",
+              "Transferencia y transmisión: el envío de datos a un tercero que los trata como responsable (transferencia) o por cuenta nuestra (transmisión).",
+            ],
+          },
+          {
+            kind: "p",
+            text: "Aplicamos los principios de legalidad, finalidad, libertad, veracidad o calidad, transparencia, acceso y circulación restringida, seguridad y confidencialidad.",
+          },
         ],
       },
       {
@@ -96,6 +121,21 @@ export const datosPersonales: BilingualDocument = {
         ],
       },
       {
+        id: "autorizacion",
+        heading: "Cómo obtenemos tu autorización",
+        summary: "Te la pedimos antes de tratar tus datos, te decimos para qué y guardamos constancia.",
+        blocks: [
+          {
+            kind: "p",
+            text: "Te pedimos autorización antes de tratar tus datos, por medios que permiten guardar constancia: la casilla obligatoria del checkout, el registro de tu cuenta, el aviso de cookies o la conversación por WhatsApp. Al pedirla te informamos el tratamiento, su finalidad, tus derechos y cómo contactarnos.",
+          },
+          {
+            kind: "p",
+            text: "Responder preguntas sobre datos sensibles o sobre menores de edad es siempre opcional. Si un menor de edad compra a través de la tienda, la autorización debe darla su representante legal.",
+          },
+        ],
+      },
+      {
         id: "compartir",
         heading: "Con quién los compartimos",
         summary: "Solo con quien necesitamos para cobrar, entregar y operar la tienda. Nunca los vendemos.",
@@ -134,11 +174,35 @@ export const datosPersonales: BilingualDocument = {
           },
           {
             kind: "p",
-            text: `Para ejercer cualquiera de ellos escribe a ${m.email} indicando tu nombre y el derecho que quieres ejercer. Respondemos las consultas en un máximo de diez (10) días hábiles y los reclamos en un máximo de quince (15) días hábiles, contados desde que recibimos la solicitud. Si necesitamos más tiempo te explicaremos por qué y cuándo tendrás respuesta.`,
+            text: `Para ejercer cualquiera de ellos escribe a ${m.email} indicando tu nombre y el derecho que quieres ejercer. El trámite y los plazos están en la sección «Cómo presentar consultas y reclamos».`,
           },
           {
             kind: "note",
             text: "Ten en cuenta que si pides eliminar tus datos, perderás el acceso a tu historial de pedidos y el saldo de Kora Cashback asociado a tu cuenta. Conservaremos únicamente la información de las ventas que la ley nos obliga a guardar por razones contables y tributarias.",
+          },
+        ],
+      },
+      {
+        id: "procedimiento",
+        heading: "Cómo presentar consultas y reclamos",
+        summary: "Por correo o WhatsApp. Consultas: 10 días hábiles. Reclamos: 15 días hábiles. Sin costo.",
+        blocks: [
+          {
+            kind: "p",
+            text: `Puedes presentarlos tú, tus causahabientes, tu representante o tu apoderado, sin ningún costo, escribiendo a ${m.email} o por WhatsApp. La solicitud debe indicar el nombre del titular, lo que pides, una dirección o correo para responderte y, si aplica, los documentos que quieras hacer valer.`,
+          },
+          {
+            kind: "list",
+            items: [
+              "Consultas (conocer qué datos tenemos y cómo los usamos): respondemos en un máximo de diez (10) días hábiles desde que recibimos la solicitud. Si no es posible, te explicamos el motivo y respondemos en un plazo que no excede cinco (5) días hábiles adicionales.",
+              "Reclamos (corregir, actualizar o suprimir datos, revocar la autorización o advertir un incumplimiento): respondemos en un máximo de quince (15) días hábiles desde que recibimos la solicitud. Si no es posible, te explicamos el motivo y respondemos en un plazo que no excede ocho (8) días hábiles adicionales.",
+              "Si el reclamo está incompleto, te pedimos completarlo dentro de los cinco (5) días siguientes. Si pasan dos (2) meses sin que lo completes, se entiende que desististe.",
+              "Mientras resolvemos un reclamo completo, marcamos tus datos con la leyenda «reclamo en trámite» en un máximo de dos (2) días hábiles.",
+            ],
+          },
+          {
+            kind: "p",
+            text: "Agotado este trámite, puedes acudir a la Superintendencia de Industria y Comercio.",
           },
         ],
       },
@@ -164,7 +228,7 @@ export const datosPersonales: BilingualDocument = {
           },
           {
             kind: "p",
-            text: "Ningún sistema es infalible. Si llegara a ocurrir un incidente que afecte tus datos personales, te informaremos y lo reportaremos a la autoridad conforme a la ley.",
+            text: "Ningún sistema es infalible. Si llegara a ocurrir un incidente que afecte tus datos personales, lo registramos, aplicamos las medidas para contenerlo, lo reportamos a la Superintendencia de Industria y Comercio dentro de los quince (15) días hábiles siguientes a su detección y te informamos cuando pueda afectarte de manera significativa.",
           },
         ],
       },
@@ -172,34 +236,17 @@ export const datosPersonales: BilingualDocument = {
         id: "cookies",
         heading: "Cookies",
         summary: c?.medicion
-          ? "Usamos cookies necesarias para que la tienda funcione y, solo si lo autorizas, cookies de medición de Meta, Google y Microsoft Clarity."
+          ? "Usamos cookies necesarias y, solo si las aceptas, cookies de análisis y publicidad."
           : "Solo usamos cookies necesarias para que la tienda funcione.",
         blocks: c?.medicion
           ? [
               {
                 kind: "p",
-                text: "Usamos cookies estrictamente necesarias para que la tienda funcione: mantener tu sesión iniciada, recordar la moneda y el idioma que elegiste, conservar los productos de tu carrito, guardar tu elección sobre cookies y registrar de qué campaña o enlace llegaste a la tienda.",
+                text: "Usamos cookies necesarias para que la tienda funcione y, solo si las aceptas en el aviso de cookies, cookies de análisis y publicidad de aliados que nos ayudan a mejorar la tienda y medir nuestra publicidad. Cuando confirmamos el pedido de quien las aceptó, informamos a esos aliados que la compra ocurrió, con los datos de contacto cifrados de forma irreversible. Algunos de ellos están en Estados Unidos.",
               },
               {
                 kind: "p",
-                text: "Solo si lo autorizas en el aviso de cookies, usamos además cookies de medición de Meta Platforms (Facebook e Instagram), de Google (Google Analytics y Google Ads) y de Microsoft Clarity, con estas finalidades:",
-              },
-              {
-                kind: "list",
-                items: [
-                  "Medir qué anuncios y publicaciones llevan a una compra.",
-                  "Informar a esas plataformas, cuando confirmamos tu pedido, que la compra ocurrió y por qué valor, para que nuestros anuncios lleguen a personas con intereses parecidos.",
-                  "Mostrarte anuncios de KORA más relevantes en esas plataformas.",
-                  "Entender cómo se usa la tienda —en qué se hace clic, hasta dónde se desplaza la página, dónde se atasca la compra— para mejorarla. Microsoft Clarity graba la navegación de forma anónima y oculta lo que escribes en los formularios.",
-                ],
-              },
-              {
-                kind: "p",
-                text: "Al confirmar tu pedido les enviamos tu correo, teléfono, nombre y ciudad cifrados de forma irreversible (SHA-256), junto con la dirección IP y el navegador desde los que compraste, únicamente para que puedan reconocer la compra. Estas plataformas están en Estados Unidos y tratan esos datos conforme a sus propias políticas.",
-              },
-              {
-                kind: "p",
-                text: "Si eliges «Solo necesarias», no cargamos ninguna de esas cookies ni enviamos tus datos de compra a ninguna plataforma. Puedes cambiar tu elección en cualquier momento desde «Preferencias de cookies», al pie de la tienda.",
+                text: "El detalle de qué cookies usamos, para qué y cómo aceptarlas, rechazarlas o borrarlas está en nuestra Política de cookies.",
               },
             ]
           : [
@@ -218,6 +265,10 @@ export const datosPersonales: BilingualDocument = {
             kind: "p",
             text: "Si modificamos esta política publicaremos la nueva versión en esta misma página, con su fecha de actualización. Cuando el cambio afecte de forma sustancial las finalidades del tratamiento, te lo comunicaremos antes de aplicarlo.",
           },
+          {
+            kind: "p",
+            text: "Esta política rige desde la fecha de actualización indicada al inicio. Los datos se tratan durante el tiempo necesario para las finalidades descritas; revocada la autorización, se suprimen salvo que una obligación legal o contractual exija conservarlos, caso en el que te lo informamos.",
+          },
         ],
       },
     ],
@@ -228,7 +279,7 @@ export const datosPersonales: BilingualDocument = {
     title: "Privacy and Personal Data Policy",
     shortTitle: "Privacy policy",
     summary: "Who processes your data, for what, with whom it is shared, and what you can request at any time.",
-    updatedAt: c?.medicion ? ACTUALIZADO : ACTUALIZADO_SIN_MEDICION,
+    updatedAt: ACTUALIZADO,
     sections: [
       {
         id: "responsable",
@@ -242,6 +293,33 @@ export const datosPersonales: BilingualDocument = {
           { kind: "p", text: presentacionEn(m) },
           { kind: "p", text: `For any matter related to your personal data, write to ${m.email}.` },
           { kind: "note", text: PREVALECE_ESPANOL },
+        ],
+      },
+      {
+        id: "marco-legal",
+        heading: "Legal framework, definitions and principles",
+        summary: "We process your data under Colombian Law 1581 of 2012 and its regulations, following eight principles.",
+        blocks: [
+          {
+            kind: "p",
+            text: "This policy is governed by articles 15 and 20 of the Political Constitution of Colombia, Law 1581 of 2012, Decree 1074 of 2015 (which compiles Decrees 1377 of 2013 and 886 of 2014), External Circular 005 of 2017 of the Superintendence of Industry and Commerce, and any rules that amend or complement them.",
+          },
+          {
+            kind: "list",
+            items: [
+              "Data subject: the person the data refers to; in this store, you.",
+              "Processing: any operation on the data, such as collecting, storing, using, sharing or deleting it.",
+              "Authorization: your prior, express and informed consent to the processing.",
+              "Controller: whoever decides on the processing; in this case, KORA.",
+              "Processor: whoever processes data on the controller's behalf, such as the carrier or the hosting provider.",
+              "Sensitive data: data that affects your privacy or may lead to discrimination, such as racial origin, political orientation, religious beliefs, health, sex life or biometric data.",
+              "Transfer and transmission: sending data to a third party that processes it as a controller (transfer) or on our behalf (transmission).",
+            ],
+          },
+          {
+            kind: "p",
+            text: "We apply the principles of legality, purpose, freedom, accuracy or quality, transparency, restricted access and circulation, security and confidentiality.",
+          },
         ],
       },
       {
@@ -295,6 +373,21 @@ export const datosPersonales: BilingualDocument = {
         ],
       },
       {
+        id: "autorizacion",
+        heading: "How we obtain your authorization",
+        summary: "We ask before processing your data, tell you why, and keep a record.",
+        blocks: [
+          {
+            kind: "p",
+            text: "We ask for your authorization before processing your data, through means that let us keep a record: the mandatory checkbox at checkout, your account registration, the cookie notice or the WhatsApp conversation. When asking, we tell you about the processing, its purpose, your rights and how to contact us.",
+          },
+          {
+            kind: "p",
+            text: "Answering questions about sensitive data or minors is always optional. If a minor buys through the store, authorization must be given by their legal representative.",
+          },
+        ],
+      },
+      {
         id: "compartir",
         heading: "Who we share it with",
         summary: "Only with those we need to charge, deliver and run the store. We never sell it.",
@@ -333,11 +426,35 @@ export const datosPersonales: BilingualDocument = {
           },
           {
             kind: "p",
-            text: `To exercise any of them, write to ${m.email} with your name and the right you want to exercise. We answer inquiries within ten (10) business days and claims within fifteen (15) business days from receipt. If we need more time we will explain why and when you will get an answer.`,
+            text: `To exercise any of them, write to ${m.email} with your name and the right you want to exercise. The process and deadlines are in the section "How to submit inquiries and claims".`,
           },
           {
             kind: "note",
             text: "Please note that if you ask us to delete your data, you will lose access to your order history and the Kora Cashback balance linked to your account. We will only keep the sales information that the law requires us to keep for accounting and tax purposes.",
+          },
+        ],
+      },
+      {
+        id: "procedimiento",
+        heading: "How to submit inquiries and claims",
+        summary: "By email or WhatsApp. Inquiries: 10 business days. Claims: 15 business days. Free of charge.",
+        blocks: [
+          {
+            kind: "p",
+            text: `You, your successors, your representative or your attorney may submit them free of charge by writing to ${m.email} or via WhatsApp. The request must include the data subject's name, what you are asking for, an address or email for our answer and, if applicable, any supporting documents.`,
+          },
+          {
+            kind: "list",
+            items: [
+              "Inquiries (knowing what data we hold and how we use it): we answer within ten (10) business days of receipt. If that is not possible, we explain why and answer within no more than five (5) additional business days.",
+              "Claims (correcting, updating or deleting data, revoking authorization or reporting a breach): we answer within fifteen (15) business days of receipt. If that is not possible, we explain why and answer within no more than eight (8) additional business days.",
+              "If a claim is incomplete, we ask you to complete it within the following five (5) days. If two (2) months pass without completing it, it is considered withdrawn.",
+              "While we resolve a complete claim, we mark your data as \"claim in progress\" within no more than two (2) business days.",
+            ],
+          },
+          {
+            kind: "p",
+            text: "Once this process is exhausted, you may go to Colombia's Superintendence of Industry and Commerce.",
           },
         ],
       },
@@ -358,41 +475,24 @@ export const datosPersonales: BilingualDocument = {
             kind: "p",
             text: "We apply reasonable technical and administrative measures to protect your data: every connection to the store is encrypted, access to the admin panel is restricted by permissions, and passwords are stored encrypted, never in plain text. Details about card payments are in our payment security policy.",
           },
-          { kind: "p", text: "No system is infallible. If an incident affecting your personal data ever occurs, we will inform you and report it to the authority as required by law." },
+          { kind: "p", text: "No system is infallible. If an incident affecting your personal data ever occurs, we log it, take measures to contain it, report it to the Superintendence of Industry and Commerce within fifteen (15) business days of detection, and inform you when it may significantly affect you." },
         ],
       },
       {
         id: "cookies",
         heading: "Cookies",
         summary: c?.medicion
-          ? "We use cookies the store needs to work and, only with your permission, Meta, Google and Microsoft Clarity measurement cookies."
+          ? "We use necessary cookies and, only if you accept them, analytics and advertising cookies."
           : "We only use cookies the store needs to work.",
         blocks: c?.medicion
           ? [
               {
                 kind: "p",
-                text: "We use strictly necessary cookies to make the store work: keeping you signed in, remembering the currency and language you chose, keeping the products in your cart, saving your cookie choice and recording which campaign or link brought you to the store.",
+                text: "We use necessary cookies to make the store work and, only if you accept them in the cookie notice, analytics and advertising cookies from partners that help us improve the store and measure our advertising. When we confirm an order from someone who accepted them, we tell those partners the purchase happened, with contact details irreversibly hashed. Some of them are in the United States.",
               },
               {
                 kind: "p",
-                text: "Only if you allow it in the cookie notice, we also use measurement cookies from Meta Platforms (Facebook and Instagram), Google (Google Analytics and Google Ads) and Microsoft Clarity, for these purposes:",
-              },
-              {
-                kind: "list",
-                items: [
-                  "Measuring which ads and posts lead to a purchase.",
-                  "Telling those platforms, when we confirm your order, that the purchase happened and its value, so our ads reach people with similar interests.",
-                  "Showing you more relevant KORA ads on those platforms.",
-                  "Understanding how the store is used —what gets clicked, how far pages are scrolled, where checkout gets stuck— to improve it. Microsoft Clarity records browsing anonymously and hides what you type in forms.",
-                ],
-              },
-              {
-                kind: "p",
-                text: "When we confirm your order we send them your email, phone, name and city irreversibly hashed (SHA-256), together with the IP address and browser you purchased from, solely so they can recognize the purchase. These platforms are in the United States and process that data under their own policies.",
-              },
-              {
-                kind: "p",
-                text: "If you choose \"Necessary only\", we load none of those cookies and send your purchase data to no platform. You can change your choice at any time from \"Cookie preferences\" at the bottom of the store.",
+                text: "Details on which cookies we use, why, and how to accept, reject or delete them are in our Cookie policy.",
               },
             ]
           : [
@@ -408,6 +508,7 @@ export const datosPersonales: BilingualDocument = {
         summary: "We publish every version with its date and notify you of significant changes.",
         blocks: [
           { kind: "p", text: "If we change this policy we will publish the new version on this page with its update date. When a change substantially affects the purposes of processing, we will notify you before applying it." },
+          { kind: "p", text: "This policy is in force from the update date shown at the top. Data is processed for as long as needed for the purposes described; once authorization is revoked, it is deleted unless a legal or contractual obligation requires keeping it, in which case we will let you know." },
         ],
       },
     ],

@@ -1,13 +1,13 @@
-// Aviso de cookies de medición (change `medicion-publicitaria`). Solo aparece
-// si la tienda tiene Meta o Google configurados.
+// Aviso de cookies (change `medicion-publicitaria`). Solo aparece si la tienda
+// tiene alguna medición configurada. No nombra proveedores (Daniel, 11 oct):
+// el detalle está en la política de cookies.
 export const cookies = {
-  titulo: "Tu privacidad",
-  /** `plataformas`: las que están encendidas, ya unidas ("Meta y Google", "Google"). */
-  texto: (plataformas: string) =>
-    `Usamos cookies propias para que la tienda funcione. Con tu autorización, también usamos cookies de ${plataformas} para medir qué publicidad funciona y mostrarte anuncios más relevantes.`,
-  y: "y",
-  politica: "Política de privacidad",
+  texto: "Usamos cookies para mejorar tu experiencia. Conoce nuestra política de",
+  cookies: "cookies",
+  y: "y de",
+  privacidad: "privacidad",
   aceptar: "Aceptar",
-  rechazar: "Solo necesarias",
+  /** La X: cierra el aviso SIN aceptar — solo quedan las cookies necesarias. */
+  cerrar: "Cerrar y usar solo las cookies necesarias",
   preferencias: "Preferencias de cookies",
 };
