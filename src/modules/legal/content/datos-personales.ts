@@ -14,15 +14,17 @@
 import { PREVALECE_ESPANOL, presentacionEn, presentacionEs } from "./common";
 import type { BilingualDocument } from "./types";
 
-const ACTUALIZADO = "2026-10-10";
+const ACTUALIZADO = "2026-10-11";
+// La versión SIN medición no cambió desde el centro legal: conserva su fecha.
+const ACTUALIZADO_SIN_MEDICION = "2026-10-10";
 
 export const datosPersonales: BilingualDocument = {
-  es: (m) => ({
+  es: (m, c) => ({
     slug: "datos-personales",
     title: "Política de privacidad y tratamiento de datos personales",
     shortTitle: "Privacidad y tratamiento de datos",
     summary: "Quién trata tus datos, para qué, con quién se comparten y qué puedes exigir en cualquier momento.",
-    updatedAt: ACTUALIZADO,
+    updatedAt: c?.medicion ? ACTUALIZADO : ACTUALIZADO_SIN_MEDICION,
     sections: [
       {
         id: "responsable",
@@ -169,13 +171,43 @@ export const datosPersonales: BilingualDocument = {
       {
         id: "cookies",
         heading: "Cookies",
-        summary: "Solo usamos cookies necesarias para que la tienda funcione.",
-        blocks: [
-          {
-            kind: "p",
-            text: "Esta tienda usa únicamente cookies estrictamente necesarias para funcionar: mantener tu sesión iniciada, recordar la moneda y el idioma que elegiste y conservar los productos de tu carrito. No usamos cookies de publicidad ni de seguimiento de terceros, y no perfilamos tu comportamiento de navegación.",
-          },
-        ],
+        summary: c?.medicion
+          ? "Usamos cookies necesarias para que la tienda funcione y, solo si lo autorizas, cookies de medición de Meta, Google y Microsoft Clarity."
+          : "Solo usamos cookies necesarias para que la tienda funcione.",
+        blocks: c?.medicion
+          ? [
+              {
+                kind: "p",
+                text: "Usamos cookies estrictamente necesarias para que la tienda funcione: mantener tu sesión iniciada, recordar la moneda y el idioma que elegiste, conservar los productos de tu carrito, guardar tu elección sobre cookies y registrar de qué campaña o enlace llegaste a la tienda.",
+              },
+              {
+                kind: "p",
+                text: "Solo si lo autorizas en el aviso de cookies, usamos además cookies de medición de Meta Platforms (Facebook e Instagram), de Google (Google Analytics y Google Ads) y de Microsoft Clarity, con estas finalidades:",
+              },
+              {
+                kind: "list",
+                items: [
+                  "Medir qué anuncios y publicaciones llevan a una compra.",
+                  "Informar a esas plataformas, cuando confirmamos tu pedido, que la compra ocurrió y por qué valor, para que nuestros anuncios lleguen a personas con intereses parecidos.",
+                  "Mostrarte anuncios de KORA más relevantes en esas plataformas.",
+                  "Entender cómo se usa la tienda —en qué se hace clic, hasta dónde se desplaza la página, dónde se atasca la compra— para mejorarla. Microsoft Clarity graba la navegación de forma anónima y oculta lo que escribes en los formularios.",
+                ],
+              },
+              {
+                kind: "p",
+                text: "Al confirmar tu pedido les enviamos tu correo, teléfono, nombre y ciudad cifrados de forma irreversible (SHA-256), junto con la dirección IP y el navegador desde los que compraste, únicamente para que puedan reconocer la compra. Estas plataformas están en Estados Unidos y tratan esos datos conforme a sus propias políticas.",
+              },
+              {
+                kind: "p",
+                text: "Si eliges «Solo necesarias», no cargamos ninguna de esas cookies ni enviamos tus datos de compra a ninguna plataforma. Puedes cambiar tu elección en cualquier momento desde «Preferencias de cookies», al pie de la tienda.",
+              },
+            ]
+          : [
+              {
+                kind: "p",
+                text: "Esta tienda usa únicamente cookies estrictamente necesarias para funcionar: mantener tu sesión iniciada, recordar la moneda y el idioma que elegiste y conservar los productos de tu carrito. No usamos cookies de publicidad ni de seguimiento de terceros, y no perfilamos tu comportamiento de navegación.",
+              },
+            ],
       },
       {
         id: "cambios-politica",
@@ -191,12 +223,12 @@ export const datosPersonales: BilingualDocument = {
     ],
   }),
 
-  en: (m) => ({
+  en: (m, c) => ({
     slug: "datos-personales",
     title: "Privacy and Personal Data Policy",
     shortTitle: "Privacy policy",
     summary: "Who processes your data, for what, with whom it is shared, and what you can request at any time.",
-    updatedAt: ACTUALIZADO,
+    updatedAt: c?.medicion ? ACTUALIZADO : ACTUALIZADO_SIN_MEDICION,
     sections: [
       {
         id: "responsable",
@@ -332,13 +364,43 @@ export const datosPersonales: BilingualDocument = {
       {
         id: "cookies",
         heading: "Cookies",
-        summary: "We only use cookies the store needs to work.",
-        blocks: [
-          {
-            kind: "p",
-            text: "This store only uses strictly necessary cookies: keeping you signed in, remembering the currency and language you chose and keeping the products in your cart. We do not use advertising or third-party tracking cookies, and we do not profile your browsing behavior.",
-          },
-        ],
+        summary: c?.medicion
+          ? "We use cookies the store needs to work and, only with your permission, Meta, Google and Microsoft Clarity measurement cookies."
+          : "We only use cookies the store needs to work.",
+        blocks: c?.medicion
+          ? [
+              {
+                kind: "p",
+                text: "We use strictly necessary cookies to make the store work: keeping you signed in, remembering the currency and language you chose, keeping the products in your cart, saving your cookie choice and recording which campaign or link brought you to the store.",
+              },
+              {
+                kind: "p",
+                text: "Only if you allow it in the cookie notice, we also use measurement cookies from Meta Platforms (Facebook and Instagram), Google (Google Analytics and Google Ads) and Microsoft Clarity, for these purposes:",
+              },
+              {
+                kind: "list",
+                items: [
+                  "Measuring which ads and posts lead to a purchase.",
+                  "Telling those platforms, when we confirm your order, that the purchase happened and its value, so our ads reach people with similar interests.",
+                  "Showing you more relevant KORA ads on those platforms.",
+                  "Understanding how the store is used —what gets clicked, how far pages are scrolled, where checkout gets stuck— to improve it. Microsoft Clarity records browsing anonymously and hides what you type in forms.",
+                ],
+              },
+              {
+                kind: "p",
+                text: "When we confirm your order we send them your email, phone, name and city irreversibly hashed (SHA-256), together with the IP address and browser you purchased from, solely so they can recognize the purchase. These platforms are in the United States and process that data under their own policies.",
+              },
+              {
+                kind: "p",
+                text: "If you choose \"Necessary only\", we load none of those cookies and send your purchase data to no platform. You can change your choice at any time from \"Cookie preferences\" at the bottom of the store.",
+              },
+            ]
+          : [
+              {
+                kind: "p",
+                text: "This store only uses strictly necessary cookies: keeping you signed in, remembering the currency and language you chose and keeping the products in your cart. We do not use advertising or third-party tracking cookies, and we do not profile your browsing behavior.",
+              },
+            ],
       },
       {
         id: "cambios-politica",

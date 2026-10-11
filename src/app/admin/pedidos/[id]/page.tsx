@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { readMeasurementConfig } from "@/modules/measurement/config";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/auth";
@@ -36,9 +37,16 @@ export default async function OrderDetailPage({
         include: { actor: { select: { name: true } } },
       },
       confirmedBy: { select: { name: true } },
+      attribution: true,
+      adConversions: { select: { platform: true, sentAt: true } },
     },
   });
   if (!order) notFound();
+
+  const medicion = readMeasurementConfig();
+  const plataformasActivas =
+    [medicion.meta && "Meta", medicion.ga4 && "Google Analytics"].filter(Boolean).join(" y ") ||
+    "ninguna plataforma (medición apagada)";
 
   const perms = session.user.permissions;
   const style = STATUS_STYLE[order.status];
@@ -340,6 +348,44 @@ export default async function OrderDetailPage({
               </div>
             </dl>
           </section>
+
+          {/* De dónde vino el comprador (medicion-publicitaria). Solo pedidos
+              de la tienda: una venta de mostrador no tiene campaña. */}
+          {order.channel === "WEB" && (
+            <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
+              <h2 className="mb-4 text-[15px] font-bold text-kora-black">Origen del pedido</h2>
+              <dl className="space-y-3 text-[13px]">
+                {(
+                  [
+                    ["Fuente", order.attribution?.source ?? "Directo o desconocido"],
+                    ["Medio", order.attribution?.medium],
+                    ["Campaña", order.attribution?.campaign],
+                    ["Anuncio", order.attribution?.content],
+                    ["Página de entrada", order.attribution?.landing],
+                  ] as const
+                )
+                  .filter(([, v]) => Boolean(v))
+                  .map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-[11.5px] text-[#9aa0ab]">{label}</dt>
+                      <dd className="font-medium break-words text-kora-black">{value}</dd>
+                    </div>
+                  ))}
+                <div>
+                  <dt className="text-[11.5px] text-[#9aa0ab]">Medición</dt>
+                  <dd className="font-medium text-kora-black">
+                    {!order.attribution?.consent
+                      ? "Sin autorización de cookies: no se informa a Meta ni a Google"
+                      : order.adConversions.length > 0
+                        ? `Compra informada a ${order.adConversions
+                            .map((c) => (c.platform === "META" ? "Meta" : "Google Analytics"))
+                            .join(" y ")}`
+                        : `Se informa a ${plataformasActivas} al confirmar`}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          )}
 
           {order.whatsappMessage && (
             <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">

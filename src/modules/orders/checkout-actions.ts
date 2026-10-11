@@ -34,6 +34,7 @@ import { subscribeFromCheckout } from "@/modules/consent/subscription";
 import { consumeCashback, CashbackError } from "@/modules/cashback/ledger";
 import { resolveRedemption } from "@/modules/cashback/redemption";
 import { validateCoupon } from "@/modules/coupons/validate";
+import { attributionForOrder } from "@/modules/measurement/request";
 
 /**
  * El cupón se agotó o se pausó entre validarlo y crear el pedido.
@@ -359,6 +360,12 @@ export async function createOrder(
     zip: undefined,
   });
 
+  // De dónde vino el comprador (change medicion-publicitaria). Se lee ANTES de
+  // la transacción porque son cookies y cabeceras, no la base; se escribe
+  // DENTRO, junto al pedido. Leer la petición no llama a ningún tercero: la
+  // compra se informa a Meta y Google desde el worker, al confirmar.
+  const atribucion = await attributionForOrder();
+
   try {
     const order = await db.$transaction(async (tx) => {
       const customer = await resolveOrderCustomer(tx, {
@@ -528,6 +535,10 @@ export async function createOrder(
         data: { whatsappMessage: message },
         include: { customer: { select: { id: true } } },
       });
+
+      if (atribucion) {
+        await tx.orderAttribution.create({ data: { ...atribucion, orderId: created.id } });
+      }
 
       // Bandeja de salida: el pedido y su aviso se escriben JUNTOS o ninguno.
       // De aquí cuelgan el correo al comprador y el aviso al operador — nada

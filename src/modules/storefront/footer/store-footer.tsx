@@ -18,6 +18,8 @@ import { ChevronDown, Mail, MessageCircle } from "lucide-react";
 import type { Locale } from "@/modules/i18n";
 import { MESSAGES } from "@/modules/i18n/messages";
 import { merchant } from "@/modules/legal/config";
+import { medicionActiva } from "@/modules/measurement/config";
+import { CookiePreferencesLink } from "@/modules/measurement/tags";
 import { allLegalDocuments } from "@/modules/legal/content";
 import { MARCAS_ACEPTADAS, MEDIOS_TRANSFERENCIA } from "@/modules/legal/payments";
 import { legalUrl } from "@/modules/legal/url";
@@ -58,7 +60,16 @@ function Logos({ titulo, medios }: { titulo: string; medios: readonly { id: stri
 }
 
 /** Columna de enlaces: lista abierta en escritorio, acordeón en móvil. */
-function Columna({ titulo, enlaces }: { titulo: string; enlaces: Enlace[] }) {
+function Columna({
+  titulo,
+  enlaces,
+  extra,
+}: {
+  titulo: string;
+  enlaces: Enlace[];
+  /** Un elemento que no es enlace (p. ej. el botón de preferencias de cookies). */
+  extra?: React.ReactNode;
+}) {
   const lista = (
     <ul className="space-y-2.5 text-[13.5px]">
       {enlaces.map((e) => (
@@ -74,6 +85,7 @@ function Columna({ titulo, enlaces }: { titulo: string; enlaces: Enlace[] }) {
           )}
         </li>
       ))}
+      {extra && <li>{extra}</li>}
     </ul>
   );
 
@@ -131,7 +143,15 @@ export function StoreFooter({ locale, categories, whatsapp }: Props) {
 
         <Columna titulo={f.tienda} enlaces={tienda} />
         <Columna titulo={f.ayuda} enlaces={ayuda} />
-        <Columna titulo={f.legal} enlaces={legal} />
+        <Columna
+          titulo={f.legal}
+          enlaces={legal}
+          extra={
+            medicionActiva() ? (
+              <CookiePreferencesLink className="text-left hover:text-white" />
+            ) : undefined
+          }
+        />
 
         <div className="min-w-0 space-y-7">
           <div>

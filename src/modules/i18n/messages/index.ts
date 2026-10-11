@@ -25,6 +25,8 @@ import { errores as erroresEs } from "./es/errores";
 import { errores as erroresEn } from "./en/errores";
 import { movil as movilEs } from "./es/movil";
 import { movil as movilEn } from "./en/movil";
+import { cookies as cookiesEs } from "./es/cookies";
+import { cookies as cookiesEn } from "./en/cookies";
 
 const es = {
   comun: comunEs,
@@ -39,6 +41,7 @@ const es = {
   buscador: buscadorEs,
   errores: erroresEs,
   movil: movilEs,
+  cookies: cookiesEs,
 };
 
 export type Messages = typeof es;
@@ -56,6 +59,7 @@ const en: Messages = {
   buscador: buscadorEn,
   errores: erroresEn,
   movil: movilEn,
+  cookies: cookiesEn,
 };
 
 export const MESSAGES: Record<"es" | "en", Messages> = { es, en };

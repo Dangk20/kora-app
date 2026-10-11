@@ -13,6 +13,8 @@ import { legalUrl } from "@/modules/legal/url";
 import { allLegalDocuments } from "@/modules/legal/content";
 import { merchant } from "@/modules/legal/config";
 import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
+import { measurementPublicConfig } from "@/modules/measurement/config";
+import { MeasurementTags } from "@/modules/measurement/tags";
 import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
 import { MobileBarsProvider } from "@/modules/storefront/mobile/bars-context";
 import { SearchBox } from "./search-box";
@@ -187,6 +189,15 @@ export default async function StoreLayout({
       <MobileBottomNav />
 
       <CartDrawer />
+
+      {/* Medición publicitaria: aviso de cookies y etiquetas de Meta y Google,
+          solo si el entorno las configura y solo tras "Aceptar". La
+          configuración se lee aquí, en el servidor, al ejecutarse: nunca
+          NEXT_PUBLIC_*, porque la imagen es la misma en pruebas y producción. */}
+      <MeasurementTags
+        config={measurementPublicConfig()}
+        privacyUrl={legalUrl(locale, "datos-personales", { ancla: "cookies" })}
+      />
     </div>
     </MobileBarsProvider>
     </CartProvider>

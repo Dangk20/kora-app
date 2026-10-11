@@ -90,6 +90,13 @@ export type LegalDocumentFactory = (merchant: Merchant, contexto?: LegalContext)
 export type LegalContext = {
   /** WhatsApp de atención en formato E.164 (`+573024456290`). */
   whatsapp?: string | null;
+  /**
+   * ¿Está encendida la medición publicitaria (Meta / Google)? Gobierna la
+   * sección de cookies de la política de privacidad: el texto nunca afirma
+   * algo que la tienda no hace, en ninguno de los dos sentidos. Change
+   * `medicion-publicitaria`.
+   */
+  medicion?: boolean;
 };
 
 /** Cada documento existe en los dos idiomas de la tienda. */
