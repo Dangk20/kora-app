@@ -8,6 +8,12 @@ import { cashbackSummary } from "@/modules/cashback/balance";
 import { subscriptionState } from "@/modules/consent/subscription";
 import { customerMetrics, topCategories, whatsappLink } from "@/modules/customers/profile";
 import { customerSummary, listCustomers, PAGE_SIZE } from "@/modules/customers/queries";
+import {
+  ETIQUETA_LABEL,
+  FILTROS_ETIQUETA,
+  parseFiltroEtiqueta,
+  type Etiqueta,
+} from "@/modules/customers/etiqueta";
 import { CustomerForm } from "./customer-form";
 import { CustomerSheet } from "./customer-sheet";
 
@@ -32,6 +38,14 @@ function iniciales(nombre: string): string {
     .join("");
 }
 
+// Mismos tonos que los badges de estado de Pedidos: Cliente lleva el naranja de
+// "Confirmado" —es justo el hecho que la produce— y No cliente el gris neutro
+// de "Pendiente". Solo paleta de marca.
+const ETIQUETA_STYLE: Record<Etiqueta, string> = {
+  cliente: "bg-[#FFE9DD] text-[#FF5A1F]",
+  no_cliente: "bg-[#f0ece6] text-[#8a8f98]",
+};
+
 function Resumen({ label, hint, value }: { label: string; hint?: string; value: number }) {
   return (
     <div className="rounded-[14px] border border-[#eee9e2] bg-white px-5 py-4">
@@ -45,20 +59,38 @@ function Resumen({ label, hint, value }: { label: string; hint?: string; value: 
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; ver?: string; nuevo?: string; editar?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    ver?: string;
+    nuevo?: string;
+    editar?: string;
+    etiqueta?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user.permissions.includes("customers:view")) redirect("/admin");
   const puedeCrear = session.user.permissions.includes("customers:create");
   const puedeEditar = session.user.permissions.includes("customers:edit");
 
-  const { q = "", page = "1", ver, nuevo, editar } = await searchParams;
+  const { q = "", page = "1", ver, nuevo, editar, etiqueta: etiquetaParam } = await searchParams;
   const pagina = Math.max(1, Number(page) || 1);
+  const etiqueta = parseFiltroEtiqueta(etiquetaParam);
 
   const [resumen, listado] = await Promise.all([
     customerSummary(),
-    listCustomers({ search: q, page: pagina, pageSize: PAGE_SIZE }),
+    listCustomers({ search: q, page: pagina, pageSize: PAGE_SIZE, etiqueta }),
   ]);
+
+  // Toda navegación de la vista conserva búsqueda y filtro.
+  const href = (extra: Record<string, string> = {}, filtro: string = etiqueta) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (filtro !== "todos") p.set("etiqueta", filtro);
+    for (const [k, v] of Object.entries(extra)) p.set(k, v);
+    const s = p.toString();
+    return `/admin/clientes${s ? `?${s}` : ""}`;
+  };
 
   // Paneles laterales controlados por la dirección, como el resto del panel:
   // así son enlazables y sobreviven a recargar.
@@ -79,16 +111,18 @@ export default async function ClientesPage({
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Resumen label="Clientes nuevos" hint="últimos 30 días" value={resumen.nuevos} />
-        <Resumen label="Clientes activos" hint="últimos 30 días" value={resumen.activos} />
-        <Resumen label="Total de clientes" value={resumen.total} />
-        <Resumen label="Clientes con cuenta" value={resumen.conCuenta} />
+      {/* Tres cifras y nada más (Daniel, 11 oct 2026): cuántas personas hay y
+          cuántas de ellas compraron. */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Resumen label="Total de registros" hint="registradas o que compraron" value={resumen.total} />
+        <Resumen label="Clientes" hint="con compra confirmada" value={resumen.clientes} />
+        <Resumen label="No clientes" hint="sin compra confirmada" value={resumen.noClientes} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-extrabold text-kora-black">Clientes</h1>
         <form className="ml-auto flex items-center gap-2" action="/admin/clientes">
+          {etiqueta !== "todos" && <input type="hidden" name="etiqueta" value={etiqueta} />}
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#9aa0a8]" />
             <input
@@ -100,7 +134,7 @@ export default async function ClientesPage({
           </div>
           {puedeCrear && (
             <Link
-              href="/admin/clientes?nuevo=1"
+              href={href({ nuevo: "1" })}
               className="bg-kora-gradient inline-flex items-center gap-1.5 rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white"
             >
               <Plus className="size-4" /> Crear cliente
@@ -109,17 +143,43 @@ export default async function ClientesPage({
         </form>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        {FILTROS_ETIQUETA.map((f) => {
+          const activo = etiqueta === f.key;
+          return (
+            <Link
+              key={f.key}
+              href={href({}, f.key)}
+              aria-current={activo ? "page" : undefined}
+              className={
+                activo
+                  ? "bg-kora-gradient rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                  : "rounded-full border border-[#e2ddd6] bg-white px-3.5 py-1.5 text-[13px] font-semibold text-[#6b6f78]"
+              }
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+      </div>
+
       <div className="overflow-hidden rounded-[14px] border border-[#eee9e2] bg-white">
         {listado.rows.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <UsersRound className="mx-auto mb-3 size-9 text-[#cfd3d9]" />
             <p className="font-semibold text-kora-black">
-              {q ? "Ningún cliente coincide con la búsqueda" : "Todavía no hay clientes"}
+              {q
+                ? "Nadie coincide con la búsqueda"
+                : etiqueta === "clientes"
+                  ? "Todavía nadie tiene una compra confirmada"
+                  : etiqueta === "no_clientes"
+                    ? "Todas las personas de la base ya compraron"
+                    : "Todavía no hay personas en la base"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {q
                 ? "Prueba con otro nombre, número o correo."
-                : "Se crean solos con cada compra en la tienda, o puedes añadirlos a mano."}
+                : "Se crean solas al registrarse o comprar en la tienda, o puedes añadirlas a mano."}
             </p>
           </div>
         ) : (
@@ -127,6 +187,7 @@ export default async function ClientesPage({
             <thead className="border-b border-[#f0ece6] bg-[#fbfaf8] text-left text-[12px] tracking-wide text-[#6b6f78] uppercase">
               <tr>
                 <th className="px-5 py-3 font-semibold">Cliente</th>
+                <th className="px-5 py-3 font-semibold">Estado</th>
                 <th className="px-5 py-3 font-semibold">WhatsApp</th>
                 <th className="px-5 py-3 font-semibold">Email</th>
                 <th className="px-5 py-3 font-semibold">País</th>
@@ -142,8 +203,20 @@ export default async function ClientesPage({
                       <span className="bg-kora-gradient flex size-9 items-center justify-center rounded-full text-[12px] font-bold text-white">
                         {iniciales(c.name)}
                       </span>
-                      <span className="font-semibold text-kora-black">{c.name}</span>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-kora-black">{c.name}</div>
+                        <div className="text-[11.5px] text-[#9aa0ab]">
+                          {c.tieneCuenta ? "Con cuenta" : "Invitado"}
+                        </div>
+                      </div>
                     </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap ${ETIQUETA_STYLE[c.etiqueta]}`}
+                    >
+                      {ETIQUETA_LABEL[c.etiqueta]}
+                    </span>
                   </td>
                   <td className="px-5 py-3 text-[#4a4f57]">{c.phone ?? "—"}</td>
                   <td className="px-5 py-3 text-[#4a4f57]">
@@ -173,7 +246,7 @@ export default async function ClientesPage({
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-1.5">
                       <Link
-                        href={`/admin/clientes?ver=${c.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                        href={href({ ver: c.id })}
                         aria-label={`Ver ${c.name}`}
                         className={ACTION_ICON}
                       >
@@ -181,7 +254,7 @@ export default async function ClientesPage({
                       </Link>
                       {puedeEditar && (
                         <Link
-                          href={`/admin/clientes?editar=${c.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                          href={href({ editar: c.id })}
                           aria-label={`Editar ${c.name}`}
                           className={ACTION_ICON}
                         >
@@ -202,13 +275,13 @@ export default async function ClientesPage({
       {listado.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            {listado.total} cliente{listado.total === 1 ? "" : "s"} · página {listado.page} de{" "}
+            {listado.total} persona{listado.total === 1 ? "" : "s"} · página {listado.page} de{" "}
             {listado.totalPages}
           </span>
           <div className="flex gap-2">
             {listado.page > 1 && (
               <Link
-                href={`/admin/clientes?page=${listado.page - 1}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                href={href({ page: String(listado.page - 1) })}
                 className="rounded-lg border border-[#e2ddd6] px-3 py-1.5 font-semibold text-kora-black"
               >
                 Anterior
@@ -216,7 +289,7 @@ export default async function ClientesPage({
             )}
             {listado.page < listado.totalPages && (
               <Link
-                href={`/admin/clientes?page=${listado.page + 1}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                href={href({ page: String(listado.page + 1) })}
                 className="rounded-lg border border-[#e2ddd6] px-3 py-1.5 font-semibold text-kora-black"
               >
                 Siguiente
@@ -243,7 +316,7 @@ export default async function ClientesPage({
           suscripcion={perfil.suscripcion}
           top={perfil.top}
           whatsapp={perfil.whatsapp}
-          backTo={`/admin/clientes${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+          backTo={href()}
         />
       )}
 
@@ -263,7 +336,7 @@ export default async function ClientesPage({
                 }
               : null
           }
-          backTo={`/admin/clientes${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+          backTo={href()}
         />
       )}
     </>

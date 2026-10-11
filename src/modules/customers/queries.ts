@@ -8,18 +8,30 @@
 
 import { db } from "@/lib/db";
 import { CONFIRMED_SQL_LIST, confirmedFilter, windowStart } from "./confirmed";
+import {
+  esClienteWhere,
+  etiquetaDe,
+  whereEtiqueta,
+  type Etiqueta,
+  type FiltroEtiqueta,
+} from "./etiqueta";
 
 type Db = typeof db;
 
 export type CustomerSummary = {
   nuevos: number;
   activos: number;
+  /** Total de registros: registradas, compradoras invitadas y creadas a mano. */
   total: number;
+  /** Con al menos un pedido confirmado. clientes + noClientes = total. */
+  clientes: number;
+  noClientes: number;
+  /** Registrados en la web: crearon cuenta de acceso en la tienda. */
   conCuenta: number;
 };
 
 /**
- * Las cuatro tarjetas del encabezado.
+ * Las tarjetas del encabezado.
  *
  * "Activo" significa **compró y esa compra se confirmó**: un pedido pendiente o
  * cancelado no vuelve activo a nadie. Si lo hiciera, la tarjeta contaría
@@ -29,22 +41,23 @@ export type CustomerSummary = {
 export async function customerSummary(client: Db = db): Promise<CustomerSummary> {
   const desde = windowStart();
 
-  const [total, nuevos, activos] = await Promise.all([
+  // "Registrados en la web" estuvo fijo en 0 desde que se escribió esta
+  // función, cuando la cuenta del comprador no existía; nadie lo conectó al
+  // construirla, y ese cero era justo el "no sabemos cuántos se registraron".
+  // La cuenta es la contraseña en la fila del cliente (cuenta-comprador).
+  const [total, nuevos, activos, clientes, conCuenta] = await Promise.all([
     client.customer.count(),
     client.customer.count({ where: { createdAt: { gte: desde } } }),
     client.customer.count({
       where: { orders: { some: { ...confirmedFilter, createdAt: { gte: desde } } } },
     }),
+    client.customer.count({ where: esClienteWhere }),
+    client.customer.count({ where: { passwordHash: { not: null } } }),
   ]);
 
-  // "Clientes con cuenta" mide la adopción del registro opcional frente a los
-  // compradores invitados. La cuenta del comprador (módulo ACC) todavía no
-  // existe —"Mi cuenta" dice "Próximamente"— así que hoy es necesariamente 0.
-  // Es la misma regla que el saldo de fidelización: mostrar cero sin error en
-  // vez de ocultar la tarjeta, para que el hueco quede visible y listo.
-  const conCuenta = 0;
-
-  return { total, nuevos, activos, conCuenta };
+  // No clientes se obtiene por diferencia y no con otra consulta: así la suma
+  // cuadra por construcción, aunque entre dos conteos se confirme un pedido.
+  return { total, nuevos, activos, clientes, noClientes: total - clientes, conCuenta };
 }
 
 export type CustomerRow = {
@@ -53,6 +66,10 @@ export type CustomerRow = {
   phone: string | null;
   email: string | null;
   country: string;
+  /** Derivada de sus pedidos confirmados; ver etiqueta.ts. */
+  etiqueta: Etiqueta;
+  /** Creó cuenta en la tienda (si no, es invitada o se creó a mano). */
+  tieneCuenta: boolean;
   /** Días de la semana (0 = domingo … 6 = sábado) con más pedidos confirmados. */
   topWeekdays: number[];
 };
@@ -79,13 +96,18 @@ function soloDigitos(s: string): string {
 }
 
 export async function listCustomers(
-  { search = "", page = 1, pageSize = PAGE_SIZE }: { search?: string; page?: number; pageSize?: number },
+  {
+    search = "",
+    page = 1,
+    pageSize = PAGE_SIZE,
+    etiqueta = "todos",
+  }: { search?: string; page?: number; pageSize?: number; etiqueta?: FiltroEtiqueta },
   client: Db = db,
 ): Promise<CustomerPage> {
   const q = search.trim();
   const digitos = soloDigitos(q);
 
-  const where = q
+  const busqueda = q
     ? {
         OR: [
           { name: { contains: q, mode: "insensitive" as const } },
@@ -95,6 +117,7 @@ export async function listCustomers(
         ],
       }
     : {};
+  const where = { AND: [busqueda, whereEtiqueta(etiqueta)] };
 
   const [total, clientes] = await Promise.all([
     client.customer.count({ where }),
@@ -103,14 +126,29 @@ export async function listCustomers(
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, name: true, phone: true, email: true, country: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        country: true,
+        // Solo para saber SI tiene cuenta; el hash no sale de esta función.
+        passwordHash: true,
+        // La etiqueta, en la misma consulta: un conteo filtrado por fila.
+        _count: { select: { orders: { where: confirmedFilter } } },
+      },
     }),
   ]);
 
   const topWeekdays = await weekdaysByCustomer(clientes.map((c) => c.id), client);
 
   return {
-    rows: clientes.map((c) => ({ ...c, topWeekdays: topWeekdays.get(c.id) ?? [] })),
+    rows: clientes.map(({ passwordHash, _count, ...c }) => ({
+      ...c,
+      etiqueta: etiquetaDe(_count.orders),
+      tieneCuenta: passwordHash !== null,
+      topWeekdays: topWeekdays.get(c.id) ?? [],
+    })),
     total,
     page,
     pageSize,
