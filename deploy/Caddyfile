@@ -89,7 +89,12 @@ test.korashopp.com {
 
 # `www` no sirve contenido: redirige al apex, para no tener la misma página
 # viva bajo dos direcciones (specs/edge-routing).
-www.# ─────────────────────────────────────────────────────────────
+www.korashopp.com {
+	import seguridad
+	redir https://korashopp.com{uri} permanent
+}
+
+# ─────────────────────────────────────────────────────────────
 # CENTRO LEGAL — change `centro-legal` (10 oct 2026)
 # ─────────────────────────────────────────────────────────────
 # Lo sirve la MISMA aplicación de producción: el middleware reconoce el host
@@ -103,11 +108,6 @@ legal.korashopp.com {
 	reverse_proxy kora-prod-app:3000 {
 		header_up X-Forwarded-For {remote_host}
 	}
-}
-
-korashopp.com {
-	import seguridad
-	redir https://korashopp.com{uri} permanent
 }
 
 korashopp.com {
