@@ -12,7 +12,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMessages } from "@/modules/i18n/provider";
 import {
@@ -162,38 +161,38 @@ y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
       )}
 
       {visible && (
-        // Barra inferior, como la de Panamericana (referencia de Daniel). La X
-        // NO acepta: cierra dejando solo las cookies necesarias. Aceptar por
-        // cerrar sería un consentimiento tácito, y la Ley 1581 lo exige expreso.
         <div
           role="dialog"
           aria-live="polite"
-          aria-label={t.preferencias}
-          className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-[60] bg-kora-black text-white shadow-[0_-6px_24px_rgba(0,0,0,0.25)] lg:bottom-0"
+          aria-label={t.titulo}
+          className="fixed inset-x-3 bottom-[calc(72px+env(safe-area-inset-bottom))] z-[60] mx-auto max-w-[560px] rounded-2xl bg-kora-black p-5 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] lg:bottom-6"
         >
-          <div className="mx-auto flex max-w-[1320px] items-center gap-3 px-4 py-3 sm:gap-5 sm:px-[22px] lg:justify-center">
-            <p className="min-w-0 flex-1 text-[13px] leading-snug sm:text-[14.5px] lg:flex-none">
-              {t.texto}{" "}
-              <a href={cookiesUrl} className="font-bold underline underline-offset-2">
-                {t.cookies}
-              </a>{" "}
-              {t.y}{" "}
-              <a href={privacyUrl} className="font-bold underline underline-offset-2">
-                {t.privacidad}
-              </a>
-            </p>
-            <Button type="button" variant="brand" className="shrink-0 px-5 uppercase" onClick={() => elegir("si")}>
+          <p className="text-[15px] font-bold">{t.titulo}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-[#C9CCD3]">
+            {t.texto}{" "}
+            <a href={cookiesUrl} className="font-semibold text-white underline underline-offset-2">
+              {t.cookies}
+            </a>{" "}
+            {t.y}{" "}
+            <a href={privacyUrl} className="font-semibold text-white underline underline-offset-2">
+              {t.privacidad}
+            </a>
+            .
+          </p>
+          {/* Mismo peso visual para las dos opciones: rechazar no puede ser
+              más difícil que aceptar (Ley 1581: autorización expresa). */}
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              onClick={() => elegir("no")}
+            >
+              {t.rechazar}
+            </Button>
+            <Button type="button" variant="brand" onClick={() => elegir("si")}>
               {t.aceptar}
             </Button>
-            <button
-              type="button"
-              aria-label={t.cerrar}
-              title={t.cerrar}
-              onClick={() => elegir("no")}
-              className="shrink-0 rounded-full p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
-            >
-              <X className="size-5" aria-hidden />
-            </button>
           </div>
         </div>
       )}

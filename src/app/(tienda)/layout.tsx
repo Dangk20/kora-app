@@ -13,6 +13,7 @@ import { legalUrl } from "@/modules/legal/url";
 import { allLegalDocuments } from "@/modules/legal/content";
 import { merchant } from "@/modules/legal/config";
 import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
+import { CategoryMarquee } from "@/modules/storefront/category-marquee";
 import { measurementPublicConfig } from "@/modules/measurement/config";
 import { MeasurementTags } from "@/modules/measurement/tags";
 import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
@@ -140,22 +141,14 @@ export default async function StoreLayout({
           <div className="mx-auto flex h-[46px] max-w-[1320px] items-center gap-1.5 px-[22px]">
             <Link
               href="/catalogo"
-              className="py-2 pr-3.5 text-[13.5px] font-semibold text-[#F5F5F7] hover:text-white"
+              className="shrink-0 py-2 pr-3.5 text-[13.5px] font-semibold whitespace-nowrap text-[#F5F5F7] hover:text-white"
             >
               {t.layout.todasLasCategorias}
             </Link>
             <span className="mx-2 h-[18px] w-px bg-[#2a2e36]" aria-hidden />
-            <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
-              {categories.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/catalogo?categoria=${c.slug}`}
-                  className="shrink-0 px-3.5 py-2 text-[13.5px] font-medium whitespace-nowrap text-[#A0A4AD] hover:text-white"
-                >
-                  {c.name}
-                </Link>
-              ))}
-            </div>
+            <CategoryMarquee
+              items={categories.map((c) => ({ href: `/catalogo?categoria=${c.slug}`, label: c.name }))}
+            />
             <a
               href={WHATSAPP.href}
               target="_blank"

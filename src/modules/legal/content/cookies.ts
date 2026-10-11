@@ -3,7 +3,7 @@
 // Estructura tomada de la política de cookies de Panamericana (referencia que
 // pidió Daniel), adaptada a lo que KORA hace de verdad. La diferencia que no se
 // negocia: aquí aceptar NO es implícito. Las cookies opcionales solo se activan
-// con "Aceptar"; cerrar el aviso deja únicamente las necesarias. Ley 1581 de
+// con "Aceptar"; "Solo necesarias" las deja apagadas. Ley 1581 de
 // 2012: la autorización es previa, expresa e informada.
 //
 // No nombra proveedores, a pedido de Daniel ("no nombremos plataformas"): se
@@ -106,13 +106,13 @@ export const cookies: BilingualDocument = {
       {
         id: "consentimiento",
         heading: "Cómo das o retiras tu consentimiento",
-        summary: "«Aceptar» activa las opcionales; cerrar el aviso deja solo las necesarias. Puedes cambiarlo cuando quieras.",
+        summary: "«Aceptar» activa las opcionales; «Solo necesarias» las deja apagadas. Puedes cambiarlo cuando quieras.",
         blocks: [
           {
             kind: "list",
             items: [
               "Al pulsar «Aceptar» en el aviso de cookies autorizas las cookies opcionales de análisis y publicidad.",
-              "Si cierras el aviso con la X, solo usamos las cookies necesarias. No activamos ninguna opcional sin tu aceptación.",
+              "Si eliges «Solo necesarias», solo usamos las cookies necesarias. No activamos ninguna opcional sin tu aceptación.",
               "Puedes cambiar tu elección en cualquier momento desde «Preferencias de cookies», al pie de la tienda. Si retiras tu aceptación, borramos las cookies de nuestros aliados de tu navegador.",
               "Tu elección se recuerda durante seis meses; después te lo volvemos a preguntar.",
             ],
@@ -256,13 +256,13 @@ export const cookies: BilingualDocument = {
       {
         id: "consentimiento",
         heading: "How you give or withdraw consent",
-        summary: "\"Accept\" activates optional cookies; closing the notice keeps only necessary ones. You can change it anytime.",
+        summary: "\"Accept\" activates optional cookies; \"Necessary only\" keeps them off. You can change it anytime.",
         blocks: [
           {
             kind: "list",
             items: [
               "By clicking \"Accept\" in the cookie notice you authorize optional analytics and advertising cookies.",
-              "If you close the notice with the X, we only use necessary cookies. We never activate optional cookies without your acceptance.",
+              "If you choose \"Necessary only\", we only use necessary cookies. We never activate optional cookies without your acceptance.",
               "You can change your choice at any time from \"Cookie preferences\" at the bottom of the store. If you withdraw your acceptance, we delete our partners' cookies from your browser.",
               "Your choice is remembered for six months; after that we ask again.",
             ],
