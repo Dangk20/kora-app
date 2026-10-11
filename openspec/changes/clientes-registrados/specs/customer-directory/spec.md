@@ -2,20 +2,17 @@
 
 ### Requirement: Resumen de la base en cuatro indicadores
 
-La vista SHALL mostrar estos indicadores calculados en tiempo real:
+La vista SHALL mostrar estos tres indicadores, y solo estos, calculados en tiempo real:
 
 | Indicador | Qué cuenta |
 |---|---|
-| **Clientes nuevos** | Registros creados en los últimos 30 días |
-| **Clientes activos** | Personas con al menos un **pedido confirmado** en los últimos 30 días |
-| **Personas en la base** | Total histórico de filas de cliente: registradas, compradoras invitadas y creadas a mano |
+| **Total de registros** | Total histórico de filas de cliente: registradas, compradoras invitadas y creadas a mano |
 | **Clientes** | Personas con al menos un pedido confirmado, en cualquier fecha y canal |
 | **No clientes** | Personas sin ningún pedido confirmado |
-| **Registrados en la web** | Personas que crearon cuenta de acceso en la tienda, frente a compradores invitados |
 
-Cuando no haya datos, cada indicador SHALL mostrar **cero**, sin error. "Registrados en la web" SHALL contar las cuentas reales; NO SHALL ser un valor fijo.
+Cuando no haya datos, cada indicador SHALL mostrar **cero**, sin error.
 
-**Invariante:** "activo" y "Cliente" significan **compró y esa compra se confirmó**. Un pedido pendiente, cancelado o vencido no vuelve activo ni Cliente a nadie — si lo hiciera, el indicador contaría intenciones en vez de ventas, y el operador tomaría decisiones de remarketing sobre gente que nunca compró. **Clientes + No clientes = Personas en la base**, siempre.
+**Invariante:** "Cliente" significa **compró y esa compra se confirmó**. Un pedido pendiente, cancelado o vencido no vuelve Cliente a nadie — si lo hiciera, el indicador contaría intenciones en vez de ventas, y el operador tomaría decisiones de remarketing sobre gente que nunca compró. **Clientes + No clientes = Total de registros**, siempre.
 
 #### Scenario: Base con actividad
 
@@ -30,17 +27,17 @@ Cuando no haya datos, cada indicador SHALL mostrar **cero**, sin error. "Registr
 #### Scenario: Un cliente con pedido pendiente
 
 - **WHEN** un cliente tiene un pedido creado pero **sin confirmar** en los últimos 30 días, y ningún confirmado
-- **THEN** cuenta en el total, en "No clientes" y, si es reciente, en "nuevos" — pero **NO** cuenta como activo ni como Cliente
+- **THEN** cuenta en "Total de registros" y en "No clientes", pero **NO** cuenta como Cliente
 
 #### Scenario: Un cliente con pedido cancelado
 
 - **WHEN** el único pedido reciente de un cliente fue cancelado
-- **THEN** no cuenta como activo ni como Cliente
+- **THEN** no cuenta como Cliente
 
 #### Scenario: Alguien se registra en la tienda
 
 - **WHEN** una persona crea su cuenta sin comprar
-- **THEN** "Personas en la base", "No clientes" y "Registrados en la web" suben en uno, y "Clientes" no cambia
+- **THEN** "Total de registros" y "No clientes" suben en uno, y "Clientes" no cambia
 
 ### Requirement: Listado con la información operativa del cliente
 

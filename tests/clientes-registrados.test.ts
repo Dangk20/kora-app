@@ -209,7 +209,7 @@ describe("indicadores", () => {
     expect(despues.conCuenta).toBe(antes.conCuenta);
   });
 
-  it("Clientes + No clientes = Personas en la base, y Registrados en la web es el conteo real", async () => {
+  it("Clientes + No clientes = Total de registros, y Registrados en la web es el conteo real", async () => {
     await registrado();
     const c = await invitado();
     await pedido(c.id);

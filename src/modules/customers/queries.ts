@@ -21,7 +21,7 @@ type Db = typeof db;
 export type CustomerSummary = {
   nuevos: number;
   activos: number;
-  /** Personas en la base: registradas, compradoras invitadas y creadas a mano. */
+  /** Total de registros: registradas, compradoras invitadas y creadas a mano. */
   total: number;
   /** Con al menos un pedido confirmado. clientes + noClientes = total. */
   clientes: number;

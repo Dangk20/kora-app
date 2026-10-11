@@ -14,7 +14,7 @@ El hallazgo cambia el problema: las personas registradas **ya** tienen fila de c
 
 **Cuenta / invitado** sale de `passwordHash IS NOT NULL`, igual que el perfil (`customer-sheet.tsx`) y el segmento `con_cuenta` de campañas. El hash se lee en el servidor y solo sale un booleano.
 
-**Indicadores.** Se pasa de 4 a 6 tarjetas (rejilla 2 → 3 → 6 columnas): Personas en la base, Clientes, No clientes, Registrados en la web, Clientes nuevos (30 días), Clientes activos (30 días). Se conservan nuevos y activos porque ya los usa el operador.
+**Indicadores.** Tres tarjetas (Daniel, 11 oct): Total de registros, Clientes y No clientes. `customerSummary()` sigue calculando cuentas, nuevos y activos —el cero fijo de "con cuenta" se corrigió—, pero el panel no los muestra.
 
 **Pantalla.** Mismo listado de `/admin/clientes` (patrón Productos/Inventario del prototipo `Kora.dc.html`, sección Clientes). La etiqueta va en una columna "Estado" con el estilo de los badges de estado de Pedidos: **Cliente** en el naranja de marca (`#FFE9DD` / `#FF5A1F`, el mismo de "Confirmado", que es justo el hecho que la produce) y **No cliente** en el gris neutro (`#f0ece6` / `#8a8f98`, el de "Pendiente"). Cuenta/Invitado va como segunda línea bajo el nombre, con el texto que ya usa el perfil. El filtro usa los chips de Cupones (`Todos · Clientes · No clientes`, el activo con `bg-kora-gradient`). Nada de verdes ni azules.
 

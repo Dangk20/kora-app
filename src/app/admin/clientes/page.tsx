@@ -111,13 +111,12 @@ export default async function ClientesPage({
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Resumen label="Personas en la base" hint="registradas o que compraron" value={resumen.total} />
+      {/* Tres cifras y nada más (Daniel, 11 oct 2026): cuántas personas hay y
+          cuántas de ellas compraron. */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Resumen label="Total de registros" hint="registradas o que compraron" value={resumen.total} />
         <Resumen label="Clientes" hint="con compra confirmada" value={resumen.clientes} />
         <Resumen label="No clientes" hint="sin compra confirmada" value={resumen.noClientes} />
-        <Resumen label="Registrados en la web" hint="con cuenta en la tienda" value={resumen.conCuenta} />
-        <Resumen label="Clientes nuevos" hint="últimos 30 días" value={resumen.nuevos} />
-        <Resumen label="Clientes activos" hint="últimos 30 días" value={resumen.activos} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

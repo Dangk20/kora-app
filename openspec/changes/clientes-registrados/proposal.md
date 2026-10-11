@@ -14,7 +14,7 @@ Lo que muestra el código hoy:
 - Cada persona del listado lleva una etiqueta **derivada de sus pedidos**: **Cliente** si tiene al menos un pedido en `CONFIRMED_STATUSES` (web o POS); **No cliente** si no tiene ninguno (registrado sin comprar, o con pedidos solo pendientes, cancelados o vencidos). Cambia a Cliente en el mismo instante en que se confirma su primer pedido, sin escribir nada más.
 - El listado muestra además si la persona **tiene cuenta** en la tienda o es **invitada** (dato que ya existe: `passwordHash`).
 - Filtro por etiqueta: **Todos / Clientes / No clientes**, resuelto en servidor y combinable con la búsqueda y el paginado.
-- Indicadores arriba: se suman **Clientes** y **No clientes**, "Total de clientes" pasa a "Personas en la base", y **"Registrados en la web" (con cuenta) deja de ser un cero fijo** y cuenta de verdad.
+- Indicadores arriba: **tres y nada más** (Daniel, 11 oct): **Total de registros**, **Clientes** y **No clientes**.
 - Se ajusta el texto de lista vacía para que no diga que solo comprar crea clientes.
 
 ## Capabilities
