@@ -143,10 +143,18 @@ export const cuenta: typeof es = {
   },
 
   legal: {
-    inicio: "Home",
-    actualizado: (fecha: string) => `Last updated: ${fecha}`,
-    soloEspanol: "This document is currently available in Spanish only.",
+    marca: "legal",
+    inicio: "All legal documents",
+    idioma: "Language",
+    volver: "Back to KORA",
+    documentos: "Documents",
+    enEstaPagina: "On this page",
+    centroTitulo: "KORA Legal Center",
+    centroResumen: "Every term that governs your purchases at KORA, in one place.",
+    leer: "Read",
+    actualizado: (fecha: string) => `Last modified on ${fecha}`,
+    marcasAceptadas: "Accepted cards",
     borradorTitulo: "Draft:",
-    borrador: "the merchant's details are missing (legal name, tax ID, address and contact email). This document can't be published like this.",
+    borrador: "company details are missing (legal name, tax ID, registration, address or contact email). This document can't be published like this.",
   },
 };

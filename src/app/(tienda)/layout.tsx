@@ -8,7 +8,10 @@ import { listCategories } from "@/modules/storefront/queries";
 import { CartProvider } from "@/modules/cart/cart-context";
 import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { whatsappNumberFor } from "@/modules/orders/settings";
-import { LEGAL_LINKS } from "@/modules/legal/content";
+import { StoreFooter } from "@/modules/storefront/footer/store-footer";
+import { legalUrl } from "@/modules/legal/url";
+import { allLegalDocuments } from "@/modules/legal/content";
+import { merchant } from "@/modules/legal/config";
 import { MobileShell } from "@/modules/storefront/mobile/mobile-shell";
 import { MobileBottomNav, MobileNavSpacer } from "@/modules/storefront/mobile/mobile-chrome";
 import { MobileBarsProvider } from "@/modules/storefront/mobile/bars-context";
@@ -49,6 +52,13 @@ export default async function StoreLayout({
     href: `https://api.whatsapp.com/send?phone=${number.replace(/\D/g, "")}`,
   };
 
+  // El menú móvil es cliente: recibe los enlaces legales ya resueltos, porque
+  // la dirección del centro legal se lee del entorno en el servidor.
+  const legalLinks = allLegalDocuments(merchant(), locale).map((d) => ({
+    href: legalUrl(locale, d.slug),
+    label: d.shortTitle,
+  }));
+
   return (
     <I18nProvider locale={locale}>
     <CartProvider>
@@ -63,6 +73,7 @@ export default async function StoreLayout({
         currency={currency}
         categories={categories}
         whatsappHref={WHATSAPP.href}
+        legalLinks={legalLinks}
       />
 
       <header className="sticky top-0 z-50 hidden bg-[#16181D] lg:block">
@@ -167,68 +178,7 @@ export default async function StoreLayout({
 
       <main className="flex-1">{children}</main>
 
-      <footer className="bg-[#0E0F12] px-[22px] py-10 text-[#A0A4AD]">
-        <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/logo-kora.png"
-              alt="KORA"
-              width={140}
-              height={36}
-              className="h-7 w-auto"
-            />
-            <span className="text-xs">© 2026 · {t.layout.lema}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
-            <a
-              href={WHATSAPP.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white"
-            >
-              {t.layout.escribenosWhatsapp}
-            </a>
-            {/* El seguimiento va aquí, junto a WhatsApp, y no entre las
-                políticas: quien lo busca está buscando su pedido, no un
-                documento legal. Es la única vía para quien compró como
-                invitado, que es la mayoría mientras el correo esté bloqueado. */}
-            <Link href="/pedido" className="hover:text-white">
-              {t.layout.seguimientoPedido}
-            </Link>
-            <Link href="/login" className="hover:text-white">
-              {t.layout.accesoEquipo}
-            </Link>
-          </div>
-        </div>
-
-        {/* Las tres políticas, accesibles desde cualquier página pública.
-            Van en su propia fila para que el envolver en móvil no empuje al
-            logo ni deje enlaces sueltos a media línea. */}
-        <div className="mx-auto mt-7 max-w-[1320px] border-t border-[#22252b] pt-6">
-          <ul className="flex flex-wrap gap-x-6 gap-y-2.5 text-[13px]">
-            {LEGAL_LINKS.map((l) => (
-              <li key={l.href}>
-                <Link href={l.href} className="hover:text-white">
-                  {t.layout.legales[l.href] ?? l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Firma de quien diseñó y desarrolló la tienda. */}
-        <p className="mx-auto mt-6 max-w-[1320px] border-t border-[#22252b] pt-5 text-center text-xs text-[#6b7078]">
-          {t.layout.firma}{" "}
-          <a
-            href="https://dangk.framer.website/"
-            target="_blank"
-            rel="noopener"
-            className="font-semibold text-[#A0A4AD] underline underline-offset-2 hover:text-white"
-          >
-            Dangk
-          </a>
-        </p>
-      </footer>
+      <StoreFooter locale={locale} categories={categories} whatsapp={WHATSAPP} />
 
       {/* La barra inferior es fija: sin este hueco, lo último de cada página
           queda debajo de ella — y en el carrito lo último es el botón de

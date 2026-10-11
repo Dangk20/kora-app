@@ -60,9 +60,12 @@ export type BuyerDefaults = {
 export function CheckoutView({
   initialCountry,
   buyer,
+  legal,
 }: {
   initialCountry: Country;
   buyer?: BuyerDefaults;
+  /** Direcciones del centro legal, resueltas en el servidor (salen del entorno). */
+  legal: { datos: string; terminos: string; cambios: string };
 }) {
   const { lines, ready, clear } = useCart();
   const t = useMessages();
@@ -836,7 +839,7 @@ export function CheckoutView({
                       perdería el formulario a medio llenar y el comprador
                       tendría que empezar de cero por leer lo que autoriza. */}
                   <a
-                    href="/legal/datos-personales"
+                    href={legal.datos}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-kora-coral underline underline-offset-2 hover:opacity-80"
@@ -859,7 +862,7 @@ export function CheckoutView({
               <p className="pt-1 text-[12px] leading-relaxed text-[#9aa0ab]">
                 {tc.aceptasTerminos}{" "}
                 <a
-                  href="/legal/terminos"
+                  href={legal.terminos}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-[#4a4f58]"
@@ -868,7 +871,7 @@ export function CheckoutView({
                 </a>{" "}
                 {tc.yLa}{" "}
                 <a
-                  href="/legal/cambios"
+                  href={legal.cambios}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-[#4a4f58]"

@@ -150,13 +150,21 @@ export const cuenta = {
     volverTienda: "Volver a la tienda",
   },
 
-  // Marco de las páginas legales (el contenido sigue en español)
+  // Marco del centro legal (change `centro-legal`): cabecera, navegación e
+  // índice. El cuerpo de cada documento vive en src/modules/legal/content/.
   legal: {
-    inicio: "Inicio",
-    actualizado: (fecha: string) => `Última actualización: ${fecha}`,
-    /** Solo en inglés: el documento no está traducido. */
-    soloEspanol: null as string | null,
+    marca: "legal",
+    inicio: "Todos los documentos",
+    idioma: "Idioma",
+    volver: "Volver a KORA",
+    documentos: "Documentos",
+    enEstaPagina: "En esta página",
+    centroTitulo: "Centro legal de KORA",
+    centroResumen: "Todas las condiciones que rigen tus compras en KORA, en un solo lugar.",
+    leer: "Leer",
+    actualizado: (fecha: string) => `Última modificación: ${fecha}`,
+    marcasAceptadas: "Tarjetas aceptadas",
     borradorTitulo: "Borrador:",
-    borrador: "faltan los datos del comerciante (razón social, NIT, domicilio y correo de contacto). Este documento no puede publicarse así.",
+    borrador: "faltan datos de las sociedades (razón social, NIT, registro, domicilio o correo de contacto). Este documento no puede publicarse así.",
   },
 };

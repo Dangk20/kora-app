@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LEGAL_SLUGS, allLegalDocuments, esSlugLegal, legalDocument } from "@/modules/legal/content";
 import type { LegalDocument } from "@/modules/legal/content";
 import { merchant } from "@/modules/legal/config";
 import { ORDER_TTL_HOURS } from "@/modules/orders/status";
 import { TASA_CASHBACK, VIGENCIA_MESES } from "@/modules/cashback/money";
+import { MARCAS_ACEPTADAS } from "@/modules/legal/payments";
+import { LOCALES } from "@/modules/i18n";
+
+const SOCIEDADES = {
+  KORA_LEGAL_MATRICULA: "matrícula mercantil 0000000001 de la Cámara de Comercio de Ejemplo",
+  KORA_LEGAL_LLC_RAZON_SOCIAL: "Example Holdings LLC",
+  KORA_LEGAL_LLC_DOMICILIO: "1 Main St, Seattle, WA 98101, Estados Unidos",
+  KORA_LEGAL_LLC_REGISTRO: "UBI 000000001 (Washington)",
+};
 
 const COMERCIANTE = merchant({
   NODE_ENV: "production",
@@ -11,6 +20,7 @@ const COMERCIANTE = merchant({
   KORA_LEGAL_NIT: "900.123.456-7",
   KORA_LEGAL_DOMICILIO: "Calle 1 # 2-3, Bogotá D.C.",
   KORA_LEGAL_EMAIL: "datos@ejemplo.com",
+  ...SOCIEDADES,
 } as NodeJS.ProcessEnv);
 
 /** Todo el texto del documento en una sola cadena, para buscar dentro. */
@@ -18,7 +28,7 @@ function texto(doc: LegalDocument): string {
   const partes: string[] = [doc.title, doc.summary];
 
   for (const section of doc.sections) {
-    partes.push(section.heading);
+    partes.push(section.heading, section.summary ?? "");
     for (const block of section.blocks) {
       if (block.kind === "list") partes.push(...block.items);
       else partes.push(block.text);
@@ -28,17 +38,19 @@ function texto(doc: LegalDocument): string {
   return partes.join("\n");
 }
 
-const doc = (slug: (typeof LEGAL_SLUGS)[number]) => legalDocument(slug, COMERCIANTE);
+const doc = (slug: (typeof LEGAL_SLUGS)[number], locale: "es" | "en" = "es") => legalDocument(slug, COMERCIANTE, locale);
 
 describe("documentos legales — estructura", () => {
-  it("los tres documentos existen y se resuelven por su slug", () => {
-    expect(allLegalDocuments(COMERCIANTE)).toHaveLength(3);
-    for (const slug of LEGAL_SLUGS) {
-      expect(doc(slug).slug).toBe(slug);
+  it("los siete documentos existen en los dos idiomas y se resuelven por su slug", () => {
+    for (const locale of LOCALES) {
+      expect(allLegalDocuments(COMERCIANTE, locale)).toHaveLength(7);
+      for (const slug of LEGAL_SLUGS) {
+        expect(doc(slug, locale).slug).toBe(slug);
+      }
     }
   });
 
-  it("solo los tres slugs conocidos son legales", () => {
+  it("solo los slugs conocidos son legales", () => {
     for (const slug of LEGAL_SLUGS) expect(esSlugLegal(slug)).toBe(true);
     for (const otro of ["inventada", "privacy", "", "cambios/", "../config"]) {
       expect(esSlugLegal(otro)).toBe(false);
@@ -46,11 +58,12 @@ describe("documentos legales — estructura", () => {
   });
 
   it("ningún documento sale vacío ni sin fecha de actualización", () => {
-    for (const slug of LEGAL_SLUGS) {
-      const d = doc(slug);
+    for (const slug of LEGAL_SLUGS) for (const locale of LOCALES) {
+      const d = doc(slug, locale);
       expect(d.title.length).toBeGreaterThan(10);
       expect(d.summary.length).toBeGreaterThan(20);
       expect(d.sections.length).toBeGreaterThan(2);
+      expect(d.shortTitle.length).toBeGreaterThan(5);
       expect(d.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       for (const section of d.sections) {
         expect(section.blocks.length).toBeGreaterThan(0);
@@ -67,12 +80,17 @@ describe("documentos legales — estructura", () => {
       KORA_LEGAL_NIT: "800.999.111-2",
       KORA_LEGAL_DOMICILIO: "Carrera 9 # 8-7, Medellín",
       KORA_LEGAL_EMAIL: "contacto@otra.com",
+      KORA_LEGAL_MATRICULA: "matrícula 2",
+      KORA_LEGAL_LLC_RAZON_SOCIAL: "Other Parent LLC",
+      KORA_LEGAL_LLC_DOMICILIO: "2 Elm St, Austin, TX",
+      KORA_LEGAL_LLC_REGISTRO: "SOS 2",
     } as NodeJS.ProcessEnv);
 
-    for (const slug of LEGAL_SLUGS) {
-      const t = texto(legalDocument(slug, otro));
-      expect(t).not.toContain("Comercializadora Ejemplo");
-      expect(t).not.toContain("900.123.456-7");
+    for (const slug of LEGAL_SLUGS) for (const locale of LOCALES) {
+      const t = texto(legalDocument(slug, otro, locale));
+      for (const valor of ["Comercializadora Ejemplo", "900.123.456-7", ...Object.values(SOCIEDADES)]) {
+        expect(t).not.toContain(valor);
+      }
     }
 
     expect(texto(legalDocument("datos-personales", otro))).toContain("Otra Sociedad Ltda.");
@@ -135,9 +153,20 @@ describe("política de cambios — los derechos irrenunciables se publican", () 
 describe("condiciones de venta — describen el negocio real", () => {
   const t = () => texto(doc("terminos"));
 
-  it("dice que la plataforma no procesa pagos", () => {
-    expect(t()).toMatch(/no tiene pasarela de pago|no procesa pagos/i);
+  it("describe las dos vías de pago: tarjeta en la página del procesador y otro medio por WhatsApp", () => {
+    expect(t()).toMatch(/página de pago segura de nuestro procesador/i);
     expect(t()).toContain("WhatsApp");
+  });
+
+  it("NO niega el cobro en línea", () => {
+    // Decía "no cobramos en línea" y "KORA no tiene pasarela de pago": lo
+    // contrario de lo que el banco espera leer en un comercio con pago alojado.
+    for (const locale of LOCALES) for (const slug of LEGAL_SLUGS) {
+      const c = texto(doc(slug, locale));
+      for (const patron of [/no cobramos en línea/i, /no tiene pasarela/i, /no procesa pagos/i, /we do not charge online/i]) {
+        expect(c).not.toMatch(patron);
+      }
+    }
   });
 
   it("el plazo de vigencia publicado es el que el sistema aplica de verdad", () => {
@@ -147,9 +176,11 @@ describe("condiciones de venta — describen el negocio real", () => {
     expect(t()).toContain(`${ORDER_TTL_HOURS} horas`);
   });
 
-  it("la tasa y la vigencia del cashback salen de sus constantes", () => {
-    expect(t()).toContain(`${Math.round(TASA_CASHBACK * 100)} %`);
-    expect(t()).toContain(`${VIGENCIA_MESES} meses`);
+  it("la tasa y la vigencia del cashback salen de sus constantes, en los dos idiomas", () => {
+    expect(texto(doc("promociones"))).toContain(`${Math.round(TASA_CASHBACK * 100)} %`);
+    expect(texto(doc("promociones"))).toContain(`${VIGENCIA_MESES} meses`);
+    expect(texto(doc("promociones", "en"))).toContain(`${Math.round(TASA_CASHBACK * 100)}%`);
+    expect(texto(doc("promociones", "en"))).toContain(`${VIGENCIA_MESES} months`);
   });
 
   it("advierte que las monedas no se convierten entre sí", () => {
@@ -185,7 +216,7 @@ describe("política de datos — sostiene el consentimiento del checkout", () =>
 
   it("presenta al responsable como sociedad, no como persona natural", () => {
     expect(t()).toContain(`sociedad identificada con NIT ${COMERCIANTE.nit}`);
-    expect(texto(doc("terminos"))).toContain(`sociedad identificada con NIT ${COMERCIANTE.nit}`);
+    expect(texto(doc("terminos"))).toContain(`sociedad en Colombia, identificada con NIT ${COMERCIANTE.nit}`);
   });
 
   it("publica un canal de atención al titular", () => {
@@ -211,5 +242,103 @@ describe("política de datos — sostiene el consentimiento del checkout", () =>
   it("no promete cookies de terceros que la tienda no usa", () => {
     expect(t()).toMatch(/estrictamente necesarias/i);
     expect(t()).toMatch(/no usamos cookies de publicidad/i);
+  });
+});
+
+describe("centro legal — dos idiomas, mismas secciones", () => {
+  it("cada documento tiene en inglés las mismas secciones, en el mismo orden y con la misma ancla", () => {
+    // El equivalente de `typeof es` en los diccionarios: una sección sin
+    // traducir, o traducida en otro orden, rompe el cambio de idioma.
+    for (const slug of LEGAL_SLUGS) {
+      const es = doc(slug, "es").sections.map((s) => s.id);
+      const en = doc(slug, "en").sections.map((s) => s.id);
+      expect(en, slug).toEqual(es);
+      expect(new Set(es).size, `${slug}: anclas repetidas`).toBe(es.length);
+    }
+  });
+
+  it("la versión en inglés dice que prevalece la española", () => {
+    for (const slug of LEGAL_SLUGS) {
+      expect(texto(doc(slug, "en")), slug).toMatch(/Spanish version of this document prevails/);
+    }
+  });
+});
+
+describe("normas de las redes de tarjetas — lo que el banco pide encontrar", () => {
+  it("dirección física y país de las dos sociedades, con sus registros", () => {
+    const c = texto(doc("comercio"));
+    for (const valor of [
+      COMERCIANTE.domicilio,
+      COMERCIANTE.nit,
+      COMERCIANTE.matricula,
+      COMERCIANTE.llc.razonSocial,
+      COMERCIANTE.llc.domicilio,
+      COMERCIANTE.llc.registro,
+      "Estados Unidos",
+      "Colombia",
+    ]) {
+      expect(c).toContain(valor);
+    }
+  });
+
+  it("contacto de atención: correo, y teléfono cuando se conoce", () => {
+    const c = texto(legalDocument("comercio", COMERCIANTE, "es", { whatsapp: "+573024456290" }));
+    expect(c).toContain(COMERCIANTE.email);
+    expect(c).toContain("+57 302 445 6290");
+  });
+
+  it("monedas de transacción y marcas aceptadas", () => {
+    for (const locale of LOCALES) {
+      const c = texto(doc("seguridad-pagos", locale));
+      expect(c).toContain("COP");
+      expect(c).toContain("USD");
+      for (const marca of MARCAS_ACEPTADAS) expect(c).toContain(marca.nombre);
+    }
+  });
+
+  it("las transferencias por país se anuncian en los dos idiomas", () => {
+    for (const locale of LOCALES) {
+      const c = texto(doc("seguridad-pagos", locale)) + texto(doc("terminos", locale));
+      for (const medio of ["Nequi", "Bre-B", "Zelle"]) expect(c, `${locale}: ${medio}`).toContain(medio);
+    }
+  });
+
+  it("KORA no recibe ni almacena datos de tarjeta, en seguridad y en privacidad", () => {
+    expect(texto(doc("seguridad-pagos"))).toMatch(/no recibe, no ve y no almacena/);
+    expect(texto(doc("datos-personales"))).toMatch(/No recibimos, no vemos y no almacenamos los datos de tu tarjeta/);
+    expect(texto(doc("seguridad-pagos", "en"))).toMatch(/does not receive, see or store/);
+  });
+
+  it("política de entrega: solo Colombia y sin exportación", () => {
+    const e = texto(doc("envios"));
+    expect(e).toMatch(/únicamente en Colombia/);
+    expect(e).toMatch(/No realizamos envíos internacionales ni exportamos productos/);
+    expect(texto(doc("terminos"))).toMatch(/Restricciones legales y de exportación/);
+  });
+
+  it("reembolsos con tarjeta: a la misma tarjeta", () => {
+    expect(texto(doc("cambios"))).toMatch(/reembolso se hace a la misma tarjeta/);
+    expect(texto(doc("cambios", "en"))).toMatch(/refund goes to the same card/);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("condiciones de las promociones, que se retiran solas al vencer", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
+    expect(texto(doc("promociones"))).toContain("BIENVENIDOSAKORA");
+    expect(texto(doc("promociones"))).toMatch(/Reglas generales de los cupones/);
+
+    // Vencida, no se sigue prometiendo: la página es dinámica.
+    vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+    expect(texto(doc("promociones"))).not.toContain("BIENVENIDOSAKORA");
+    expect(texto(doc("promociones"))).toMatch(/no hay promociones públicas vigentes/);
+  });
+
+  it("la transferencia de datos a la matriz en EE.UU. se declara", () => {
+    expect(texto(doc("datos-personales"))).toMatch(/transferencia internacional de datos/);
+    expect(texto(doc("datos-personales"))).toContain(COMERCIANTE.llc.razonSocial);
   });
 });

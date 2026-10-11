@@ -21,6 +21,17 @@ export const LEGAL_REQUIRED_VARS = [
   "KORA_LEGAL_NIT",
   "KORA_LEGAL_DOMICILIO",
   "KORA_LEGAL_EMAIL",
+  // Registro mercantil de la sociedad colombiana. KORA opera en dos países y
+  // el centro legal publica el registro de cada sociedad (Daniel, 10 oct).
+  "KORA_LEGAL_MATRICULA",
+  // La sociedad de EE.UU. que procesa los pagos con tarjeta (cuenta comercial
+  // de Bank of America). Las redes de tarjetas exigen que el sitio muestre la
+  // dirección física y el país del comercio que cobra: publicarla con un
+  // marcador no deja un texto incompleto, deja al comercio fuera de norma
+  // ante el banco. Change `centro-legal`.
+  "KORA_LEGAL_LLC_RAZON_SOCIAL",
+  "KORA_LEGAL_LLC_DOMICILIO",
+  "KORA_LEGAL_LLC_REGISTRO",
 ] as const;
 
 export type LegalVar = (typeof LEGAL_REQUIRED_VARS)[number];
@@ -32,6 +43,16 @@ export type Merchant = {
   domicilio: string;
   /** Canal de atención al titular de datos personales. */
   email: string;
+  /** Registro mercantil en Colombia, p. ej. "matrícula mercantil 0000435099 de la Cámara de Comercio del Huila" (en minúscula: va a mitad de frase). */
+  matricula: string;
+  /** La sociedad de EE.UU. que figura en los cobros con tarjeta. */
+  llc: {
+    razonSocial: string;
+    /** Dirección física completa, con estado y país. */
+    domicilio: string;
+    /** Registro empresarial, p. ej. "UBI 606212090 (Washington)". */
+    registro: string;
+  };
   /** `true` cuando algún dato es un marcador de desarrollo, no el real. */
   incompleto: boolean;
 };
@@ -48,6 +69,10 @@ const MARCADOR: Record<LegalVar, string> = {
   KORA_LEGAL_NIT: "[NIT PENDIENTE]",
   KORA_LEGAL_DOMICILIO: "[DOMICILIO PENDIENTE]",
   KORA_LEGAL_EMAIL: "[CORREO DE CONTACTO PENDIENTE]",
+  KORA_LEGAL_MATRICULA: "[MATRÍCULA MERCANTIL PENDIENTE]",
+  KORA_LEGAL_LLC_RAZON_SOCIAL: "[SOCIEDAD DE EE.UU. PENDIENTE]",
+  KORA_LEGAL_LLC_DOMICILIO: "[DIRECCIÓN EN EE.UU. PENDIENTE]",
+  KORA_LEGAL_LLC_REGISTRO: "[REGISTRO EMPRESARIAL PENDIENTE]",
 };
 
 /** Variables del comerciante que faltan o están vacías. Vacío = completo. */
@@ -69,6 +94,12 @@ export function merchant(env: NodeJS.ProcessEnv = process.env): Merchant {
     nit: valor("KORA_LEGAL_NIT"),
     domicilio: valor("KORA_LEGAL_DOMICILIO"),
     email: valor("KORA_LEGAL_EMAIL"),
+    matricula: valor("KORA_LEGAL_MATRICULA"),
+    llc: {
+      razonSocial: valor("KORA_LEGAL_LLC_RAZON_SOCIAL"),
+      domicilio: valor("KORA_LEGAL_LLC_DOMICILIO"),
+      registro: valor("KORA_LEGAL_LLC_REGISTRO"),
+    },
     incompleto: missingLegalVars(env).length > 0,
   };
 }
@@ -79,8 +110,9 @@ export class LegalConfigError extends Error {
   constructor(missing: readonly LegalVar[]) {
     super(
       `Datos del comerciante sin configurar. Faltan estas variables de entorno: ${missing.join(", ")}. ` +
-        "Las páginas legales de /legal identifican al responsable del tratamiento de datos; " +
-        "publicarlas con marcadores invalida el consentimiento que se pide en el checkout (Ley 1581/2012, art. 9).",
+        "Las páginas legales identifican al responsable del tratamiento de datos y al comercio que cobra con tarjeta; " +
+        "publicarlas con marcadores invalida el consentimiento que se pide en el checkout (Ley 1581/2012, art. 9) " +
+        "y deja el sitio fuera de las normas de las redes de tarjetas.",
     );
     this.name = "LegalConfigError";
     this.missing = missing;

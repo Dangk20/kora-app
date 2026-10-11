@@ -11,10 +11,24 @@ export const layout = {
   accesoEquipo: "Acceso al equipo",
   /** Firma del pie: "Diseño y desarrollo por" + enlace a Dangk. */
   firma: "Diseño y desarrollo por",
-  /** Por ruta: las páginas legales siguen en español (fuera de esta entrega). */
-  legales: {
-    "/legal/datos-personales": "Tratamiento de datos",
-    "/legal/terminos": "Términos y condiciones",
-    "/legal/cambios": "Cambios y garantía",
-  } as Record<string, string>,
+  /** Footer (change `centro-legal`): lo que las redes de tarjetas piden ver en el sitio. */
+  footer: {
+    tienda: "Tienda",
+    catalogo: "Todo el catálogo",
+    ayuda: "Ayuda",
+    legal: "Legal",
+    centroLegal: "Centro legal",
+    mediosPago: "Medios de pago",
+    tarjetas: "Tarjetas de crédito y débito",
+    transferenciaCo: "Transferencia en Colombia · COP",
+    transferenciaUs: "Transferencia desde EE.UU. · USD",
+    otrosMedios: "Las transferencias se coordinan por WhatsApp al crear tu pedido.",
+    contacto: "Contáctanos",
+    correo: "Correo",
+    whatsapp: "WhatsApp y teléfono",
+    siguenos: "Síguenos",
+    matriz: "Sociedad matriz · Estados Unidos",
+    colombia: "Sociedad en Colombia",
+    derechos: (anio: number) => `© ${anio} KORA. Todos los derechos reservados.`,
+  },
 };

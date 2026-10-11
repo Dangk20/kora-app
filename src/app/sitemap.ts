@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { storeUrl } from "@/lib/site";
-import { LEGAL_LINKS } from "@/modules/legal/content";
+import { LEGAL_SLUGS } from "@/modules/legal/content";
+import { legalUrl } from "@/modules/legal/url";
+import { LOCALES } from "@/modules/i18n";
 import { listCategories, listProductSlugs } from "@/modules/storefront/queries";
 
 // El sitemap parte de la MISMA definición de "producto publicado" que la
@@ -39,11 +41,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const estaticas: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "daily", priority: 1 },
     { url: `${base}/catalogo`, changeFrequency: "daily", priority: 0.9 },
-    ...LEGAL_LINKS.map((l) => ({
-      url: `${base}${l.href}`,
-      changeFrequency: "yearly" as const,
-      priority: 0.2,
-    })),
+    // El centro legal, en los dos idiomas. Con subdominio, sus direcciones
+    // son las de `legal.korashopp.com`: la misma definición que el footer.
+    ...LOCALES.flatMap((locale) =>
+      LEGAL_SLUGS.map((slug) => ({
+        url: legalUrl(locale, slug, { storeBase: base }),
+        changeFrequency: "yearly" as const,
+        priority: 0.2,
+      })),
+    ),
   ];
 
   return [
