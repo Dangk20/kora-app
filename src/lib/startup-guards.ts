@@ -37,6 +37,7 @@
 
 import { assertEmailConfigured } from "@/modules/email/config";
 import { assertLegalConfigured } from "@/modules/legal/config";
+import { assertMeasurementConfigured } from "@/modules/measurement/config";
 import { assertStorageConfigured } from "@/modules/storage/config";
 
 type Guarda = {
@@ -56,6 +57,7 @@ const GUARDAS: readonly Guarda[] = [
   { asunto: "Imágenes de producto", comprobar: assertStorageConfigured },
   { asunto: "Envío de correo", comprobar: assertEmailConfigured },
   { asunto: "Datos del comerciante", comprobar: assertLegalConfigured },
+  { asunto: "Medición publicitaria", comprobar: assertMeasurementConfigured },
 ];
 
 export type FalloDeArranque = { asunto: string; mensaje: string };

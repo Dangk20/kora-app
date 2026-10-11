@@ -6,6 +6,7 @@ import type { Locale } from "@/modules/i18n";
 import { whatsappNumberFor } from "@/modules/orders/settings";
 import type { LegalContext } from "./content";
 import { esHostLegal } from "./url";
+import { medicionActiva } from "@/modules/measurement/config";
 
 /** ¿Se está sirviendo esta página por el subdominio legal? */
 export async function enSubdominioLegal(): Promise<boolean> {
@@ -19,5 +20,8 @@ export async function enSubdominioLegal(): Promise<boolean> {
  * en el panel, cambia aquí también. En inglés, el de la línea en USD.
  */
 export async function legalContext(locale: Locale): Promise<LegalContext> {
-  return { whatsapp: await whatsappNumberFor(locale === "en" ? "USD" : "COP") };
+  return {
+    whatsapp: await whatsappNumberFor(locale === "en" ? "USD" : "COP"),
+    medicion: medicionActiva(),
+  };
 }

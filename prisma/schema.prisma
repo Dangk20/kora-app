@@ -548,12 +548,77 @@ model Order {
   stockMovements    StockMovement[]
   statusHistory     OrderStatusHistory[]
   cashbackMovements CashbackMovement[]
+  attribution       OrderAttribution?
+  adConversions     AdConversion[]
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
   @@index([status, createdAt])
   @@index([customerId])
   @@map("orders")
+}
+
+// ── Medición publicitaria (change medicion-publicitaria, 11 oct 2026) ──
+//
+// De dónde vino el comprador de un pedido. Tabla aparte y no columnas en
+// `orders`: el pedido es el snapshot de la venta; esto es un dato de marketing
+// con otra vida, que se puede purgar sin tocar una sola venta.
+//
+// Los identificadores de plataforma, el navegador y la IP SOLO se guardan con
+// consentimiento (`consent = true`). Sin él queda el origen —una cookie propia
+// que no identifica a nadie— y nada más.
+model OrderAttribution {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  consent Boolean @default(false)
+
+  source   String?
+  medium   String?
+  campaign String?
+  content  String?
+  term     String?
+  fbclid   String?
+  gclid    String?
+  landing  String?
+  touchAt  DateTime?
+
+  // Solo con consentimiento.
+  fbp         String?
+  fbc         String?
+  gaClientId  String?
+  gaSessionId String?
+  userAgent   String?
+  ipAddress   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([source, campaign])
+  @@map("order_attributions")
+}
+
+enum AdPlatform {
+  META
+  GA4
+}
+
+// Constancia de que la compra de un pedido se informó a una plataforma. El
+// índice único es la idempotencia: el manejador la consulta antes de enviar y
+// la escribe después. Si muere entre medias y reenvía, la plataforma
+// deduplica (Meta por event_id, GA4 por transaction_id).
+model AdConversion {
+  id       String     @id @default(cuid())
+  orderId  String
+  order    Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  platform AdPlatform
+  eventId  String
+  value    Decimal    @db.Decimal(12, 2)
+  currency Currency
+  sentAt   DateTime   @default(now())
+
+  @@unique([orderId, platform])
+  @@map("ad_conversions")
 }
 
 model OrderItem {

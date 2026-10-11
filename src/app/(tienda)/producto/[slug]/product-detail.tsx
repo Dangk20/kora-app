@@ -12,6 +12,7 @@ import { PriceTag } from "@/modules/storefront/price-tag";
 import type { StoreProduct } from "@/modules/storefront/queries";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import { useCart } from "@/modules/cart/cart-context";
+import { trackAddToCart, trackViewContent } from "@/modules/measurement/track";
 import { ProductGuarantees } from "@/modules/storefront/product-guarantees";
 import { useOwnsBottomBar } from "@/modules/storefront/mobile/bars-context";
 
@@ -106,8 +107,25 @@ export function ProductDetail({
     setJustAdded(false);
   };
 
+  // Medición: una vista de producto por ficha abierta (no por cada variante).
+  // El ref la hace única también cuando el efecto corre dos veces (modo
+  // estricto de React en desarrollo).
+  const fichaMedida = useRef<string | null>(null);
+  useEffect(() => {
+    if (!variant || !price?.available || fichaMedida.current === product.id) return;
+    fichaMedida.current = product.id;
+    trackViewContent({ sku: variant.sku, name: product.name, price: price.amount, qty: 1 }, price.currency);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]);
+
+  const medirAgregado = () => {
+    if (!variant || !price?.available) return;
+    trackAddToCart({ sku: variant.sku, name: product.name, price: price.amount, qty }, price.currency);
+  };
+
   const addToCart = () => {
     if (!variant || soldOut) return;
+    medirAgregado();
     cart.add(variant.id, qty, { nombre: product.name });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2500);
@@ -117,6 +135,7 @@ export function ProductDetail({
     if (!variant || soldOut) return;
     // En silencio: se navega al checkout de inmediato y confirmar algo que
     // ya no se va a ver es un parpadeo, no una confirmación.
+    medirAgregado();
     cart.add(variant.id, qty, { silencioso: true });
     router.push("/checkout");
   };

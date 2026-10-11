@@ -31,6 +31,7 @@ import { PantallaProceso } from "./pantalla-proceso";
 import { InvitacionCuenta } from "./invitacion-cuenta";
 import { guardarDireccionDelPedido } from "../cuenta/direcciones-actions";
 import { useMessages } from "@/modules/i18n/provider";
+import { trackInitiateCheckout, trackLead } from "@/modules/measurement/track";
 
 // `min-h-12` = 48 px: el mínimo táctil del diseño (§05). Y `text-base` en
 // móvil no es estética — iOS hace zoom automático sobre cualquier campo con
@@ -238,6 +239,18 @@ export function CheckoutView({
     [cart],
   );
 
+  // Medición: una vez por visita al checkout, cuando hay algo que pedir. Sin
+  // consentimiento no hay etiquetas cargadas y la llamada no hace nada.
+  const checkoutMedido = useRef(false);
+  useEffect(() => {
+    if (checkoutMedido.current || !cart || buyable.length === 0) return;
+    checkoutMedido.current = true;
+    trackInitiateCheckout(
+      buyable.map((l) => ({ sku: l.sku, name: l.productName, price: l.unitPrice, qty: l.qtyAvailable })),
+      cart.currency,
+    );
+  }, [cart, buyable]);
+
   const submit = (formData: FormData) => {
     setError(null);
     const campo = (name: string) => String(formData.get(name) ?? "");
@@ -309,6 +322,10 @@ export function CheckoutView({
             notes: payload.shipping.notes,
           }).catch(() => {});
         }
+
+        // Pedido creado = intención, todavía no venta. La compra la informa el
+        // servidor cuando el operador confirma (medicion-publicitaria).
+        if (cart) trackLead(result.orderNumber, total, cart.currency);
 
         recordarPedidoSinEnviar({
           orderNumber: result.orderNumber,

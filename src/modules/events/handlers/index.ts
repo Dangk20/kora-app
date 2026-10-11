@@ -6,6 +6,10 @@ import type { EventHandler } from "../types";
 import { orderConfirmedCashbackHandler } from "./order-confirmed-cashback";
 import { orderConfirmedLogHandler } from "./order-confirmed-log";
 import {
+  orderConfirmedGa4Handler,
+  orderConfirmedMetaHandler,
+} from "./order-confirmed-measurement";
+import {
   orderCancelledBuyerEmail,
   orderConfirmedBuyerEmail,
   orderCreatedBuyerEmail,
@@ -46,6 +50,14 @@ export function registerAllHandlers(): void {
   registrar("order.shipped", orderShippedBuyerEmail);
   registrar("order.delivered", orderDeliveredBuyerEmail);
   registrar("order.cancelled", orderCancelledBuyerEmail);
+
+  // Medición publicitaria (change medicion-publicitaria). AL FINAL a
+  // propósito: si Meta o Google fallan, el evento se reintenta completo, y
+  // para entonces el cashback y el correo ya ocurrieron —sus manejadores son
+  // idempotentes, así que reintentarlos no duplica nada—. Una plataforma de
+  // anuncios caída nunca debe ir antes que el dinero ni el aviso al comprador.
+  registrar("order.confirmed", orderConfirmedMetaHandler);
+  registrar("order.confirmed", orderConfirmedGa4Handler);
 }
 
 export { registeredTypes };
