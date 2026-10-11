@@ -14,7 +14,6 @@ import { LanguageSwitch } from "@/app/(tienda)/language-switch";
 import { useEffect } from "react";
 import Link from "next/link";
 import { MessageCircle, User, X } from "lucide-react";
-import { LEGAL_LINKS } from "@/modules/legal/content";
 import { CategoryTile, inkFor } from "@/modules/catalog/tiles";
 import type { StoreCategory } from "../queries";
 
@@ -23,11 +22,14 @@ export function MobileMenu({
   onClose,
   categories,
   whatsappHref,
+  legalLinks,
 }: {
   open: boolean;
   onClose: () => void;
   categories: StoreCategory[];
   whatsappHref: string;
+  /** Resueltos en el servidor: la dirección del centro legal sale del entorno. */
+  legalLinks: { href: string; label: string }[];
 }) {
   const t = useMessages();
   // Con el menú abierto la página de detrás no debe desplazarse: si lo hace,
@@ -140,14 +142,14 @@ export function MobileMenu({
           </div>
 
           <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2.5 border-t border-[#f0ece6] px-[18px] py-3.5">
-            {LEGAL_LINKS.map((l) => (
+            {legalLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={onClose}
                 className="text-[11.5px] text-[#8a8f98]"
               >
-                {t.layout.legales[l.href] ?? l.label}
+                {l.label}
               </Link>
             ))}
           </div>

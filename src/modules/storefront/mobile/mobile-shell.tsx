@@ -16,10 +16,12 @@ export function MobileShell({
   currency,
   categories,
   whatsappHref,
+  legalLinks,
 }: {
   currency: Currency;
   categories: StoreCategory[];
   whatsappHref: string;
+  legalLinks: { href: string; label: string }[];
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -31,6 +33,7 @@ export function MobileShell({
         onClose={() => setMenuOpen(false)}
         categories={categories}
         whatsappHref={whatsappHref}
+        legalLinks={legalLinks}
       />
     </>
   );

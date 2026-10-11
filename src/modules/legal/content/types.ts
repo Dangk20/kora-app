@@ -10,6 +10,7 @@
 // revisión y sin fecha es un riesgo legal mayor que la incomodidad de desplegar.
 // El historial de estos archivos ES el historial de las políticas.
 
+import type { Locale } from "@/modules/i18n";
 import type { Merchant } from "../config";
 
 /** Un párrafo puede llevar énfasis o una lista; nada más. */
@@ -19,7 +20,15 @@ export type LegalBlock =
   | { kind: "note"; text: string };
 
 export type LegalSection = {
+  /**
+   * Ancla de la sección (`#pago`). Es la MISMA en los dos idiomas: así el
+   * selector de idioma conserva la posición y una prueba puede comparar las dos
+   * versiones sección por sección.
+   */
+  id: string;
   heading: string;
+  /** Lo esencial de la sección en una o dos frases, en el recuadro destacado. */
+  summary?: string;
   blocks: LegalBlock[];
 };
 
@@ -27,6 +36,8 @@ export type LegalDocument = {
   slug: LegalSlug;
   /** Título de la página y de la pestaña. */
   title: string;
+  /** Etiqueta corta para listas, footer y menú. */
+  shortTitle: string;
   /** Una línea bajo el título, para orientar antes de leer. */
   summary: string;
   /**
@@ -41,7 +52,23 @@ export type LegalDocument = {
   sections: LegalSection[];
 };
 
-export const LEGAL_SLUGS = ["datos-personales", "terminos", "cambios"] as const;
+/**
+ * Los documentos, en el orden en que se listan en el centro legal.
+ *
+ * Los slugs son los mismos en los dos idiomas (`/en/terminos`): cambiar de
+ * idioma es cambiar un segmento de la URL, sin tabla de equivalencias que
+ * pueda desincronizarse. Los tres primeros conservan su slug histórico para
+ * que la redirección desde `korashopp.com/legal/<slug>` sea directa.
+ */
+export const LEGAL_SLUGS = [
+  "terminos",
+  "datos-personales",
+  "cambios",
+  "envios",
+  "seguridad-pagos",
+  "promociones",
+  "comercio",
+] as const;
 
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
 
@@ -53,4 +80,17 @@ export type LegalSlug = (typeof LEGAL_SLUGS)[number];
  * (con los datos reales) sin duplicar el texto — y duplicarlo sería la forma
  * segura de que uno de los dos se quedara desactualizado.
  */
-export type LegalDocumentFactory = (merchant: Merchant) => LegalDocument;
+export type LegalDocumentFactory = (merchant: Merchant, contexto?: LegalContext) => LegalDocument;
+
+/**
+ * Datos de contacto que no son del entorno sino de la base: el WhatsApp de
+ * atención lo configura el operador en el panel. Opcional para que los
+ * documentos se puedan construir en pruebas y en el sitemap sin base.
+ */
+export type LegalContext = {
+  /** WhatsApp de atención en formato E.164 (`+573024456290`). */
+  whatsapp?: string | null;
+};
+
+/** Cada documento existe en los dos idiomas de la tienda. */
+export type BilingualDocument = Record<Locale, LegalDocumentFactory>;

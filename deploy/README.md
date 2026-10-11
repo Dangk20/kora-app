@@ -219,6 +219,33 @@ Valores vigentes (KORA SHOPP S.A.S., RUT DIAN 141284373798, 8 oct 2026):
 `KORA_LEGAL_DOMICILIO="Calle 25 Sur # 32-23, Neiva, Huila, Colombia"`,
 `KORA_LEGAL_EMAIL="info.kora.shopping@gmail.com"`.
 
+**Desde el change `centro-legal` (10 oct 2026) son ocho, no cuatro.** Se suman
+el registro mercantil de la S.A.S. y la sociedad matriz en EE.UU., que procesa
+los pagos con tarjeta (Bank of America exige publicar su dirección física y su
+país):
+`KORA_LEGAL_MATRICULA="matrícula mercantil 0000435099 de la Cámara de Comercio del Huila"`,
+`KORA_LEGAL_LLC_RAZON_SOCIAL="KORA SHOPPING LLC"`,
+`KORA_LEGAL_LLC_DOMICILIO="7212 Harrow Pl, Arlington, WA 98223-4635, Estados Unidos"`,
+`KORA_LEGAL_LLC_REGISTRO="UBI 606212090 (Washington)"`.
+Sin cualquiera de ellas, producción **no arranca** y el registro nombra la que
+falta.
+
+### Centro legal en `legal.korashopp.com` — en este orden
+
+1. **DNS** (Hostinger): registro `A` `legal` → `2.24.90.21`.
+2. **Caddy**: copiar el bloque `legal.korashopp.com` de `deploy/Caddyfile` al
+   del servidor y recargar el borde (aviso 1: recrear el contenedor). Comprobar
+   que `https://legal.korashopp.com` responde con certificado válido.
+3. **`.env.production`**: las ocho `KORA_LEGAL_*` y, solo después del paso 2,
+   `KORA_LEGAL_URL="https://legal.korashopp.com"`. Antes de ese paso la tienda
+   enlazaría a un subdominio que no responde.
+4. **Desplegar producción** y verificar:
+   `curl -I https://korashopp.com/legal/terminos` → `301` a
+   `https://legal.korashopp.com/es/terminos`, y esa dirección → `200`.
+
+Vuelta atrás: vaciar `KORA_LEGAL_URL` y reiniciar la app. Todo vuelve a
+servirse en `korashopp.com/legal/<idioma>/<documento>`, sin desplegar código.
+
 Identifican al responsable del tratamiento en `/legal/datos-personales`, que es
 la política a la que apunta la autorización que el checkout le pide al
 comprador. Publicarlas con marcadores no deja un texto incompleto: deja un

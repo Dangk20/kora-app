@@ -31,6 +31,10 @@ function produccionCompleta(): NodeJS.ProcessEnv {
     KORA_LEGAL_NIT: "900000000-1",
     KORA_LEGAL_DOMICILIO: "Calle 1 #2-3, Bogotá",
     KORA_LEGAL_EMAIL: "datos@ejemplo.com",
+    KORA_LEGAL_MATRICULA: "matrícula mercantil 0000000001",
+    KORA_LEGAL_LLC_RAZON_SOCIAL: "Example Holdings LLC",
+    KORA_LEGAL_LLC_DOMICILIO: "1 Main St, Seattle, WA 98101, Estados Unidos",
+    KORA_LEGAL_LLC_REGISTRO: "UBI 000000001 (Washington)",
   } as NodeJS.ProcessEnv;
 }
 

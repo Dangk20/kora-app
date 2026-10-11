@@ -1,0 +1,15 @@
+Marcas de aceptación de Visa, Mastercard y American Express, a todo color.
+
+Fuente: aaronfagan/svg-credit-card-payment-icons (carpeta flat/), licencia Apache 2.0.
+Las marcas son propiedad de sus titulares; se muestran para indicar que se
+aceptan, como exigen las redes de tarjetas (Bank of America, oct 2026).
+No se recolorean ni se deforman: los estándares de marca lo prohíben.
+Qué marcas se muestran lo decide MARCAS_ACEPTADAS en src/modules/legal/payments.ts.
+
+Medios de transferencia (10 oct 2026):
+- nequi.svg — Wikimedia Commons, "Nequi Colombia logo.svg".
+- zelle.svg — Wikimedia Commons, "Zelle logo.svg" (versión invertida oficial, blanco sobre morado).
+- Bre-B: FALTA. El sello oficial está en el Manual de Identidad Visual del Banco de la
+  República (banrep.gov.co/es/bre-b/caja-herramientas), que no se deja descargar en
+  automático. Al tenerlo, guardarlo como bre-b.svg y poner `logo: "/marcas/bre-b.svg"`
+  en MEDIOS_TRANSFERENCIA. Mientras tanto se muestra el nombre en texto.

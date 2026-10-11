@@ -172,7 +172,8 @@ describe("plantilla de marca", () => {
     const { html, text } = renderCampaign(BASE);
     for (const salida of [html, text]) {
       expect(salida).toContain("KORA");
-      expect(salida).toContain("/politica-de-datos");
+      // Antes apuntaba a /politica-de-datos, una ruta que nunca existió.
+      expect(salida).toContain("/legal/es/datos-personales");
       expect(salida).toContain(BASE.unsubscribeUrl);
     }
   });

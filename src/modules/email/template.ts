@@ -16,6 +16,7 @@
 
 import type { Currency } from "@/generated/prisma/enums";
 import { storeUrl } from "./driver";
+import { legalUrl } from "@/modules/legal/url";
 
 // Paleta oficial (src/app/globals.css). En un correo no hay variables CSS:
 // los valores van literales.
@@ -605,7 +606,7 @@ export function renderCampaignHtml(input: TemplateInput): string {
     <tr><td style="padding:18px 26px 26px;border-top:1px solid #eee9e2;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:${GRIS};">
       <p style="margin:0 0 6px;">${NEGOCIO} · Todo lo que quieres, en un solo lugar</p>
       <p style="margin:0;">
-        <a href="${base}/politica-de-datos" style="color:${GRIS};">Política de tratamiento de datos</a>
+        <a href="${escapeHtml(legalUrl("es", "datos-personales", { storeBase: base }))}" style="color:${GRIS};">Política de tratamiento de datos</a>
         ${
           input.unsubscribeUrl
             ? `&nbsp;·&nbsp;<a href="${input.unsubscribeUrl}" style="color:${GRIS};">Cancelar suscripción</a>`
@@ -688,7 +689,7 @@ export function renderCampaignText(input: TemplateInput): string {
   lineas.push(
     "—",
     `${NEGOCIO} · Todo lo que quieres, en un solo lugar`,
-    `Política de tratamiento de datos: ${base}/politica-de-datos`,
+    `Política de tratamiento de datos: ${legalUrl("es", "datos-personales", { storeBase: base })}`,
   );
   if (input.unsubscribeUrl) lineas.push(`Cancelar suscripción: ${input.unsubscribeUrl}`);
   return lineas.join("\n");

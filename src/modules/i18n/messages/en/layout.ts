@@ -11,10 +11,23 @@ export const layout: typeof es = {
   seguimientoPedido: "Track your order",
   accesoEquipo: "Staff login",
   firma: "Design & development by",
-  // Las páginas están en español: se avisa en el enlace.
-  legales: {
-    "/legal/datos-personales": "Privacy policy (Spanish)",
-    "/legal/terminos": "Terms and conditions (Spanish)",
-    "/legal/cambios": "Returns and warranty (Spanish)",
+  footer: {
+    tienda: "Shop",
+    catalogo: "Full catalog",
+    ayuda: "Help",
+    legal: "Legal",
+    centroLegal: "Legal center",
+    mediosPago: "Payment methods",
+    tarjetas: "Credit and debit cards",
+    transferenciaCo: "Bank transfer in Colombia · COP",
+    transferenciaUs: "Bank transfer from the US · USD",
+    otrosMedios: "Transfers are arranged on WhatsApp when you place your order.",
+    contacto: "Contact us",
+    correo: "Email",
+    whatsapp: "WhatsApp and phone",
+    siguenos: "Follow us",
+    matriz: "Parent company · United States",
+    colombia: "Company in Colombia",
+    derechos: (anio: number) => `© ${anio} KORA. All rights reserved.`,
   },
 };

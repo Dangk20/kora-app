@@ -1,43 +1,49 @@
+import type { Locale } from "@/modules/i18n";
 import type { Merchant } from "../config";
 import { cambios } from "./cambios";
+import { comercio } from "./comercio";
 import { datosPersonales } from "./datos-personales";
+import { envios } from "./envios";
+import { promociones } from "./promociones";
+import { seguridadPagos } from "./seguridad-pagos";
 import { terminos } from "./terminos";
-import { LEGAL_SLUGS, type LegalDocument, type LegalDocumentFactory, type LegalSlug } from "./types";
+import {
+  LEGAL_SLUGS,
+  type BilingualDocument,
+  type LegalContext,
+  type LegalDocument,
+  type LegalSlug,
+} from "./types";
 
-const DOCUMENTOS: Record<LegalSlug, LegalDocumentFactory> = {
-  "datos-personales": datosPersonales,
+const DOCUMENTOS: Record<LegalSlug, BilingualDocument> = {
   terminos,
+  "datos-personales": datosPersonales,
   cambios,
+  envios,
+  "seguridad-pagos": seguridadPagos,
+  promociones,
+  comercio,
 };
 
-/** ¿Es este slug uno de los tres documentos legales? */
+/** ¿Es este slug uno de los documentos legales? */
 export function esSlugLegal(slug: string): slug is LegalSlug {
   return (LEGAL_SLUGS as readonly string[]).includes(slug);
 }
 
-/** El documento con los datos del comerciante ya interpolados. */
-export function legalDocument(slug: LegalSlug, merchant: Merchant): LegalDocument {
-  return DOCUMENTOS[slug](merchant);
+/** El documento en ese idioma, con los datos del comerciante ya interpolados. */
+export function legalDocument(
+  slug: LegalSlug,
+  merchant: Merchant,
+  locale: Locale = "es",
+  contexto?: LegalContext,
+): LegalDocument {
+  return DOCUMENTOS[slug][locale](merchant, contexto);
 }
 
-/** Los tres, en el orden en que se enlazan en el footer. */
-export function allLegalDocuments(merchant: Merchant): LegalDocument[] {
-  return LEGAL_SLUGS.map((slug) => DOCUMENTOS[slug](merchant));
+/** Todos, en el orden del centro legal. */
+export function allLegalDocuments(merchant: Merchant, locale: Locale = "es", contexto?: LegalContext): LegalDocument[] {
+  return LEGAL_SLUGS.map((slug) => legalDocument(slug, merchant, locale, contexto));
 }
-
-/**
- * Enlaces para el footer y el sitemap.
- *
- * Las etiquetas son más cortas que los títulos de las páginas: en el footer
- * "Política de tratamiento de datos personales" ocupa una línea entera en
- * móvil. El destino, en cambio, sale de los mismos slugs — así no hay forma de
- * enlazar a una página legal que no exista.
- */
-export const LEGAL_LINKS: ReadonlyArray<{ href: string; label: string }> = [
-  { href: "/legal/datos-personales", label: "Tratamiento de datos" },
-  { href: "/legal/terminos", label: "Términos y condiciones" },
-  { href: "/legal/cambios", label: "Cambios y garantía" },
-];
 
 export { LEGAL_SLUGS };
-export type { LegalBlock, LegalDocument, LegalSection, LegalSlug } from "./types";
+export type { LegalBlock, LegalContext, LegalDocument, LegalSection, LegalSlug } from "./types";

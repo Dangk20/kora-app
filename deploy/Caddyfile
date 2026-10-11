@@ -89,7 +89,23 @@ test.korashopp.com {
 
 # `www` no sirve contenido: redirige al apex, para no tener la misma página
 # viva bajo dos direcciones (specs/edge-routing).
-www.korashopp.com {
+www.# ─────────────────────────────────────────────────────────────
+# CENTRO LEGAL — change `centro-legal` (10 oct 2026)
+# ─────────────────────────────────────────────────────────────
+# Lo sirve la MISMA aplicación de producción: el middleware reconoce el host
+# (KORA_LEGAL_URL) y sirve solo el centro legal; la tienda y el panel no
+# existen en este host. Caddy solo enruta y conserva el Host original, que es
+# lo que el middleware mira. Sin cortina de previa: el banco tiene que poder
+# revisarlo. Requiere el registro DNS `A legal → 2.24.90.21`.
+legal.korashopp.com {
+	import seguridad
+	encode zstd gzip
+	reverse_proxy kora-prod-app:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+}
+
+korashopp.com {
 	import seguridad
 	redir https://korashopp.com{uri} permanent
 }

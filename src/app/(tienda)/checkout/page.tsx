@@ -4,7 +4,8 @@ import { currentBuyer } from "@/modules/buyer/session-cookie";
 import { availableFor } from "@/modules/cashback/redemption";
 import { listAddresses } from "@/modules/customers/addresses";
 import { ultimaFacturacion } from "@/modules/buyer/orders";
-import { getMessages } from "@/modules/i18n/server";
+import { activeLocale, getMessages } from "@/modules/i18n/server";
+import { legalUrl } from "@/modules/legal/url";
 import { CheckoutView } from "./checkout-view";
 
 // El layout raíz ya añade el sufijo "· KORA" (template de metadata).
@@ -16,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CheckoutPage() {
   // La moneda define el país de QUIEN PAGA: COP → Colombia, USD → EE.UU.
   // El envío es siempre Colombia (KORA no envía a EE.UU.).
-  const [currency, buyer] = await Promise.all([activeCurrency(), currentBuyer()]);
+  const [currency, buyer, locale] = await Promise.all([activeCurrency(), currentBuyer(), activeLocale()]);
 
   // El saldo se lee en la moneda activa y NUNCA se convierte: un pedido en
   // dólares solo puede gastar saldo en dólares.
@@ -30,6 +31,11 @@ export default async function CheckoutPage() {
 
   return (
     <CheckoutView
+      legal={{
+        datos: legalUrl(locale, "datos-personales"),
+        terminos: legalUrl(locale, "terminos"),
+        cambios: legalUrl(locale, "cambios"),
+      }}
       initialCountry={currency === "COP" ? "CO" : "US"}
       buyer={
         buyer

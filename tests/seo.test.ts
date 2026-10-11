@@ -11,7 +11,7 @@ import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
 import { db } from "@/lib/db";
 import { RUTAS_PRIVADAS } from "@/modules/legal/routes";
-import { LEGAL_LINKS } from "@/modules/legal/content";
+import { LEGAL_SLUGS } from "@/modules/legal/content";
 
 const BASE = "https://kora-test.local";
 
@@ -100,7 +100,9 @@ describe("nada que dependa del entorno se congela en el build", () => {
   it.each([
     ["src/app/robots.ts", "robots.txt"],
     ["src/app/sitemap.ts", "sitemap"],
-    ["src/app/(tienda)/legal/[slug]/page.tsx", "páginas legales"],
+    ["src/app/(legal)/legal/page.tsx", "raíz del centro legal"],
+    ["src/app/(legal)/legal/[idioma]/page.tsx", "índice del centro legal"],
+    ["src/app/(legal)/legal/[idioma]/[slug]/page.tsx", "documentos del centro legal"],
   ])("%s (%s) se resuelve al pedirlo, no al construir la imagen", (ruta) => {
     const fuente = readFileSync(join(process.cwd(), ruta), "utf8");
 
@@ -164,13 +166,14 @@ describe("sitemap — se construye sobre el catálogo real", () => {
     await db.category.deleteMany({ where: { slug: "zz-test-sitemap-categoria" } });
   });
 
-  it("incluye home, catálogo y las tres páginas legales", async () => {
+  it("incluye home, catálogo y los documentos legales en los dos idiomas", async () => {
     const urls = (await sitemap()).map((e) => e.url);
 
     expect(urls).toContain(BASE);
     expect(urls).toContain(`${BASE}/catalogo`);
-    for (const l of LEGAL_LINKS) {
-      expect(urls).toContain(`${BASE}${l.href}`);
+    for (const slug of LEGAL_SLUGS) {
+      expect(urls).toContain(`${BASE}/legal/es/${slug}`);
+      expect(urls).toContain(`${BASE}/legal/en/${slug}`);
     }
   });
 
