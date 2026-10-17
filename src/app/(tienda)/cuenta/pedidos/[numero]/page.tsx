@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, FileText, Home, MessageCircle } from "lucide-react";
+import { ArrowLeft, Download, FileText, Home, MessageCircle, Store } from "lucide-react";
 import { CONFIRMED_STATUSES } from "@/modules/customers/confirmed";
 import { requireBuyer } from "@/modules/buyer/guard";
 import { buyerOrder } from "@/modules/buyer/orders";
@@ -45,7 +45,8 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
   const estado = fraseDeEstado(pedido.status, pedido.estadoEn[pedido.status] ?? pedido.createdAt, t);
   const tieneComprobante = CONFIRMED_STATUSES.includes(pedido.status);
 
-  const direccion = [
+  const recoger = pedido.deliveryMethod === "PICKUP";
+  const direccion = recoger ? [] : [
     [pedido.shipAddress, pedido.shipAddress2].filter(Boolean).join(", "),
     pedido.shipNeighborhood,
     [pedido.shipCity, pedido.shipState].filter(Boolean).join(", "),
@@ -196,6 +197,28 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
               ))}
             </ul>
           </section>
+
+          {/* Se recoge en la tienda: sin dirección, quién recoge. */}
+          {recoger && (
+            <section className="rounded-[16px] border border-[#eee9e2] bg-white">
+              <h2 className="border-b border-[#f0ece6] px-5 py-3.5 text-[15px] font-bold text-kora-black">{tp.entrega}</h2>
+              <div className="flex items-start gap-4 px-5 py-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[#eee9e2] text-kora-black">
+                  <Store className="size-[18px]" />
+                </span>
+                <div className="text-[13.5px]">
+                  <p className="font-semibold text-kora-black">{tp.recogerEnTienda(pedido.shipCity ?? "Neiva")}</p>
+                  {pedido.shipName && (
+                    <p className="text-muted-foreground">
+                      {tp.recoge(pedido.shipName)}
+                      {pedido.shipPhone && <span> · {pedido.shipPhone}</span>}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[12px] text-muted-foreground">{tp.recogerPorWhatsapp}</p>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* A dónde va */}
           {direccion.length > 0 && (

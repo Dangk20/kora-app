@@ -147,6 +147,7 @@ describe("el código del pedido se congela, no se recalcula", () => {
         createdAt: new Date("2026-12-31T20:00:00Z"),
         currency: "COP",
         channel: "WEB",
+        deliveryMethod: "SHIPPING",
         subtotal: { toString: () => "1000" },
         discountTotal: { toString: () => "0" },
         cashbackApplied: { toString: () => "0" },
@@ -315,6 +316,7 @@ describe("facturación y envío en el comprobante (snapshot v2)", () => {
     const o = await db.order.create({
       data: {
         channel: "WEB",
+        deliveryMethod: "SHIPPING",
         status: "CONFIRMED",
         currency: "USD",
         subtotal: 15,
@@ -359,6 +361,7 @@ describe("facturación y envío en el comprobante (snapshot v2)", () => {
     const o = await db.order.create({
       data: {
         channel: "WEB",
+        deliveryMethod: "SHIPPING",
         status: "CONFIRMED",
         currency: "COP",
         subtotal: 100_000,

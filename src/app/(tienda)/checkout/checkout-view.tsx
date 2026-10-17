@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Flame, Loader2, MessageCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronDown, Flame, Loader2, MessageCircle, ShieldCheck, Store, Truck } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
 import {
   huellaDeCarrito,
@@ -26,6 +26,7 @@ import { DOCUMENT_TYPES, PAYMENT_METHODS } from "@/modules/orders/geo";
 import { CategoryTile } from "@/modules/catalog/tiles";
 import type { Address } from "@/modules/customers/addresses";
 import type { UltimaFacturacion } from "@/modules/buyer/orders";
+import type { TiendaFisica } from "@/modules/orders/tienda-fisica";
 import { OrderBridge } from "./order-bridge";
 import { PantallaProceso } from "./pantalla-proceso";
 import { InvitacionCuenta } from "./invitacion-cuenta";
@@ -62,8 +63,11 @@ export function CheckoutView({
   initialCountry,
   buyer,
   legal,
+  tienda,
 }: {
   initialCountry: Country;
+  /** La tienda de Neiva para "Recoger en tienda", resuelta en el servidor. */
+  tienda: TiendaFisica;
   buyer?: BuyerDefaults;
   /** Direcciones del centro legal, resueltas en el servidor (salen del entorno). */
   legal: { datos: string; terminos: string; cambios: string };
@@ -113,6 +117,18 @@ export function CheckoutView({
     zip: facturacion?.zip ?? "",
   });
   const setF = (patch: Partial<typeof fact>) => setFact((f) => ({ ...f, ...patch }));
+
+  // ── Cómo recibe el pedido (change entrega-recoger-o-envio, 17 oct 2026) ──
+  // Es la PRIMERA pregunta: hasta responderla el resto del formulario no se
+  // despliega. Recoger no pide dirección; envío es el formulario de siempre.
+  const [entrega, setEntrega] = useState<"SHIPPING" | "PICKUP" | null>(null);
+  const recoger = entrega === "PICKUP";
+  const entregaRef = useRef<HTMLElement>(null);
+  // Con pagador en Colombia, por omisión recoge él. Desde EE.UU. no puede:
+  // tiene que decir quién va a la tienda.
+  const [recojoYo, setRecojoYo] = useState(true);
+  const recogePagador = country === "CO" && recojoYo;
+  const [recoge, setRecoge] = useState({ name: "", phone: "", document: "" });
 
   // ── Datos de envío: SIEMPRE Colombia ──
   // KORA no envía a EE.UU. (decisión del cliente, 13 sep 2026): quien compra
@@ -260,6 +276,16 @@ export function CheckoutView({
     // que se quiere evitar.
     const payload = {
       checkoutToken: checkoutToken.current,
+      deliveryMethod: entrega,
+      pickupByPayer: recoger && recogePagador,
+      pickup:
+        recoger && !recogePagador
+          ? {
+              name: campo("pickup.name"),
+              phone: campo("pickup.phone"),
+              document: campo("pickup.document"),
+            }
+          : undefined,
       couponCode: coupon?.code ?? "",
       cashbackRequested: cashbackAplicable,
       billing: {
@@ -279,8 +305,9 @@ export function CheckoutView({
       // El envío viaja SIEMPRE tal como se ve —los campos están a la vista y
       // se pueden editar—; la casilla solo dice si el comprador los dejó
       // iguales a la facturación.
-      shipSameAsBilling: mismosDatos,
-      shipping: {
+      // Con recogida no viaja ningún bloque de envío: no hay a dónde enviar.
+      shipSameAsBilling: !recoger && mismosDatos,
+      shipping: recoger ? undefined : {
         country: "CO" as const,
         name: campo("shipping.name"),
         phone: campo("shipping.phone"),
@@ -310,16 +337,17 @@ export function CheckoutView({
         // que tiene el número del pedido delante. Lo encontró Daniel probando.
         // Después del pedido y sin bloquearlo: la venta ya está hecha, y una
         // comodidad no puede tumbarla si falla.
-        if (buyer && !mismosDatos && direccionId === null && guardarNueva) {
+        if (buyer && payload.shipping && !mismosDatos && direccionId === null && guardarNueva) {
+          const envioGuardado = payload.shipping;
           void guardarDireccionDelPedido({
             country: "CO",
-            state: payload.shipping.state,
-            city: payload.shipping.city,
-            address: payload.shipping.address,
-            address2: payload.shipping.address2,
-            neighborhood: payload.shipping.neighborhood,
+            state: envioGuardado.state,
+            city: envioGuardado.city,
+            address: envioGuardado.address,
+            address2: envioGuardado.address2,
+            neighborhood: envioGuardado.neighborhood,
             zip: "",
-            notes: payload.shipping.notes,
+            notes: envioGuardado.notes,
           }).catch(() => {});
         }
 
@@ -494,6 +522,67 @@ export function CheckoutView({
           trampa que la portada (ver CLAUDE.md, tienda móvil). */}
       <form action={submit} className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
+          {/* La PRIMERA pregunta (change entrega-recoger-o-envio): hasta
+              responderla, el resto del formulario no se despliega. */}
+          <section ref={entregaRef} className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
+            <h2 className="mb-1 text-lg font-bold text-kora-black">{tc.entregaTitulo}</h2>
+            {!entrega && <p className="mb-4 text-[12.5px] text-[#8a8f98]">{tc.entregaAyuda}</p>}
+            <div className={`grid gap-2.5 sm:grid-cols-2 ${entrega ? "mt-4" : ""}`}>
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-[14px] border-[1.8px] p-4 transition-colors ${
+                    entrega === "PICKUP"
+                      ? "border-kora-coral bg-[#FFF7F3]"
+                      : "border-[#e2ddd6] hover:border-[#d6d0c8]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deliveryMethod"
+                    value="PICKUP"
+                    checked={entrega === "PICKUP"}
+                    onChange={() => setEntrega("PICKUP")}
+                    className="mt-1 size-4 accent-kora-coral"
+                  />
+                  <Store className="mt-0.5 size-5 shrink-0 text-kora-coral" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2 text-[14px] font-bold text-kora-black">
+                      {tc.recogerTitulo}
+                      <span className="rounded-full bg-kora-black px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-white">
+                        {tc.recogerSoloNeiva}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-[12.5px] text-[#6b6f78]">{tc.recogerDescripcion}</span>
+                  </span>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-[14px] border-[1.8px] p-4 transition-colors ${
+                    entrega === "SHIPPING"
+                      ? "border-kora-coral bg-[#FFF7F3]"
+                      : "border-[#e2ddd6] hover:border-[#d6d0c8]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deliveryMethod"
+                    value="SHIPPING"
+                    checked={entrega === "SHIPPING"}
+                    onChange={() => setEntrega("SHIPPING")}
+                    className="mt-1 size-4 accent-kora-coral"
+                  />
+                  <Truck className="mt-0.5 size-5 shrink-0 text-kora-coral" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2 text-[14px] font-bold text-kora-black">
+                      {tc.envioOpcionTitulo}
+                    </span>
+                    <span className="mt-0.5 block text-[12.5px] text-[#6b6f78]">{tc.envioOpcionDescripcion}</span>
+                  </span>
+                </label>
+            </div>
+            {fieldError("deliveryMethod")}
+          </section>
+
+          {entrega && (
+          <>
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-kora-black">
@@ -641,6 +730,7 @@ export function CheckoutView({
             </div>
           </section>
 
+          {!recoger && (
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-1 text-lg font-bold text-kora-black">
               {tc.envioTitulo}
@@ -818,6 +908,75 @@ export function CheckoutView({
             </div>
           </section>
 
+          )}
+
+          {recoger && (
+            <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
+              <h2 className="mb-3 text-lg font-bold text-kora-black">{tc.tiendaTitulo}</h2>
+              <div className="mb-5 flex items-start gap-3 rounded-[14px] bg-[#FFF7F3] p-4 text-[13px] text-[#4a4f58]">
+                <Store className="mt-0.5 size-5 shrink-0 text-kora-coral" />
+                {tienda.direccion ? (
+                  <span>
+                    <span className="block font-bold text-kora-black">{tienda.direccion}</span>
+                    {tienda.horario && <span className="mt-0.5 block">{tienda.horario}</span>}
+                  </span>
+                ) : (
+                  <span>{tc.tiendaSinDatos}</span>
+                )}
+              </div>
+
+              <h3 className="mb-1 text-[15px] font-bold text-kora-black">{tc.recogeTitulo}</h3>
+              {/* "Lo recojo yo" solo con pagador en Colombia: desde EE.UU.
+                  alguien más tiene que ir a la tienda. */}
+              {isCO && (
+                <label className="mt-3 mb-4 flex cursor-pointer items-center gap-2.5 rounded-[14px] border-[1.6px] border-[#e2ddd6] p-3.5 text-[13.5px] font-semibold text-kora-black has-checked:border-kora-coral has-checked:bg-[#FFF7F3]">
+                  <input
+                    type="checkbox"
+                    checked={recojoYo}
+                    onChange={(e) => setRecojoYo(e.target.checked)}
+                    className="size-[18px] accent-kora-coral"
+                  />
+                  {tc.recojoYo}
+                </label>
+              )}
+              {fieldError("pickup")}
+
+              {!recogePagador && (
+                <>
+                  <p className="mb-4 text-[12.5px] text-[#8a8f98]">{tc.recogeNota}</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className={labelCls} htmlFor="pickup.name">{tc.nombreRecoge}</label>
+                      <input id="pickup.name" name="pickup.name" required className={inputCls}
+                        value={recoge.name} onChange={(e) => setRecoge((r) => ({ ...r, name: e.target.value }))}
+                        placeholder={tc.nombreRecibeEjemplo} />
+                      {fieldError("pickup.name")}
+                    </div>
+                    <div>
+                      <label className={labelCls} htmlFor="pickup.phone">{tc.celularRecoge}</label>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-[11px] bg-[#f5f3f0] px-3 py-3 text-sm font-semibold text-[#6b6f78]">+57</span>
+                        <input id="pickup.phone" name="pickup.phone" required inputMode="tel" className={inputCls}
+                          value={recoge.phone} onChange={(e) => setRecoge((r) => ({ ...r, phone: e.target.value }))}
+                          placeholder="300 123 4567" />
+                      </div>
+                      {fieldError("pickup.phone")}
+                    </div>
+                    <div>
+                      <label className={labelCls} htmlFor="pickup.document">
+                        {tc.documentoRecoge}
+                        <span className="ml-1 font-normal text-[#9aa0ab]">{tc.opcional}</span>
+                      </label>
+                      <input id="pickup.document" name="pickup.document" inputMode="numeric" className={inputCls}
+                        value={recoge.document} onChange={(e) => setRecoge((r) => ({ ...r, document: e.target.value }))}
+                        placeholder="1020304050" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
           <section className="rounded-[18px] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.04)] sm:rounded-[20px] sm:p-7">
             <h2 className="mb-2 text-lg font-bold text-kora-black">
               {tc.pagoTitulo}
@@ -899,6 +1058,8 @@ export function CheckoutView({
               </p>
             </div>
           </section>
+          </>
+          )}
         </div>
 
         {/* Resumen. En móvil se colapsa (diseño §05): entre el formulario y el
@@ -1102,13 +1263,13 @@ export function CheckoutView({
             </span>
           </div>
           <p className="mt-1.5 text-[11.5px] text-[#8a8f98]">
-            {tc.envioPorWhatsapp}
+            {recoger ? tc.recogerPorWhatsapp : tc.envioPorWhatsapp}
           </p>
 
           <button
             type="submit"
-            disabled={submitting || !aceptaDatos}
-            aria-describedby={!aceptaDatos ? "falta-autorizacion" : undefined}
+            disabled={submitting || !entrega || !aceptaDatos}
+            aria-describedby={!entrega ? "falta-entrega" : !aceptaDatos ? "falta-autorizacion" : undefined}
             className="bg-kora-gradient mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-[15px] font-bold text-white shadow-[0_10px_26px_rgba(255,90,31,0.32)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:grayscale-[35%]"
           >
             {submitting && <Loader2 className="size-4 animate-spin" />}
@@ -1117,7 +1278,17 @@ export function CheckoutView({
 
           {/* Un botón apagado sin explicación es un botón "que no funciona".
               Esto dice qué falta y lleva hasta la casilla. */}
-          {!aceptaDatos && !submitting && (
+          {!entrega && !submitting && (
+            <button
+              type="button"
+              id="falta-entrega"
+              onClick={() => entregaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+              className="mt-2.5 w-full text-center text-[12.5px] font-semibold text-kora-coral underline-offset-2 hover:underline"
+            >
+              {tc.eligeEntregaParaSeguir}
+            </button>
+          )}
+          {entrega && !aceptaDatos && !submitting && (
             <button
               type="button"
               id="falta-autorizacion"

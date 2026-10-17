@@ -192,6 +192,7 @@ function detalleDelPedido(o: PedidoConDetalle) {
     contactName: o.contactName,
     contactPhone: o.contactPhone,
     // Quien recibe, cuando no es quien pagó (change direccion-facturacion-y-envio).
+    deliveryMethod: o.deliveryMethod,
     shipSameAsBilling: o.shipSameAsBilling,
     shipName: o.shipName,
     shipPhone: o.shipPhone,

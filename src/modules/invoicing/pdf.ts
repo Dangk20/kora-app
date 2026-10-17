@@ -325,6 +325,16 @@ export function bloquesDePartes(s: SalesDocumentSnapshot): { izquierda: Bloque; 
     lineas: [...lineasComprador(s), ...(v2 ? lineasFacturacion(s) : [])],
   };
   if (!s.shipping) return { izquierda, derecha: null };
+  if (s.delivery === "PICKUP") {
+    // Sin dirección: se entrega en el mostrador. Se dice dónde y a quién.
+    return {
+      izquierda,
+      derecha: {
+        titulo: "RECOGER EN TIENDA",
+        lineas: [`Tienda KORA · ${s.shipping.city ?? "Neiva"}`, ...lineasDestinatario(s).map((l, i) => (i === 0 ? `Recoge: ${l}` : l))],
+      },
+    };
+  }
   const derecha: Bloque = {
     titulo: "ENVIAR A",
     lineas:

@@ -35,6 +35,7 @@ import { consumeCashback, CashbackError } from "@/modules/cashback/ledger";
 import { resolveRedemption } from "@/modules/cashback/redemption";
 import { validateCoupon } from "@/modules/coupons/validate";
 import { attributionForOrder } from "@/modules/measurement/request";
+import { CIUDAD_RECOGIDA, DEPARTAMENTO_RECOGIDA } from "./tienda-fisica";
 
 /**
  * El cupón se agotó o se pausó entre validarlo y crear el pedido.
@@ -90,8 +91,28 @@ const envioSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+/**
+ * QUIÉN RECOGE en la tienda de Neiva (change entrega-recoger-o-envio). Sin
+ * dirección: se entrega en el mostrador. Celular colombiano, como el
+ * destinatario de un envío: es a quien se llama cuando el pedido está listo.
+ */
+const recogidaSchema = z.object({
+  name: z.string().trim().min(3, "Escribe el nombre de quien recoge"),
+  phone: z.string().trim().min(7, "Celular inválido"),
+  document: z.string().trim().optional(),
+});
+
 const baseSchema = z.object({
   checkoutToken: z.string().min(10).max(100),
+  // La PRIMERA pregunta del checkout. Sin respuesta no hay pedido: el
+  // formulario no se despliega y el servidor tampoco lo acepta.
+  deliveryMethod: z.enum(["SHIPPING", "PICKUP"], {
+    error: "Elige cómo quieres recibir tu pedido",
+  }),
+  // Con recogida: "la recojo yo" (copia al pagador en servidor, como "mismos
+  // datos" en el envío) o el bloque `pickup` con otra persona.
+  pickupByPayer: z.boolean().default(false),
+  pickup: recogidaSchema.optional(),
   // El descuento NUNCA viene del navegador: solo el código. Quien calcula es
   // quien crea el pedido.
   couponCode: z.string().trim().toUpperCase().optional().or(z.literal("").transform(() => undefined)),
@@ -110,6 +131,22 @@ const baseSchema = z.object({
 });
 
 type Envio = z.infer<typeof envioSchema>;
+type Recogida = z.infer<typeof recogidaSchema>;
+
+/** Quien recoge un pedido PICKUP: el pagador, o la persona que se indicó. */
+function resolverRecogida(data: z.infer<typeof baseSchema>): Recogida | { error: string; field: string } {
+  if (data.pickupByPayer) {
+    // Igual que "misma dirección": quien paga desde EE.UU. no está en Neiva
+    // para recoger, y su teléfono es +1. Tiene que decir quién va.
+    if (data.billing.country !== "CO") {
+      return { error: "Escribe quién recoge el pedido en Neiva", field: "pickup.name" };
+    }
+    const b = data.billing;
+    return { name: b.name, phone: b.phone, document: b.document };
+  }
+  if (!data.pickup) return { error: "Escribe quién recoge el pedido", field: "pickup.name" };
+  return data.pickup;
+}
 
 /** El bloque de envío de un pedido: el escrito, o el pagador copiado. */
 function resolverEnvio(data: z.infer<typeof baseSchema>): Envio | { error: string; field: string } {
@@ -266,17 +303,50 @@ export async function createOrder(
   }
   pagador.city = direccionPagador.city; // "NEIVA" se guarda como "Neiva"
 
-  const envio = resolverEnvio(data);
-  if ("error" in envio) return { ok: false, error: envio.error, field: envio.field };
-  const contactoEnvio = validarContacto("CO", envio, { documentoObligatorio: false });
-  if (!contactoEnvio.ok) {
-    return { ok: false, error: contactoEnvio.error, field: `shipping.${contactoEnvio.field}` };
+  // ── Entrega: envío a una dirección en Colombia, o recoger en Neiva ──
+  const recoger = data.deliveryMethod === "PICKUP";
+  let envio: Envio;
+  let contactoEnvio: Extract<ReturnType<typeof validarContacto>, { ok: true }>;
+  if (recoger) {
+    const quien = resolverRecogida(data);
+    if ("error" in quien) return { ok: false, error: quien.error, field: quien.field };
+    const contacto = validarContacto("CO", quien, { documentoObligatorio: false });
+    if (!contacto.ok) {
+      // Con "la recojo yo" el celular es el del pagador: el error es suyo.
+      const bloque = data.pickupByPayer ? "billing" : "pickup";
+      return { ok: false, error: contacto.error, field: `${bloque}.${contacto.field}` };
+    }
+    contactoEnvio = contacto;
+    // Quien recoge vive en los mismos ship* que un destinatario: es la persona
+    // a la que se le entrega. Sin dirección; la ciudad es la de la tienda.
+    envio = {
+      country: "CO",
+      name: quien.name,
+      phone: quien.phone,
+      document: quien.document,
+      address: "",
+      address2: undefined,
+      city: CIUDAD_RECOGIDA,
+      state: DEPARTAMENTO_RECOGIDA,
+      neighborhood: undefined,
+      zip: undefined,
+      notes: undefined,
+    };
+  } else {
+    const resuelto = resolverEnvio(data);
+    if ("error" in resuelto) return { ok: false, error: resuelto.error, field: resuelto.field };
+    envio = resuelto;
+    const contacto = validarContacto("CO", envio, { documentoObligatorio: false });
+    if (!contacto.ok) {
+      return { ok: false, error: contacto.error, field: `shipping.${contacto.field}` };
+    }
+    contactoEnvio = contacto;
+    const direccionEnvio = validarDireccion("CO", envio);
+    if (!direccionEnvio.ok) {
+      return { ok: false, error: direccionEnvio.error, field: `shipping.${direccionEnvio.field}` };
+    }
+    envio.city = direccionEnvio.city;
   }
-  const direccionEnvio = validarDireccion("CO", envio);
-  if (!direccionEnvio.ok) {
-    return { ok: false, error: direccionEnvio.error, field: `shipping.${direccionEnvio.field}` };
-  }
-  envio.city = direccionEnvio.city;
 
   // Idempotencia: si este token ya creó un pedido, se devuelve el mismo.
   const existing = await db.order.findUnique({
@@ -350,15 +420,26 @@ export async function createOrder(
       : null;
   // La dirección de ENVÍO es la que estrena la libreta del cliente y la que
   // el panel ve como "su dirección": es a donde le llegan las cosas.
-  const address = compactAddress({
-    country: "CO",
-    address: envio.address,
-    address2: envio.address2,
-    neighborhood: envio.neighborhood,
-    city: envio.city,
-    state: envio.state,
-    zip: undefined,
-  });
+  // Con recogida no hay dirección de envío: el cliente se queda con la del
+  // pagador si está en Colombia (lo que el espejo customer.city/address ya
+  // representaba) y, si no, sin dirección — una recogida no estrena libreta
+  // con la calle de la tienda.
+  const direccionCliente = recoger
+    ? pagador.country === "CO"
+      ? pagador
+      : null
+    : envio;
+  const address = direccionCliente
+    ? compactAddress({
+        country: "CO",
+        address: direccionCliente.address,
+        address2: direccionCliente.address2,
+        neighborhood: direccionCliente.neighborhood,
+        city: direccionCliente.city,
+        state: direccionCliente.state,
+        zip: undefined,
+      })
+    : "";
 
   // De dónde vino el comprador (change medicion-publicitaria). Se lee ANTES de
   // la transacción porque son cookies y cabeceras, no la base; se escribe
@@ -375,14 +456,14 @@ export async function createOrder(
         phone,
         document: pagador.document,
         country: pagador.country,
-        city: envio.city,
+        city: direccionCliente?.city ?? "",
         address,
         acceptsMarketing: data.acceptsMarketing,
-        state: envio.state,
-        address2: envio.address2,
-        neighborhood: envio.neighborhood,
+        state: direccionCliente?.state,
+        address2: direccionCliente?.address2,
+        neighborhood: direccionCliente?.neighborhood,
         zip: undefined,
-        notes: envio.notes,
+        notes: recoger ? undefined : envio.notes,
       });
 
       // El saldo se consume ANTES de crear el pedido y dentro de su misma
@@ -441,11 +522,13 @@ export async function createOrder(
           billAddress2: pagador.address2 || null,
           billNeighborhood: pagador.country === "CO" ? pagador.neighborhood || null : null,
           billZip: pagador.country === "US" ? pagador.zip || null : null,
-          // A quién se envía. Siempre Colombia.
-          shipSameAsBilling: data.shipSameAsBilling,
+          // A quién se envía (siempre Colombia) o quién recoge en Neiva.
+          deliveryMethod: data.deliveryMethod,
+          // "Misma dirección" no existe en una recogida: no hay dirección.
+          shipSameAsBilling: recoger ? false : data.shipSameAsBilling,
           shipName: envio.name,
           shipPhone: contactoEnvio.phone,
-          shipDocument: data.shipSameAsBilling
+          shipDocument: (recoger ? data.pickupByPayer : data.shipSameAsBilling)
             ? pagador.document
               ? `${pagador.documentType ?? "CC"} ${pagador.document}`
               : null
@@ -453,7 +536,7 @@ export async function createOrder(
           shipCountry: "CO",
           shipState: envio.state,
           shipCity: envio.city,
-          shipAddress: envio.address,
+          shipAddress: envio.address || null,
           shipAddress2: envio.address2 || null,
           shipNeighborhood: envio.neighborhood || null,
           shipZip: null,
@@ -513,20 +596,28 @@ export async function createOrder(
         contactName: pagador.name,
         contactPhone: phone,
         // El mensaje la quiere en dos líneas; el pedido la guarda en una.
-        address: addressLines({
-          country: "CO",
-          address: envio.address,
-          address2: envio.address2,
-          neighborhood: envio.neighborhood,
-          city: envio.city,
-          state: envio.state,
-          zip: undefined,
-        }),
+        // Una recogida no lleva dirección: el operador sabe dónde está su tienda.
+        address: recoger
+          ? []
+          : addressLines({
+              country: "CO",
+              address: envio.address,
+              address2: envio.address2,
+              neighborhood: envio.neighborhood,
+              city: envio.city,
+              state: envio.state,
+              zip: undefined,
+            }),
         // Solo cuando recibe otra persona: si es la misma, el mensaje queda
         // como siempre.
-        shipTo: data.shipSameAsBilling
+        shipTo: recoger || data.shipSameAsBilling
           ? undefined
           : { name: envio.name, phone: contactoEnvio.phone },
+        pickup: recoger
+          ? data.pickupByPayer
+            ? { city: CIUDAD_RECOGIDA }
+            : { city: CIUDAD_RECOGIDA, name: envio.name, phone: contactoEnvio.phone }
+          : undefined,
         paymentPreference: data.paymentPreference,
       });
 

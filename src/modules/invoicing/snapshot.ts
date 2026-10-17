@@ -60,6 +60,13 @@ export type SalesDocumentSnapshot = {
   /** true = la entrega es a la misma persona y dirección que la facturación (v2). */
   sameAddress?: boolean;
 
+  /**
+   * Cómo se entrega (change entrega-recoger-o-envio). Ausente en los
+   * comprobantes emitidos antes del 17 oct 2026 = envío, como se emitieron.
+   * Con PICKUP, `shipping` lleva a quien recoge y la ciudad de la tienda.
+   */
+  delivery?: "SHIPPING" | "PICKUP";
+
   /** A dónde se envió. Nulo en venta de mostrador. */
   shipping: {
     /** Quien recibe (v2). Antes era siempre el comprador. */
@@ -120,6 +127,7 @@ export type OrderParaComprobante = {
   createdAt: Date;
   currency: Currency;
   channel: SaleChannel;
+  deliveryMethod: "SHIPPING" | "PICKUP";
   subtotal: { toString(): string };
   discountTotal: { toString(): string };
   cashbackApplied: { toString(): string };
@@ -198,6 +206,7 @@ export function buildSnapshot(
         }
       : null,
     sameAddress: order.shipSameAsBilling,
+    delivery: order.deliveryMethod,
     shipping: hayEnvio
       ? {
           name: order.shipName,
@@ -243,6 +252,7 @@ export const SELECT_PARA_COMPROBANTE = {
   createdAt: true,
   currency: true,
   channel: true,
+  deliveryMethod: true,
   subtotal: true,
   discountTotal: true,
   cashbackApplied: true,

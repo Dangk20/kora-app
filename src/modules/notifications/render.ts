@@ -32,6 +32,12 @@ export type OrderEmailData = {
    * Nulo cuando la entrega es a la misma persona y dirección.
    */
   shipTo?: { name: string | null; city: string | null } | null;
+  /**
+   * El pedido se recoge en la tienda (change entrega-recoger-o-envio): los
+   * correos de preparación y "enviado" no hablan de despacho. "Enviado" se
+   * lee como "listo para recoger".
+   */
+  pickup?: { city: string | null } | null;
 };
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -168,13 +174,29 @@ export function renderOrderEmail(
         subject: `Estamos preparando tu pedido ${data.orderNumber}`,
         preheader: "Ya lo estamos armando.",
         title: "Manos a la obra",
-        body:
-          "Tu pedido ya está en preparación: lo estamos armando y revisando antes de " +
-          "despacharlo. Te escribimos otra vez en cuanto salga.",
+        body: data.pickup
+          ? "Tu pedido ya está en preparación: lo estamos armando y revisando. Te " +
+            "escribimos otra vez en cuanto esté listo para recoger en la tienda."
+          : "Tu pedido ya está en preparación: lo estamos armando y revisando antes de " +
+            "despacharlo. Te escribimos otra vez en cuanto salga.",
         cta: { label: "Ver mi pedido", url: `${storeUrl()}/cuenta` },
       });
 
     case "BUYER_SHIPPED": {
+      // Un pedido para recoger no "sale" hacia ningún lado: está listo en la tienda.
+      if (data.pickup) {
+        const ciudad = data.pickup.city ?? "Neiva";
+        return base(data, {}, {
+          timeline: linea,
+          subject: `Tu pedido ${data.orderNumber} está listo para recoger`,
+          preheader: `Ya puedes pasar por él a nuestra tienda en ${ciudad}.`,
+          title: "Tu pedido está listo",
+          body:
+            `Tu pedido ya está listo para recoger en nuestra tienda de ${ciudad}. Si necesitas ` +
+            "la dirección, el horario o que lo recoja otra persona, escríbenos por WhatsApp.",
+          cta: data.whatsappUrl ? { label: "Escribirnos", url: data.whatsappUrl } : null,
+        });
+      }
       // A quien pagó por otra persona se le dice a quién va: "salió hacia tu
       // dirección" sería mentira para quien compró desde Miami.
       const destinatario = data.shipTo?.name

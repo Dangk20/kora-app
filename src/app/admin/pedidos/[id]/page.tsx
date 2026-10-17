@@ -304,12 +304,37 @@ export default async function OrderDetailPage({
           </section>
 
           <section className="rounded-[18px] bg-white p-6 shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
-            <h2 className="mb-4 text-[15px] font-bold text-kora-black">Datos de envío y pago</h2>
+            <h2 className="mb-4 text-[15px] font-bold text-kora-black">
+              {order.deliveryMethod === "PICKUP" ? "Entrega y pago" : "Datos de envío y pago"}
+            </h2>
             <dl className="space-y-3 text-[13px]">
+              {/* Recoger en tienda (change entrega-recoger-o-envio): no hay
+                  dirección que despachar; el operador ve quién viene. */}
+              {order.deliveryMethod === "PICKUP" && (
+                <div>
+                  <dt className="text-[11.5px] text-[#9aa0ab]">Entrega</dt>
+                  <dd className="font-bold text-kora-coral">Recoger en tienda ({order.shipCity ?? "Neiva"})</dd>
+                </div>
+              )}
               {/* Quien recibe, cuando no es quien paga: el operador despacha a
                   esta persona y la transportadora la llama a ella. Con la misma
                   dirección se dice una vez en vez de repetir los datos. */}
-              {order.shipSameAsBilling ? (
+              {order.deliveryMethod === "PICKUP" ? (
+                <>
+                  {[
+                    ["Recoge", order.shipName],
+                    ["Celular de quien recoge", order.shipPhone],
+                    ["Documento de quien recoge", order.shipDocument],
+                  ]
+                    .filter(([, v]) => Boolean(v))
+                    .map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-[11.5px] text-[#9aa0ab]">{label}</dt>
+                        <dd className="font-medium break-words text-kora-black">{value}</dd>
+                      </div>
+                    ))}
+                </>
+              ) : order.shipSameAsBilling ? (
                 <div>
                   <dt className="text-[11.5px] text-[#9aa0ab]">Recibe</dt>
                   <dd className="font-medium text-kora-black">La misma persona, en la misma dirección</dd>
@@ -330,10 +355,12 @@ export default async function OrderDetailPage({
                     ))}
                 </>
               )}
-              <div>
-                <dt className="text-[11.5px] text-[#9aa0ab]">Dirección de entrega</dt>
-                <dd className="font-medium text-kora-black">{address || "—"}</dd>
-              </div>
+              {order.deliveryMethod !== "PICKUP" && (
+                <div>
+                  <dt className="text-[11.5px] text-[#9aa0ab]">Dirección de entrega</dt>
+                  <dd className="font-medium text-kora-black">{address || "—"}</dd>
+                </div>
+              )}
               {order.shipNotes && (
                 <div>
                   <dt className="text-[11.5px] text-[#9aa0ab]">Notas de entrega</dt>
