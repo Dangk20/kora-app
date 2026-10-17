@@ -8,12 +8,7 @@ import { cashbackSummary } from "@/modules/cashback/balance";
 import { subscriptionState } from "@/modules/consent/subscription";
 import { customerMetrics, topCategories, whatsappLink } from "@/modules/customers/profile";
 import { customerSummary, listCustomers, PAGE_SIZE } from "@/modules/customers/queries";
-import {
-  ETIQUETA_LABEL,
-  FILTROS_ETIQUETA,
-  parseFiltroEtiqueta,
-  type Etiqueta,
-} from "@/modules/customers/etiqueta";
+import { FILTROS_CUENTA, ORIGEN_LABEL, parseFiltroCuenta } from "@/modules/customers/cuenta";
 import { CustomerForm } from "./customer-form";
 import { CustomerSheet } from "./customer-sheet";
 
@@ -38,12 +33,11 @@ function iniciales(nombre: string): string {
     .join("");
 }
 
-// Mismos tonos que los badges de estado de Pedidos: Cliente lleva el naranja de
-// "Confirmado" —es justo el hecho que la produce— y No cliente el gris neutro
-// de "Pendiente". Solo paleta de marca.
-const ETIQUETA_STYLE: Record<Etiqueta, string> = {
-  cliente: "bg-[#FFE9DD] text-[#FF5A1F]",
-  no_cliente: "bg-[#f0ece6] text-[#8a8f98]",
+// Con cuenta en el naranja de marca, sin cuenta en el gris neutro. Solo paleta
+// de marca.
+const CUENTA_STYLE = {
+  con: "bg-[#FFE9DD] text-[#FF5A1F]",
+  sin: "bg-[#f0ece6] text-[#6b6f78]",
 };
 
 function Resumen({ label, hint, value }: { label: string; hint?: string; value: number }) {
@@ -65,7 +59,7 @@ export default async function ClientesPage({
     ver?: string;
     nuevo?: string;
     editar?: string;
-    etiqueta?: string;
+    cuenta?: string;
   }>;
 }) {
   const session = await auth();
@@ -73,20 +67,20 @@ export default async function ClientesPage({
   const puedeCrear = session.user.permissions.includes("customers:create");
   const puedeEditar = session.user.permissions.includes("customers:edit");
 
-  const { q = "", page = "1", ver, nuevo, editar, etiqueta: etiquetaParam } = await searchParams;
+  const { q = "", page = "1", ver, nuevo, editar, cuenta: cuentaParam } = await searchParams;
   const pagina = Math.max(1, Number(page) || 1);
-  const etiqueta = parseFiltroEtiqueta(etiquetaParam);
+  const cuenta = parseFiltroCuenta(cuentaParam);
 
   const [resumen, listado] = await Promise.all([
     customerSummary(),
-    listCustomers({ search: q, page: pagina, pageSize: PAGE_SIZE, etiqueta }),
+    listCustomers({ search: q, page: pagina, pageSize: PAGE_SIZE, cuenta }),
   ]);
 
   // Toda navegación de la vista conserva búsqueda y filtro.
-  const href = (extra: Record<string, string> = {}, filtro: string = etiqueta) => {
+  const href = (extra: Record<string, string> = {}, filtro: string = cuenta) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
-    if (filtro !== "todos") p.set("etiqueta", filtro);
+    if (filtro !== "todos") p.set("cuenta", filtro);
     for (const [k, v] of Object.entries(extra)) p.set(k, v);
     const s = p.toString();
     return `/admin/clientes${s ? `?${s}` : ""}`;
@@ -111,18 +105,19 @@ export default async function ClientesPage({
 
   return (
     <>
-      {/* Tres cifras y nada más (Daniel, 11 oct 2026): cuántas personas hay y
-          cuántas de ellas compraron. */}
+      {/* Tres cifras (Daniel, 17 oct 2026): todos son clientes, y lo que se
+          distingue es si tienen cuenta en la tienda. Si compraron o no se ve
+          en la ficha de cada uno. */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Resumen label="Total de registros" hint="registradas o que compraron" value={resumen.total} />
-        <Resumen label="Clientes" hint="con compra confirmada" value={resumen.clientes} />
-        <Resumen label="No clientes" hint="sin compra confirmada" value={resumen.noClientes} />
+        <Resumen label="Total de registros" hint="web, caja, importados o a mano" value={resumen.total} />
+        <Resumen label="Clientes con cuenta" hint="pueden entrar a la tienda" value={resumen.conCuenta} />
+        <Resumen label="Clientes sin cuenta" hint="invitados, de caja o a mano" value={resumen.sinCuenta} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-extrabold text-kora-black">Clientes</h1>
         <form className="ml-auto flex items-center gap-2" action="/admin/clientes">
-          {etiqueta !== "todos" && <input type="hidden" name="etiqueta" value={etiqueta} />}
+          {cuenta !== "todos" && <input type="hidden" name="cuenta" value={cuenta} />}
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#9aa0a8]" />
             <input
@@ -144,8 +139,8 @@ export default async function ClientesPage({
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {FILTROS_ETIQUETA.map((f) => {
-          const activo = etiqueta === f.key;
+        {FILTROS_CUENTA.map((f) => {
+          const activo = cuenta === f.key;
           return (
             <Link
               key={f.key}
@@ -170,16 +165,16 @@ export default async function ClientesPage({
             <p className="font-semibold text-kora-black">
               {q
                 ? "Nadie coincide con la búsqueda"
-                : etiqueta === "clientes"
-                  ? "Todavía nadie tiene una compra confirmada"
-                  : etiqueta === "no_clientes"
-                    ? "Todas las personas de la base ya compraron"
-                    : "Todavía no hay personas en la base"}
+                : cuenta === "con_cuenta"
+                  ? "Todavía nadie ha creado cuenta en la tienda"
+                  : cuenta === "sin_cuenta"
+                    ? "Todos los clientes tienen cuenta"
+                    : "Todavía no hay clientes en la base"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {q
                 ? "Prueba con otro nombre, número o correo."
-                : "Se crean solas al registrarse o comprar en la tienda, o puedes añadirlas a mano."}
+                : "Se crean solos al registrarse o comprar en la tienda o en la caja, o puedes añadirlos a mano."}
             </p>
           </div>
         ) : (
@@ -187,7 +182,7 @@ export default async function ClientesPage({
             <thead className="border-b border-[#f0ece6] bg-[#fbfaf8] text-left text-[12px] tracking-wide text-[#6b6f78] uppercase">
               <tr>
                 <th className="px-5 py-3 font-semibold">Cliente</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
+                <th className="px-5 py-3 font-semibold">Cuenta</th>
                 <th className="px-5 py-3 font-semibold">WhatsApp</th>
                 <th className="px-5 py-3 font-semibold">Email</th>
                 <th className="px-5 py-3 font-semibold">País</th>
@@ -205,17 +200,15 @@ export default async function ClientesPage({
                       </span>
                       <div className="min-w-0">
                         <div className="font-semibold text-kora-black">{c.name}</div>
-                        <div className="text-[11.5px] text-[#9aa0ab]">
-                          {c.tieneCuenta ? "Con cuenta" : "Invitado"}
-                        </div>
+                        <div className="text-[11.5px] text-[#9aa0ab]">{ORIGEN_LABEL[c.source]}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap ${ETIQUETA_STYLE[c.etiqueta]}`}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap ${c.tieneCuenta ? CUENTA_STYLE.con : CUENTA_STYLE.sin}`}
                     >
-                      {ETIQUETA_LABEL[c.etiqueta]}
+                      {c.tieneCuenta ? "Con cuenta" : "Sin cuenta"}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-[#4a4f57]">{c.phone ?? "—"}</td>

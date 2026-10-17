@@ -1,0 +1,2 @@
+- [x] 1.1 `cuenta.ts`, resumen, listado, filtro e insignia por cuenta.
+- [x] 1.2 Prueba `clientes-registrados.test.ts` reescrita para la clasificación por cuenta.

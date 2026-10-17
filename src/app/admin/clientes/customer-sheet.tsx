@@ -196,7 +196,7 @@ export function CustomerSheet({
                     : "inline-block rounded-full bg-[#f4f2ef] px-2 py-0.5 text-[11px] font-semibold text-[#8a8f98]"
                 }
               >
-                {tieneCuenta ? "Con cuenta" : "Invitado"}
+                {tieneCuenta ? "Con cuenta" : "Sin cuenta"}
               </span>
             </div>
           </div>
