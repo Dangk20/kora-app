@@ -65,6 +65,7 @@ async function snapshotDeEjemplo(caso: Caso = "misma"): Promise<SalesDocumentSna
       createdAt: new Date(),
       currency: "COP",
       channel: "WEB",
+      deliveryMethod: "SHIPPING",
       subtotal: { toString: () => "489000" },
       discountTotal: { toString: () => "24450" },
       cashbackApplied: { toString: () => "12000" },

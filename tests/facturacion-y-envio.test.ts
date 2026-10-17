@@ -72,6 +72,9 @@ const DESTINATARIO_CO = {
 function formulario(extra: Record<string, unknown>) {
   return {
     checkoutToken: `${PREFIJO}-${Math.random().toString(36).slice(2)}`,
+    // Desde el 17 oct 2026 la primera pregunta es el método de entrega
+    // (change entrega-recoger-o-envio). Este archivo prueba el envío.
+    deliveryMethod: "SHIPPING",
     couponCode: "",
     cashbackRequested: 0,
     paymentPreference: "Nequi",

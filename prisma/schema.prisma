@@ -321,6 +321,13 @@ enum StockReason {
   LIBERACION_RESERVA
 }
 
+/// Cómo recibe el comprador su pedido (change entrega-recoger-o-envio, 17 oct 2026).
+/// PICKUP = recoger en la tienda de Neiva: los ship* guardan a QUIEN RECOGE, sin dirección.
+enum DeliveryMethod {
+  SHIPPING
+  PICKUP
+}
+
 enum SaleChannel {
   WEB
   POS
@@ -469,6 +476,8 @@ model Order {
   number Int    @unique @default(autoincrement()) // código humano: KORA-000123
 
   channel  SaleChannel // WEB o POS (POS nace y se confirma en el mismo acto)
+  // Todo pedido anterior al 17 oct 2026 fue un envío: el default ES el backfill.
+  deliveryMethod DeliveryMethod @default(SHIPPING)
   status   OrderStatus @default(PENDING)
   currency Currency    @default(COP)
 

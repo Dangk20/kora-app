@@ -7,6 +7,7 @@ import { ultimaFacturacion } from "@/modules/buyer/orders";
 import { activeLocale, getMessages } from "@/modules/i18n/server";
 import { legalUrl } from "@/modules/legal/url";
 import { CheckoutView } from "./checkout-view";
+import { tiendaFisica } from "@/modules/orders/tienda-fisica";
 
 // El layout raíz ya añade el sufijo "· KORA" (template de metadata).
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,6 +37,7 @@ export default async function CheckoutPage() {
         terminos: legalUrl(locale, "terminos"),
         cambios: legalUrl(locale, "cambios"),
       }}
+      tienda={tiendaFisica()}
       initialCountry={currency === "COP" ? "CO" : "US"}
       buyer={
         buyer

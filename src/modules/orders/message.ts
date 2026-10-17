@@ -50,6 +50,12 @@ export type MessageInput = {
    * cuando son la misma persona.
    */
   shipTo?: { name: string; phone: string };
+  /**
+   * Recoger en la tienda (change entrega-recoger-o-envio). Con `name`, recoge
+   * otra persona; sin él, recoge quien paga. Reemplaza el bloque de dirección:
+   * el operador sabe dónde está su tienda.
+   */
+  pickup?: { city: string; name?: string; phone?: string };
   paymentPreference: string;
 };
 
@@ -63,7 +69,7 @@ export function buildWhatsappMessage(input: MessageInput): string {
     "",
     // Con destinatario distinto, el bloque de arriba se titula "Paga": el
     // operador cobra a uno y despacha a otro, y tiene que verlo de un vistazo.
-    ...(input.shipTo ? ["💳 Paga"] : []),
+    ...(input.shipTo || input.pickup?.name ? ["💳 Paga"] : []),
     `👤 ${input.contactName}`,
     `📞 ${input.contactPhone}`,
     "",
@@ -99,9 +105,16 @@ export function buildWhatsappMessage(input: MessageInput): string {
     `💰 Total: ${money(input.total)} ${input.currency}`,
     `💳 Pago: ${input.paymentPreference}`,
     "",
-    input.shipTo ? "📍 Enviar a" : "📍 Entrega",
-    ...(input.shipTo ? [`👤 ${input.shipTo.name}`, `📞 ${input.shipTo.phone}`] : []),
-    ...input.address.filter(Boolean),
+    ...(input.pickup
+      ? [
+          `🏬 Recoger en tienda (${input.pickup.city})`,
+          ...(input.pickup.name ? [`👤 Recoge: ${input.pickup.name}`, `📞 ${input.pickup.phone ?? ""}`] : []),
+        ]
+      : [
+          input.shipTo ? "📍 Enviar a" : "📍 Entrega",
+          ...(input.shipTo ? [`👤 ${input.shipTo.name}`, `📞 ${input.shipTo.phone}`] : []),
+          ...input.address.filter(Boolean),
+        ]),
     "",
     "🟠 Estado: Nuevo pedido",
   );

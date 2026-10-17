@@ -46,6 +46,24 @@ export const checkout = {
   zip: "Código ZIP",
 
   // Envío
+  // ── Cómo recibir el pedido (change entrega-recoger-o-envio) ──
+  entregaTitulo: "¿Cómo quieres recibir tu pedido?",
+  entregaAyuda: "Elige una opción para continuar.",
+  recogerTitulo: "Recoger en tienda",
+  recogerSoloNeiva: "SOLO EN NEIVA",
+  recogerDescripcion: "Pasas por él a nuestra tienda, sin costo de envío.",
+  envioOpcionTitulo: "Envío a domicilio",
+  envioOpcionDescripcion: "Te lo llevamos a cualquier lugar de Colombia.",
+  tiendaTitulo: "Nuestra tienda en Neiva",
+  tiendaSinDatos: "Te confirmamos la dirección y el horario por WhatsApp.",
+  recogeTitulo: "¿Quién recoge el pedido?",
+  recojoYo: "Lo recojo yo",
+  recogeNota: "Escribe los datos de la persona que va a pasar por el pedido a la tienda.",
+  nombreRecoge: "Nombre de quien recoge",
+  celularRecoge: "Celular de quien recoge",
+  documentoRecoge: "Documento de quien recoge",
+  eligeEntregaParaSeguir: "Para continuar, elige cómo quieres recibir tu pedido",
+  recogerPorWhatsapp: "Te avisamos por WhatsApp cuando tu pedido esté listo para recoger.",
   envioTitulo: "Datos de envío",
   envioNota: {
     CO: "Hacemos envíos dentro de Colombia.",
