@@ -40,6 +40,9 @@ model User {
   stockMovements  StockMovement[]
   passwordResets  UserPasswordReset[]
   confirmedOrders Order[]              @relation("OrderConfirmedBy")
+  cashSessionsOpened CashSession[] @relation("CashSessionOpenedBy")
+  cashSessionsClosed CashSession[] @relation("CashSessionClosedBy")
+  cashMovements      CashMovement[] @relation("CashMovementBy")
   statusChanges   OrderStatusHistory[]
   campaigns       Campaign[]
   productArchives ProductArchive[]
@@ -550,6 +553,9 @@ model Order {
   confirmedAt   DateTime?
   confirmedById String?
   confirmedBy   User?     @relation("OrderConfirmedBy", fields: [confirmedById], references: [id])
+  // El turno de caja en el que se cobró (solo ventas POS; change s09-pos-caja).
+  cashSessionId String?
+  cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
 
   items             OrderItem[]
   emailsSent        OrderEmail[]
@@ -1394,4 +1400,65 @@ model JobRun {
   @@index([job, startedAt])
   @@index([job, result, finishedAt])
   @@map("job_runs")
+}
+
+/// Turno de caja (change s09-pos-caja, 17 oct 2026): se ABRE con una base de
+/// efectivo, cada venta POS queda atada a él, y se CIERRA con el resumen del
+/// día y la base que queda para el siguiente turno. Cerrado no se edita.
+///
+/// ⚠️ Un solo turno abierto por caja: lo garantiza un índice único PARCIAL
+/// (`cash_sessions_one_open_per_register`, escrito a mano en la migración
+/// porque Prisma no los modela). Dos aperturas simultáneas → la segunda falla.
+model CashSession {
+  id       String @id @default(cuid())
+  /// Cuál caja. Hoy solo existe "Caja 1"; el modelo ya admite varias.
+  register String @default("Caja 1")
+
+  openedAt    DateTime @default(now())
+  openedById  String
+  openedBy    User     @relation("CashSessionOpenedBy", fields: [openedById], references: [id])
+  openingBase Decimal  @db.Decimal(12, 2)
+
+  closedAt   DateTime?
+  closedById String?
+  closedBy   User?     @relation("CashSessionClosedBy", fields: [closedById], references: [id])
+  /// Lo que se deja en el cajón para el siguiente turno (null = sin base).
+  baseLeft   Decimal?  @db.Decimal(12, 2)
+  /// El resumen congelado al cerrar: ventas, total y monto por método.
+  summary    Json?
+
+  orders    Order[]
+  movements CashMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([register, closedAt])
+  @@map("cash_sessions")
+}
+
+enum MovementKind {
+  INGRESO
+  EGRESO
+}
+
+/// Movimiento de dinero que NO es una venta (Daniel, 17 oct 2026). Dos orígenes:
+///   - con `sessionId`: salida de efectivo del cajón durante un turno (compra
+///     para el local, domicilio…); se resta del efectivo esperado del cierre.
+///   - sin `sessionId`: registrado a mano por el administrador en Movimientos
+///     (ingreso o egreso del negocio que no pasa por la caja).
+/// No se edita ni se borra: si fue un error, se registra otro con la corrección.
+model CashMovement {
+  id          String       @id @default(cuid())
+  kind        MovementKind @default(EGRESO)
+  sessionId   String?
+  session     CashSession? @relation(fields: [sessionId], references: [id])
+  amount      Decimal     @db.Decimal(12, 2)
+  reason      String
+  createdById String
+  createdBy   User        @relation("CashMovementBy", fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([sessionId])
+  @@map("cash_movements")
 }
