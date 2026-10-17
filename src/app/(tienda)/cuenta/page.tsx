@@ -5,6 +5,8 @@ import { requireBuyer } from "@/modules/buyer/guard";
 import { buyerOrders } from "@/modules/buyer/orders";
 import { PedidoCard } from "./pedido-card";
 import { CashbackPanel } from "./cashback-panel";
+import { BeneficiosPanel } from "./beneficios-panel";
+import { beneficiosDe } from "@/modules/benefits/benefits";
 import { DatosForm, PasswordForm, SalirButton } from "./cuenta-forms";
 import { CuentaSidebar } from "./sidebar";
 import { CuentaMovil } from "./cuenta-movil";
@@ -29,7 +31,7 @@ export default async function CuentaPage({
   const seccion = seccionDe((await searchParams).seccion);
   const t = (await getMessages()).cuenta;
 
-  const [resumen, pedidos, cliente, direcciones] = await Promise.all([
+  const [resumen, pedidos, cliente, direcciones, beneficios] = await Promise.all([
     cashbackSummary(buyer.customerId),
     buyerOrders(buyer.customerId),
     db.customer.findUnique({
@@ -37,6 +39,7 @@ export default async function CuentaPage({
       select: { name: true, email: true, phone: true },
     }),
     listAddresses(buyer.customerId),
+    beneficiosDe(buyer.customerId),
   ]);
 
   return (
@@ -108,6 +111,7 @@ export default async function CuentaPage({
             <section aria-label={t.secciones.cashback}>
               <h2 className="mb-3 text-[17px] font-extrabold text-kora-black">{t.secciones.cashback}</h2>
               <CashbackPanel resumen={resumen} />
+              <BeneficiosPanel beneficios={beneficios} />
             </section>
           )}
 

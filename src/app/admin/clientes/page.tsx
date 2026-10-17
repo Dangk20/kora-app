@@ -5,6 +5,7 @@ import { Eye, Pencil, Plus, Search, UsersRound } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { cashbackSummary } from "@/modules/cashback/balance";
+import { beneficiosDe } from "@/modules/benefits/benefits";
 import { subscriptionState } from "@/modules/consent/subscription";
 import { customerMetrics, topCategories, whatsappLink } from "@/modules/customers/profile";
 import { customerSummary, listCustomers, PAGE_SIZE } from "@/modules/customers/queries";
@@ -66,6 +67,7 @@ export default async function ClientesPage({
   if (!session?.user.permissions.includes("customers:view")) redirect("/admin");
   const puedeCrear = session.user.permissions.includes("customers:create");
   const puedeEditar = session.user.permissions.includes("customers:edit");
+  const puedeOtorgar = session.user.permissions.includes("loyalty:adjust");
 
   const { q = "", page = "1", ver, nuevo, editar, cuenta: cuentaParam } = await searchParams;
   const pagina = Math.max(1, Number(page) || 1);
@@ -100,6 +102,8 @@ export default async function ClientesPage({
         suscripcion: await subscriptionState(verCliente.id),
         top: await topCategories(verCliente.id),
         whatsapp: whatsappLink(verCliente.phone),
+        beneficios: await beneficiosDe(verCliente.id),
+        opcionesBeneficio: puedeOtorgar ? await opcionesBeneficio() : null,
       }
     : null;
 
@@ -310,6 +314,8 @@ export default async function ClientesPage({
           top={perfil.top}
           whatsapp={perfil.whatsapp}
           backTo={href()}
+          beneficios={perfil.beneficios}
+          opcionesBeneficio={perfil.opcionesBeneficio}
         />
       )}
 
@@ -337,3 +343,22 @@ export default async function ClientesPage({
 }
 
 export const metadata = { title: "Clientes" };
+
+/** Categorías y productos activos para el formulario de "Otorgar beneficio". */
+async function opcionesBeneficio() {
+  const [categorias, variantes] = await Promise.all([
+    db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.variant.findMany({
+      where: { active: true, product: { active: true, archivedAt: null } },
+      orderBy: [{ product: { name: "asc" } }, { name: "asc" }],
+      select: { id: true, name: true, product: { select: { name: true } } },
+    }),
+  ]);
+  return {
+    categorias,
+    productos: variantes.map((v) => ({
+      id: v.id,
+      label: /^[úu]nica$/i.test(v.name) ? v.product.name : `${v.product.name} · ${v.name}`,
+    })),
+  };
+}

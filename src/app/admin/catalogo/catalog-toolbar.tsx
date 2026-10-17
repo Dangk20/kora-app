@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 
-export type ToolbarCategory = { id: string; name: string; parentName: string | null };
+export type ToolbarCategory = { id: string; name: string; parentId: string | null };
 
 const selectCls =
   "rounded-[10px] border-[1.6px] border-[#e2ddd6] bg-white px-3 py-2.5 text-[13px] font-semibold text-kora-black outline-none focus:border-kora-coral";
@@ -71,9 +71,12 @@ export function CatalogToolbar({
   }, [query]);
 
   const categoria = params.get("categoria") ?? "";
+  const subcategoria = params.get("sub") ?? "";
+  const principales = categories.filter((c) => !c.parentId);
+  const hijas = categories.filter((c) => c.parentId === categoria);
   const estado = params.get("estado") ?? "";
   const porPagina = params.get("por") ?? "20";
-  const hasFilters = Boolean(query || categoria || estado);
+  const hasFilters = Boolean(query || categoria || subcategoria || estado);
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -98,16 +101,35 @@ export function CatalogToolbar({
         )}
       </div>
 
+      {/* Dos pasos: la categoría principal y, dependiendo de ella, la
+          subcategoría. Cambiar la categoría borra la subcategoría elegida. */}
       <select
         value={categoria}
-        onChange={(e) => push({ categoria: e.target.value })}
+        onChange={(e) => push({ categoria: e.target.value, sub: "" })}
         aria-label="Filtrar por categoría"
         className={selectCls}
       >
         <option value="">Todas las categorías</option>
-        {categories.map((c) => (
+        {principales.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.parentName ? `${c.parentName} › ${c.name}` : c.name}
+            {c.name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={subcategoria}
+        onChange={(e) => push({ sub: e.target.value })}
+        aria-label="Filtrar por subcategoría"
+        disabled={!categoria || hijas.length === 0}
+        className={`${selectCls} disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        <option value="">
+          {!categoria ? "Elige una categoría" : hijas.length === 0 ? "Sin subcategorías" : "Todas las subcategorías"}
+        </option>
+        {hijas.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
           </option>
         ))}
       </select>

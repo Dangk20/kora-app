@@ -13,6 +13,7 @@ import { ProductModal } from "./product-modal";
 import { ArchiveButton } from "./archive-button";
 import { ArchiveHistory } from "./archive-history";
 import { ImportSheet } from "./import-sheet";
+import { categoryIdFilter } from "@/modules/catalog/category-filter";
 import { CatalogToolbar } from "./catalog-toolbar";
 import { StatusSwitch } from "./status-switch";
 import { Pagination } from "../_components/pagination";
@@ -46,6 +47,7 @@ export default async function CatalogPage({
     importar?: string;
     q?: string;
     categoria?: string;
+    sub?: string;
     estado?: string;
     por?: string;
     pagina?: string;
@@ -57,7 +59,7 @@ export default async function CatalogPage({
   const canCreate = session.user.permissions.includes("catalog:create");
   const canDelete = session.user.permissions.includes("catalog:delete");
   const sp = await searchParams;
-  const { nuevo, editar, importar, historial, q, categoria, estado } = sp;
+  const { nuevo, editar, importar, historial, q, categoria, sub, estado } = sp;
 
   const perPage = PER_PAGE_OPTIONS.includes(Number(sp.por))
     ? Number(sp.por)
@@ -77,7 +79,8 @@ export default async function CatalogPage({
       { variants: { some: { sku: { contains: term, mode: "insensitive" } } } },
     ];
   }
-  if (categoria) where.categoryId = categoria;
+  const filtroCategoria = await categoryIdFilter(categoria, sub);
+  if (filtroCategoria) where.categoryId = filtroCategoria;
   if (estado === "activo") where.active = true;
   if (estado === "inactivo") where.active = false;
   if (estado === "agotado") {
@@ -226,11 +229,7 @@ export default async function CatalogPage({
     <>
       <CatalogToolbar
         total={total}
-        categories={categories.map((c) => ({
-          id: c.id,
-          name: c.name,
-          parentName: c.parent?.name ?? null,
-        }))}
+        categories={categories.map((c) => ({ id: c.id, name: c.name, parentId: c.parentId }))}
       />
 
       <div className="overflow-hidden rounded-[18px] bg-white shadow-[0_3px_14px_rgba(0,0,0,0.04)]">
@@ -403,7 +402,7 @@ export default async function CatalogPage({
         totalPages={totalPages}
         total={total}
         perPage={perPage}
-        params={{ q, categoria, estado, por: sp.por }}
+        params={{ q, categoria, sub, estado, por: sp.por }}
         basePath="/admin/catalogo"
       />
 
