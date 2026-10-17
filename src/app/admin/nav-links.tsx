@@ -43,7 +43,7 @@ const NAV: NavItem[] = [
   { href: "/admin/pedidos", label: "Pedidos", permission: "orders:view", icon: ShoppingCart },
   // Ventas va aparte de Pedidos y con su propio permiso: un pedido es trabajo
   // por hacer, una venta es dinero que entró. El cajero ve lo primero.
-  { href: "/admin/ventas", label: "Ventas", permission: "sales:view", icon: Receipt },
+  { href: "/admin/ventas", label: "Movimientos", permission: "sales:view", icon: Receipt },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
   { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
   {
@@ -53,7 +53,7 @@ const NAV: NavItem[] = [
     icon: Mail,
     lockable: true,
   },
-  { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store, soon: "S9" },
+  { href: "/pos", label: "Punto de venta", permission: "pos:view", icon: Store },
   { href: "/admin/usuarios", label: "Usuarios", permission: "users:view", icon: Users },
 ];
 

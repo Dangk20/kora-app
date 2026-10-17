@@ -24,7 +24,9 @@ export const MATRIX: Record<string, string[]> = {
   // "sales" es distinto de "orders" a propósito: ver pedidos es atender; ver
   // ventas es ver cuánto factura el negocio. El cajero necesita lo primero y no
   // tiene por qué saber lo segundo.
-  sales: ["view", "export"],
+  // "record": registrar a mano un ingreso o egreso en Movimientos. Solo el
+  // administrador (lo tiene por "ALL"): mover el libro del negocio no es operar.
+  sales: ["view", "export", "record"],
   pos: ["view", "sell"],
   // "customers" y NO "crm": la nomenclatura acordada con el cliente prohíbe esa
   // palabra — un CRM implica un alcance mucho mayor del que se vendió.

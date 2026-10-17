@@ -68,8 +68,13 @@ describe("matriz de permisos por rol", () => {
     expect(operador).toContain("sales:view");
     expect(operador).not.toContain("sales:export");
 
+    // Registrar ingresos/egresos a mano en Movimientos: solo el administrador.
+    expect(operador).not.toContain("sales:record");
+    expect(cajero).not.toContain("sales:record");
+
     const admin = await de("admin");
     expect(admin).toContain("sales:export");
+    expect(admin).toContain("sales:record");
   });
 
   it("marketing no puede confirmar pedidos ni tocar usuarios", async () => {

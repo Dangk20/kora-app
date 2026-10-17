@@ -13,7 +13,7 @@ const VIEWS: { prefix: string; title: string; subtitle: string }[] = [
   { prefix: "/admin/usuarios", title: "Usuarios", subtitle: "Roles y accesos del equipo" },
   { prefix: "/admin/clientes", title: "Módulo de clientes", subtitle: "Tu base de compradores" },
   { prefix: "/admin/pedidos", title: "Pedidos y envíos", subtitle: "Ventas online y su estado" },
-  { prefix: "/admin/ventas", title: "Ventas", subtitle: "Lo que el negocio facturó" },
+  { prefix: "/admin/ventas", title: "Movimientos", subtitle: "Lo que entra, lo que sale y los cierres de caja" },
   { prefix: "/admin/cupones", title: "Cupones", subtitle: "Descuentos y su uso" },
   { prefix: "/admin/campanas", title: "Email marketing", subtitle: "Campañas a tu base de clientes" },
   // Última: `/admin` es prefijo de todas las demás, así que cualquier ruta que

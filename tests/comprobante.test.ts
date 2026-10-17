@@ -214,10 +214,12 @@ describe("el comprobante se emite dentro de la transacción que confirma", () =>
     const archivos = [
       "src/modules/orders/actions.ts",
       "src/modules/orders/checkout-actions.ts",
+      // La caja (S9) nace confirmada y entregada en el mismo acto.
+      "src/modules/pos/sale.ts",
     ];
     for (const ruta of archivos) {
       const fuente = readFileSync(ruta, "utf8");
-      if (!fuente.includes('status: "CONFIRMED"')) continue;
+      if (!fuente.includes('status: "CONFIRMED"') && !fuente.includes('status: "DELIVERED"')) continue;
       expect(fuente, `${ruta} confirma pedidos y tiene que congelar el comprobante`).toContain(
         "freezeSalesDocument",
       );

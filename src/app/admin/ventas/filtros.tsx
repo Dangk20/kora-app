@@ -9,6 +9,7 @@ export type FiltrosValores = {
   hasta: string;
   canal: string;
   moneda: string;
+  tipo: string;
 };
 
 const campo =
@@ -47,6 +48,16 @@ export function Filtros({ valores }: { valores: FiltrosValores }) {
           <option value="">Ambas, por separado</option>
           <option value="COP">COP</option>
           <option value="USD">USD</option>
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[12px] font-semibold text-[#6b6f78]">Tipo</span>
+        <select name="tipo" defaultValue={valores.tipo} className={campo}>
+          <option value="">Todos</option>
+          <option value="INGRESO">Ingresos</option>
+          <option value="EGRESO">Egresos</option>
+          <option value="CIERRE">Cierres de caja</option>
         </select>
       </label>
 

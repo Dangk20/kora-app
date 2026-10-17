@@ -8,13 +8,7 @@
 
 import { db } from "@/lib/db";
 import { CONFIRMED_SQL_LIST, confirmedFilter, windowStart } from "./confirmed";
-import {
-  esClienteWhere,
-  etiquetaDe,
-  whereEtiqueta,
-  type Etiqueta,
-  type FiltroEtiqueta,
-} from "./etiqueta";
+import { conCuentaWhere, whereCuenta, type FiltroCuenta } from "./cuenta";
 
 type Db = typeof db;
 
@@ -23,11 +17,10 @@ export type CustomerSummary = {
   activos: number;
   /** Total de registros: registradas, compradoras invitadas y creadas a mano. */
   total: number;
-  /** Con al menos un pedido confirmado. clientes + noClientes = total. */
-  clientes: number;
-  noClientes: number;
-  /** Registrados en la web: crearon cuenta de acceso en la tienda. */
+  /** Crearon cuenta de acceso en la tienda. conCuenta + sinCuenta = total. */
   conCuenta: number;
+  /** Compraron como invitados, en caja, o se crearon a mano o importados. */
+  sinCuenta: number;
 };
 
 /**
@@ -45,19 +38,18 @@ export async function customerSummary(client: Db = db): Promise<CustomerSummary>
   // función, cuando la cuenta del comprador no existía; nadie lo conectó al
   // construirla, y ese cero era justo el "no sabemos cuántos se registraron".
   // La cuenta es la contraseña en la fila del cliente (cuenta-comprador).
-  const [total, nuevos, activos, clientes, conCuenta] = await Promise.all([
+  const [total, nuevos, activos, conCuenta] = await Promise.all([
     client.customer.count(),
     client.customer.count({ where: { createdAt: { gte: desde } } }),
     client.customer.count({
       where: { orders: { some: { ...confirmedFilter, createdAt: { gte: desde } } } },
     }),
-    client.customer.count({ where: esClienteWhere }),
-    client.customer.count({ where: { passwordHash: { not: null } } }),
+    client.customer.count({ where: conCuentaWhere }),
   ]);
 
-  // No clientes se obtiene por diferencia y no con otra consulta: así la suma
-  // cuadra por construcción, aunque entre dos conteos se confirme un pedido.
-  return { total, nuevos, activos, clientes, noClientes: total - clientes, conCuenta };
+  // Sin cuenta se obtiene por diferencia y no con otra consulta: así la suma
+  // cuadra por construcción, aunque entre dos conteos alguien se registre.
+  return { total, nuevos, activos, conCuenta, sinCuenta: total - conCuenta };
 }
 
 export type CustomerRow = {
@@ -66,10 +58,10 @@ export type CustomerRow = {
   phone: string | null;
   email: string | null;
   country: string;
-  /** Derivada de sus pedidos confirmados; ver etiqueta.ts. */
-  etiqueta: Etiqueta;
-  /** Creó cuenta en la tienda (si no, es invitada o se creó a mano). */
+  /** Creó cuenta en la tienda; ver cuenta.ts. */
   tieneCuenta: boolean;
+  /** De dónde llegó la ficha (web, caja, importación o a mano). */
+  source: "WEB" | "POS" | "IMPORT" | "MANUAL";
   /** Días de la semana (0 = domingo … 6 = sábado) con más pedidos confirmados. */
   topWeekdays: number[];
 };
@@ -100,8 +92,8 @@ export async function listCustomers(
     search = "",
     page = 1,
     pageSize = PAGE_SIZE,
-    etiqueta = "todos",
-  }: { search?: string; page?: number; pageSize?: number; etiqueta?: FiltroEtiqueta },
+    cuenta = "todos",
+  }: { search?: string; page?: number; pageSize?: number; cuenta?: FiltroCuenta },
   client: Db = db,
 ): Promise<CustomerPage> {
   const q = search.trim();
@@ -117,7 +109,7 @@ export async function listCustomers(
         ],
       }
     : {};
-  const where = { AND: [busqueda, whereEtiqueta(etiqueta)] };
+  const where = { AND: [busqueda, whereCuenta(cuenta)] };
 
   const [total, clientes] = await Promise.all([
     client.customer.count({ where }),
@@ -134,8 +126,7 @@ export async function listCustomers(
         country: true,
         // Solo para saber SI tiene cuenta; el hash no sale de esta función.
         passwordHash: true,
-        // La etiqueta, en la misma consulta: un conteo filtrado por fila.
-        _count: { select: { orders: { where: confirmedFilter } } },
+        source: true,
       },
     }),
   ]);
@@ -143,9 +134,8 @@ export async function listCustomers(
   const topWeekdays = await weekdaysByCustomer(clientes.map((c) => c.id), client);
 
   return {
-    rows: clientes.map(({ passwordHash, _count, ...c }) => ({
+    rows: clientes.map(({ passwordHash, ...c }) => ({
       ...c,
-      etiqueta: etiquetaDe(_count.orders),
       tieneCuenta: passwordHash !== null,
       topWeekdays: topWeekdays.get(c.id) ?? [],
     })),
