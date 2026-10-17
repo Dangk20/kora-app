@@ -88,6 +88,11 @@ export type CreditInput = {
   currency: Currency;
   orderId?: string;
   note?: string;
+  /**
+   * Vencimiento propio del lote. Solo para los beneficios de regalo (30 días,
+   * change beneficios); por omisión, los 12 meses del cashback normal.
+   */
+  expiresAt?: Date;
   /** Solo para pruebas: permite fabricar lotes con vencimiento en el pasado. */
   now?: Date;
 };
@@ -117,7 +122,7 @@ export async function creditCashback(tx: Tx, input: CreditInput): Promise<Cashba
       type: "EARN",
       orderId: input.orderId ?? null,
       remaining: amount,
-      expiresAt: vencimientoDesde(ahora),
+      expiresAt: input.expiresAt ?? vencimientoDesde(ahora),
       note: input.note ?? null,
       createdAt: ahora,
     },

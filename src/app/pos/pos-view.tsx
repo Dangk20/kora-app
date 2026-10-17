@@ -6,10 +6,12 @@
 // resuelve el servidor (precio de tienda en COP).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, FileText, FlaskConical, Minus, Plus, Printer, ScanBarcode, Search, Trash2, X } from "lucide-react";
+import { Banknote, FileText, FlaskConical, Gift, Minus, Plus, Printer, ScanBarcode, Search, Trash2, X } from "lucide-react";
 import { formatMoney } from "@/modules/pricing";
 import type { PosCategory, PosProduct } from "@/modules/pos/catalog";
 import { buscarClienteCaja, cobrarVentaPos } from "@/modules/pos/actions";
+import { beneficiosCaja, descuentoBeneficioCaja } from "@/modules/benefits/actions";
+import type { BeneficioCliente } from "@/modules/benefits/benefits";
 import { Switch } from "@/components/ui/switch";
 import { PASOS_FACTURA, pasosCobro, ProcesoCobro } from "./proceso-cobro";
 
@@ -365,7 +367,7 @@ function Cobro({
 }) {
   // Se congelan al abrir: al registrarse la venta el ticket de la caja se
   // vacía, y el modal tiene que seguir mostrando lo que se cobró.
-  const [total] = useState(totalTicket);
+  const [subtotal] = useState(totalTicket);
   const [lineas] = useState(lineasTicket);
   const [method, setMethod] = useState(methods[0]);
   const [recibido, setRecibido] = useState("");
@@ -375,6 +377,24 @@ function Cobro({
     name: "", document: "", phone: "", email: "",
   });
   const [busqueda, setBusqueda] = useState<"idle" | "buscando" | "encontrado" | "nuevo">("idle");
+  // Beneficios del cliente encontrado (ruleta u otorgados): uno por compra.
+  const [beneficios, setBeneficios] = useState<BeneficioCliente[]>([]);
+  const [beneficio, setBeneficio] = useState<{ id: string; title: string; discount: number } | null>(null);
+  const [errorBeneficio, setErrorBeneficio] = useState<string | null>(null);
+  const descuento = beneficio ? beneficio.discount : 0;
+  const total = subtotal - descuento;
+  function limpiarBeneficios() {
+    setBeneficios([]);
+    setBeneficio(null);
+    setErrorBeneficio(null);
+  }
+  async function elegirBeneficio(b: BeneficioCliente) {
+    setErrorBeneficio(null);
+    if (beneficio?.id === b.id) return setBeneficio(null);
+    const r = await descuentoBeneficioCaja(b.id, lineas);
+    if (r.ok) setBeneficio({ id: b.id, title: b.title, discount: r.discount });
+    else setErrorBeneficio(r.error);
+  }
   async function buscarCliente() {
     if (cliente.phone.replace(/\D/g, "").length < 10) return;
     setBusqueda("buscando");
@@ -382,9 +402,12 @@ function Cobro({
     if (c) {
       setCliente({ id: c.id, name: c.name, document: c.document, phone: c.phone || cliente.phone, email: c.email });
       setBusqueda("encontrado");
+      limpiarBeneficios();
+      setBeneficios(await beneficiosCaja(c.id));
     } else {
       setCliente((x) => ({ ...x, id: undefined, name: "", document: "", email: "" }));
       setBusqueda("nuevo");
+      limpiarBeneficios();
     }
   }
   // ⚠️ FACTURA ELECTRÓNICA SIMULADA (solo pantalla): todavía no hay proveedor
@@ -397,7 +420,7 @@ function Cobro({
     "form" | "proceso" | "factura-pregunta" | "factura-datos" | "facturando" | "imprimir"
   >("form");
   const [etapa, setEtapa] = useState(0);
-  const [venta, setVenta] = useState<{ orderId: string; orderNumber: string; change: number } | null>(null);
+  const [venta, setVenta] = useState<{ orderId: string; orderNumber: string; change: number; cashback: number } | null>(null);
   const siRef = useRef<HTMLButtonElement>(null);
 
   const efectivo = method === "Efectivo";
@@ -438,11 +461,12 @@ function Cobro({
         method,
         cashReceived: efectivo ? recibidoNum : undefined,
         customer: conCliente ? { ...cliente, email: cliente.email.trim() } : undefined,
+        benefitId: conCliente && beneficio ? beneficio.id : undefined,
       }),
       relato,
     ]);
     if (r.ok) {
-      setVenta({ orderId: r.orderId, orderNumber: r.orderNumber, change: r.change });
+      setVenta({ orderId: r.orderId, orderNumber: r.orderNumber, change: r.change, cashback: r.cashback });
       onVendido();
       if (facturaObligatoria) {
         // Sin preguntar: con los datos que el cajero haya puesto en el cobro,
@@ -495,6 +519,11 @@ function Cobro({
       {efectivo && (
         <p className="mx-auto mt-3 w-fit rounded-[14px] bg-[#FFF4EF] px-5 py-2.5 text-[15px] font-bold text-kora-black">
           Vueltas: <span className="text-kora-coral">{money(venta.change)}</span>
+        </p>
+      )}
+      {venta.cashback > 0 && (
+        <p className="mt-2 text-[12.5px] font-semibold text-[#2f7d4f]">
+          +{money(venta.cashback)} de Kora Cashback para {cliente.name.split(" ")[0]}
         </p>
       )}
     </div>
@@ -626,6 +655,11 @@ function Cobro({
         <div className="bg-kora-gradient relative mb-5 rounded-[18px] px-5 py-4 text-white shadow-[0_14px_30px_-14px_rgba(255,90,31,0.7)]">
           <p className="text-[12px] font-bold tracking-[1.5px] uppercase opacity-85">Total a cobrar</p>
           <p className="mt-0.5 text-[34px] leading-tight font-extrabold">{money(total)}</p>
+          {descuento > 0 && (
+            <p className="text-[12.5px] font-semibold opacity-90">
+              <span className="line-through opacity-75">{money(subtotal)}</span> · {beneficio?.title} −{money(descuento)}
+            </p>
+          )}
           <button type="button" onClick={onCerrar} aria-label="Cerrar"
             className="absolute top-3 right-3 rounded-full bg-white/15 p-1.5 text-white hover:bg-white/25">
             <X className="size-4" />
@@ -693,7 +727,14 @@ function Cobro({
 
         <div className="flex min-w-0 flex-col md:border-l md:border-[#f0ece6] md:pl-6">
         <p className="mb-3 text-[12.5px] font-semibold text-[#6b6f78]">Cliente</p>
-        <Switch checked={conCliente} onCheckedChange={setConCliente} label="Agregar datos del cliente (opcional)" />
+        <Switch
+          checked={conCliente}
+          onCheckedChange={(v) => {
+            setConCliente(v);
+            if (!v) setBeneficio(null);
+          }}
+          label="Agregar datos del cliente (opcional)"
+        />
         {!conCliente && (
           <p className="mt-2 text-[12.5px] text-[#9aa0ab]">Sin datos, el recibo sale a «Consumidor final».</p>
         )}
@@ -708,6 +749,7 @@ function Cobro({
                   onChange={(e) => {
                     setCliente((c) => ({ ...c, id: undefined, phone: e.target.value.replace(/[^\d ]/g, "") }));
                     setBusqueda("idle");
+                    limpiarBeneficios();
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void buscarCliente(); } }}
                   className="w-full bg-transparent py-2.5 pl-2 text-[14px] outline-none" />
@@ -722,6 +764,24 @@ function Cobro({
               <p className="rounded-[10px] bg-[#e7f4ec] px-3 py-2 text-[12.5px] font-semibold text-[#2f7d4f]">
                 ✓ ¡Cliente encontrado!
               </p>
+            )}
+            {busqueda === "encontrado" && beneficios.length > 0 && (
+              <div className="rounded-[12px] border border-[#ffd9c7] bg-[#FFF8F4] px-3 py-2.5">
+                <p className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-kora-black">
+                  <Gift className="size-3.5 text-kora-coral" /> Tiene {beneficios.length === 1 ? "un beneficio" : `${beneficios.length} beneficios`}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {beneficios.map((b) => (
+                    <button key={b.id} type="button" onClick={() => void elegirBeneficio(b)}
+                      className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${
+                        beneficio?.id === b.id ? "bg-kora-coral text-white" : "bg-white text-kora-black ring-1 ring-[#ffd9c7] hover:ring-kora-coral"
+                      }`}>
+                      {beneficio?.id === b.id ? "✓ " : ""}{b.title}
+                    </button>
+                  ))}
+                </div>
+                {errorBeneficio && <p className="mt-1.5 text-[12px] font-semibold text-destructive">{errorBeneficio}</p>}
+              </div>
             )}
             {busqueda === "nuevo" && (
               <p className="rounded-[10px] bg-[#FFF4EF] px-3 py-2 text-[12.5px] font-semibold text-kora-coral">

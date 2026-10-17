@@ -11,6 +11,9 @@ import { freezeSalesDocument } from "@/modules/invoicing/document";
 import { formatOrderNumber } from "@/modules/orders/message";
 import { resolvePrice } from "@/modules/pricing";
 import { normalizarTelefono } from "@/modules/customers/phone";
+import { BeneficioNoDisponible, tomarBeneficio } from "@/modules/benefits/benefits";
+import { creditCashback } from "@/modules/cashback/ledger";
+import { computeAccrual } from "@/modules/cashback/accrual";
 import { resolverClienteVenta } from "./customers";
 import { CAJA } from "./turno";
 
@@ -40,12 +43,17 @@ const ventaSchema = z.object({
       email: z.string().trim().email("Correo inválido").optional().or(z.literal("")),
     })
     .optional(),
+  /**
+   * Beneficio que el cliente canjea en esta compra (change beneficios): un
+   * descuento por categoría o un producto de regalo. Exige `customer.id`.
+   */
+  benefitId: z.string().min(1).optional(),
 });
 
 export type VentaPosInput = z.input<typeof ventaSchema>;
 
 export type VentaPosResult =
-  | { ok: true; orderId: string; orderNumber: string; total: number; change: number }
+  | { ok: true; orderId: string; orderNumber: string; total: number; change: number; discount: number; cashback: number }
   | { ok: false; error: string };
 
 const num = (d: { toString(): string }) => Number(d.toString());
@@ -68,50 +76,28 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const data = parsed.data;
 
-  // La misma variante dos veces en el ticket es una sola línea.
-  const cantidades = new Map<string, number>();
-  for (const l of data.lines) cantidades.set(l.variantId, (cantidades.get(l.variantId) ?? 0) + l.qty);
+  const armado = await armarLineas(data.lines);
+  if (!armado.ok) return armado;
+  const lineas = armado.lineas;
 
-  const variantes = await db.variant.findMany({
-    where: { id: { in: [...cantidades.keys()] }, active: true, product: { active: true, archivedAt: null } },
-    select: {
-      id: true,
-      sku: true,
-      name: true,
-      priceCopStore: true,
-      priceCopOnline: true,
-      priceUsdStore: true,
-      priceUsdOnline: true,
-      product: { select: { name: true } },
-    },
-  });
-  if (variantes.length !== cantidades.size) {
-    return { ok: false, error: "Un producto del ticket ya no está disponible. Quítalo y vuelve a intentar." };
+  const subtotal = lineas.reduce((s, l) => s + l.total, 0);
+
+  // El beneficio se lee aquí para saber cuánto cobrar; dentro de la
+  // transacción se vuelve a tomar CON BLOQUEO (tomarBeneficio) y ahí se valida
+  // que siga vigente y sea de este cliente.
+  let discount = 0;
+  if (data.benefitId) {
+    if (!data.customer?.id) return { ok: false, error: "Busca al cliente para usar su beneficio" };
+    const b = await db.benefit.findUnique({
+      where: { id: data.benefitId },
+      select: { kind: true, amount: true, categoryId: true, variantId: true, title: true, category: { select: { name: true } } },
+    });
+    if (!b) return { ok: false, error: "El beneficio no existe" };
+    const r = descuentoDeBeneficio(b, lineas);
+    if (!r.ok) return r;
+    discount = r.discount;
   }
-
-  // Precio de TIENDA en COP, resuelto aquí: el único que cobra el POS.
-  const lineas = variantes
-    .map((v) => {
-      const precio = resolvePrice(
-        {
-          priceCopStore: num(v.priceCopStore),
-          priceCopOnline: num(v.priceCopOnline),
-          priceUsdStore: num(v.priceUsdStore),
-          priceUsdOnline: num(v.priceUsdOnline),
-        },
-        "COP",
-        "store",
-      ).amount;
-      const qty = cantidades.get(v.id)!;
-      return { variantId: v.id, sku: v.sku, productName: v.product.name, variantName: v.name, qty, unitPrice: precio, total: precio * qty };
-    })
-    // Orden estable: dos ventas con ítems cruzados no se bloquean entre sí.
-    .sort((a, b) => a.variantId.localeCompare(b.variantId));
-
-  const sinPrecio = lineas.find((l) => !(l.unitPrice > 0));
-  if (sinPrecio) return { ok: false, error: `${sinPrecio.productName} no tiene precio de tienda` };
-
-  const total = lineas.reduce((s, l) => s + l.total, 0);
+  const total = subtotal - discount;
   let change = 0;
   if (data.method === "Efectivo") {
     const recibido = data.cashReceived ?? 0;
@@ -145,8 +131,8 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
             // En mostrador el cliente se lleva el producto en el mismo acto.
             status: "DELIVERED",
             currency: "COP",
-            subtotal: total,
-            discountTotal: 0,
+            subtotal,
+            discountTotal: discount,
             cashbackApplied: 0,
             total,
             customerId: cliente?.id ?? null,
@@ -204,12 +190,26 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
           })),
         });
 
+        if (data.benefitId) {
+          if (!cliente) throw new BeneficioNoDisponible("Busca al cliente para usar su beneficio");
+          await tomarBeneficio(tx, data.benefitId, cliente.id, ahora);
+          await tx.benefit.update({ where: { id: data.benefitId }, data: { usedAt: ahora, usedOrderId: creado.id } });
+        }
+
+        // Kora Cashback: en caja también acumula el 3 % si la venta se ata a un
+        // cliente (reglas del cliente). Se acredita aquí, en la misma
+        // transacción, porque la venta POS no emite `order.confirmed`.
+        const cashback = cliente ? computeAccrual({ total, currency: "COP" }) : 0;
+        if (cliente && cashback > 0) {
+          await creditCashback(tx, { customerId: cliente.id, amount: cashback, currency: "COP", orderId: creado.id, now: ahora });
+        }
+
         // El comprobante se congela DENTRO de la transacción, como en
         // `confirmOrder`: una venta sin comprobante no da ningún error.
         await freezeSalesDocument(tx, creado.id, ahora);
         // Sin `order.confirmed` a propósito: dispararía correo al comprador,
-        // cashback y la compra a Meta/GA4 (ver design.md §3).
-        return creado;
+        // cashback (ya acreditado arriba) y la compra a Meta/GA4 (design.md §3).
+        return { ...creado, cashback };
       },
       { timeout: 30_000, maxWait: 30_000 },
     );
@@ -220,11 +220,14 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
       orderNumber: formatOrderNumber(order.number, order.createdAt),
       total,
       change,
+      discount,
+      cashback: order.cashback,
     };
   } catch (e) {
     if (e instanceof CajaCerrada) {
       return { ok: false, error: "La caja está cerrada. Ábrela para empezar a vender." };
     }
+    if (e instanceof BeneficioNoDisponible) return { ok: false, error: e.motivo };
     if (e instanceof FaltaStock) {
       return {
         ok: false,
@@ -234,4 +237,101 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
     console.error("[pos] no se pudo registrar la venta", e);
     return { ok: false, error: "No se pudo registrar la venta. Intenta de nuevo." };
   }
+}
+
+type LineaBeneficio = { variantId: string; categoryId: string; parentCategoryId: string | null; unitPrice: number; total: number };
+
+/**
+ * Cuánto descuenta un beneficio sobre el ticket.
+ *  - DESCUENTO_CATEGORIA: el % sobre las líneas de esa categoría.
+ *  - PRODUCTO_GRATIS: UNA unidad del producto de regalo, que debe estar en el
+ *    ticket (así sale del inventario por el motor, como cualquier venta).
+ */
+export function descuentoDeBeneficio(
+  b: { kind: string; amount: { toString(): string } | number | null; categoryId: string | null; variantId: string | null; category?: { name: string } | null },
+  lineas: LineaBeneficio[],
+): { ok: true; discount: number } | { ok: false; error: string } {
+  if (b.kind === "DESCUENTO_CATEGORIA") {
+    // La categoría del beneficio cubre también sus subcategorías.
+    const base = lineas
+      .filter((l) => l.categoryId === b.categoryId || l.parentCategoryId === b.categoryId)
+      .reduce((s, l) => s + l.total, 0);
+    if (base <= 0) return { ok: false, error: `Agrega al ticket un producto de ${b.category?.name ?? "la categoría del beneficio"}` };
+    const pct = Number(b.amount?.toString() ?? 0);
+    return { ok: true, discount: Math.floor((base * pct) / 100) };
+  }
+  if (b.kind === "PRODUCTO_GRATIS") {
+    const l = lineas.find((x) => x.variantId === b.variantId);
+    if (!l) return { ok: false, error: "Agrega al ticket el producto de regalo" };
+    return { ok: true, discount: l.unitPrice };
+  }
+  return { ok: false, error: "El cashback de regalo se usa como saldo, no como beneficio de caja" };
+}
+
+/**
+ * Las líneas del ticket con el precio de TIENDA resuelto en el servidor.
+ * La usan el cobro y la vista previa del beneficio (mismo número en los dos).
+ */
+async function armarLineas(lines: { variantId: string; qty: number }[]) {
+  // La misma variante dos veces en el ticket es una sola línea.
+  const cantidades = new Map<string, number>();
+  for (const l of lines) cantidades.set(l.variantId, (cantidades.get(l.variantId) ?? 0) + l.qty);
+
+  const variantes = await db.variant.findMany({
+    where: { id: { in: [...cantidades.keys()] }, active: true, product: { active: true, archivedAt: null } },
+    select: {
+      id: true,
+      sku: true,
+      name: true,
+      priceCopStore: true,
+      priceCopOnline: true,
+      priceUsdStore: true,
+      priceUsdOnline: true,
+      product: { select: { name: true, categoryId: true, category: { select: { parentId: true } } } },
+    },
+  });
+  if (variantes.length !== cantidades.size) {
+    return { ok: false as const, error: "Un producto del ticket ya no está disponible. Quítalo y vuelve a intentar." };
+  }
+
+  // Precio de TIENDA en COP, resuelto aquí: el único que cobra el POS.
+  const lineas = variantes
+    .map((v) => {
+      const precio = resolvePrice(
+        {
+          priceCopStore: num(v.priceCopStore),
+          priceCopOnline: num(v.priceCopOnline),
+          priceUsdStore: num(v.priceUsdStore),
+          priceUsdOnline: num(v.priceUsdOnline),
+        },
+        "COP",
+        "store",
+      ).amount;
+      const qty = cantidades.get(v.id)!;
+      return {
+        variantId: v.id, sku: v.sku, productName: v.product.name, variantName: v.name,
+        categoryId: v.product.categoryId, parentCategoryId: v.product.category.parentId, qty, unitPrice: precio, total: precio * qty,
+      };
+    })
+    // Orden estable: dos ventas con ítems cruzados no se bloquean entre sí.
+    .sort((a, b) => a.variantId.localeCompare(b.variantId));
+
+  const sinPrecio = lineas.find((l) => !(l.unitPrice > 0));
+  if (sinPrecio) return { ok: false as const, error: `${sinPrecio.productName} no tiene precio de tienda` };
+  return { ok: true as const, lineas };
+}
+
+/** Vista previa del cobro: cuánto descuenta el beneficio sobre este ticket. */
+export async function previsualizarBeneficio(
+  benefitId: string,
+  lines: { variantId: string; qty: number }[],
+): Promise<{ ok: true; discount: number } | { ok: false; error: string }> {
+  const armado = await armarLineas(lines);
+  if (!armado.ok) return armado;
+  const b = await db.benefit.findUnique({
+    where: { id: benefitId },
+    select: { kind: true, amount: true, categoryId: true, variantId: true, category: { select: { name: true } } },
+  });
+  if (!b) return { ok: false, error: "El beneficio no existe" };
+  return descuentoDeBeneficio(b, armado.lineas);
 }

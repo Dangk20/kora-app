@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { MessageCircle, X } from "lucide-react";
 import { KoraFlame } from "@/components/kora-flame";
 import type { CashbackSummary } from "@/modules/cashback/balance";
+import type { BeneficioCliente } from "@/modules/benefits/benefits";
+import { Beneficios, type OpcionesBeneficio } from "./beneficios";
 import type { SubscriptionState } from "@/modules/consent/subscription";
 import type { CustomerMetrics, TopCategory } from "@/modules/customers/profile";
 
@@ -140,6 +142,8 @@ export function CustomerSheet({
   top,
   whatsapp,
   backTo,
+  beneficios,
+  opcionesBeneficio,
 }: {
   customer: {
     id: string;
@@ -158,6 +162,9 @@ export function CustomerSheet({
   top: TopCategory[];
   whatsapp: string | null;
   backTo: string;
+  beneficios: BeneficioCliente[];
+  /** Solo para quien puede otorgar (administrador); `null` oculta el botón. */
+  opcionesBeneficio: OpcionesBeneficio | null;
 }) {
   const router = useRouter();
   const close = () => router.push(backTo);
@@ -271,6 +278,13 @@ export function CustomerSheet({
           </div>
 
           <Cashback resumen={cashback} />
+
+          <Beneficios
+            customerId={customer.id}
+            beneficios={beneficios}
+            opciones={opcionesBeneficio}
+            puedeOtorgar={opcionesBeneficio !== null}
+          />
 
           {whatsapp ? (
             <a

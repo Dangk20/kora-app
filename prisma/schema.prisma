@@ -43,6 +43,7 @@ model User {
   cashSessionsOpened CashSession[] @relation("CashSessionOpenedBy")
   cashSessionsClosed CashSession[] @relation("CashSessionClosedBy")
   cashMovements      CashMovement[] @relation("CashMovementBy")
+  benefitsGranted    Benefit[]      @relation("BenefitGrantedBy")
   statusChanges   OrderStatusHistory[]
   campaigns       Campaign[]
   productArchives ProductArchive[]
@@ -103,6 +104,7 @@ model Category {
   color         String           @default("#FBE3D3")
   icon          String           @default("package")
   products      Product[]
+  benefits      Benefit[]
   couponScopes  CouponCategory[]
   showcaseItems ShowcaseItem[]
 
@@ -205,6 +207,7 @@ model Variant {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   freeInCoupons  Coupon[]             @relation("CouponFreeVariant")
+  benefits       Benefit[]
 
   @@index([productId])
   @@map("variants")
@@ -407,6 +410,7 @@ model Customer {
   sessions           BuyerSession[]
   passwordResets     PasswordReset[]
   couponRedemptions  CouponRedemption[]
+  benefits           Benefit[]
   campaignRecipients CampaignRecipient[]
   consentEvents      ConsentEvent[]
   addresses          CustomerAddress[]
@@ -556,6 +560,7 @@ model Order {
   // El turno de caja en el que se cobró (solo ventas POS; change s09-pos-caja).
   cashSessionId String?
   cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
+  benefitsUsed  Benefit[]    @relation("BenefitUsedIn")
 
   items             OrderItem[]
   emailsSent        OrderEmail[]
@@ -908,6 +913,8 @@ model CashbackMovement {
   expiresAt DateTime?
 
   // A qué lote agota este consumo o vencimiento.
+  benefit Benefit? @relation("BenefitCashback")
+
   sourceMovementId String?
   sourceMovement   CashbackMovement?  @relation("CashbackLote", fields: [sourceMovementId], references: [id])
   consumptions     CashbackMovement[] @relation("CashbackLote")
@@ -1461,4 +1468,56 @@ model CashMovement {
 
   @@index([sessionId])
   @@map("cash_movements")
+}
+
+/// Qué es el beneficio (change beneficios, 17 oct 2026).
+enum BenefitKind {
+  /// Saldo de Kora Cashback de regalo. Se ACREDITA al otorgarse, como un lote
+  /// propio con vencimiento a 30 días, y se gasta como cualquier cashback.
+  CASHBACK
+  /// Porcentaje de descuento sobre los productos de una categoría (y sus
+  /// subcategorías), en UNA compra.
+  DESCUENTO_CATEGORIA
+  /// Un producto original de regalo, que se entrega en la tienda.
+  PRODUCTO_GRATIS
+}
+
+enum BenefitSource {
+  RULETA
+  MANUAL
+}
+
+/// Un beneficio que un cliente tiene para usar (la ruleta de la apertura, o
+/// uno otorgado a mano desde el panel). Vigencia de 30 días: distinta a los
+/// 12 meses del cashback normal. "Vencido" no se guarda: se deriva de
+/// `expiresAt`. Usado = `usedAt`, con el pedido en que se canjeó.
+model Benefit {
+  id         String        @id @default(cuid())
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  kind       BenefitKind
+  source     BenefitSource @default(MANUAL)
+  /// Lo que lee el cliente: "10% en Belleza", "Labial de regalo"…
+  title      String
+  /// CASHBACK: pesos acreditados. DESCUENTO_CATEGORIA: porcentaje (1–100).
+  amount     Decimal?      @db.Decimal(12, 2)
+  categoryId String?
+  category   Category?     @relation(fields: [categoryId], references: [id])
+  variantId  String?
+  variant    Variant?      @relation(fields: [variantId], references: [id])
+  /// El lote de cashback que abrió (solo CASHBACK).
+  cashbackMovementId String?           @unique
+  cashbackMovement   CashbackMovement? @relation("BenefitCashback", fields: [cashbackMovementId], references: [id])
+
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedOrderId String?
+  usedOrder   Order?    @relation("BenefitUsedIn", fields: [usedOrderId], references: [id])
+
+  grantedById String?
+  grantedBy   User?   @relation("BenefitGrantedBy", fields: [grantedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([customerId, expiresAt])
+  @@map("benefits")
 }

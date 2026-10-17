@@ -30,6 +30,10 @@ const CEL_NUEVO = "3109990001";
 const CEL_EXISTE = "3109990002";
 
 async function limpiarClientes() {
+  // Las ventas con cliente le acreditan Kora Cashback (3 %): primero sus lotes.
+  const where = { customer: { phone: { in: [`+57${CEL_NUEVO}`, `+57${CEL_EXISTE}`] } } };
+  await db.benefit.deleteMany({ where });
+  await db.cashbackMovement.deleteMany({ where });
   await db.customer.deleteMany({ where: { phone: { in: [`+57${CEL_NUEVO}`, `+57${CEL_EXISTE}`] } } });
 }
 
@@ -39,6 +43,7 @@ async function limpiarPedidos() {
     select: { id: true },
   });
   const ids = pedidos.map((p) => p.id);
+  await db.cashbackMovement.deleteMany({ where: { orderId: { in: ids } } });
   await db.salesDocument.deleteMany({ where: { orderId: { in: ids } } });
   await db.stockMovement.updateMany({ where: { orderId: { in: ids } }, data: { orderId: null } });
   await db.orderStatusHistory.deleteMany({ where: { orderId: { in: ids } } });
