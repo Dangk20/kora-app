@@ -90,7 +90,7 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
     if (!data.customer?.id) return { ok: false, error: "Busca al cliente para usar su beneficio" };
     const b = await db.benefit.findUnique({
       where: { id: data.benefitId },
-      select: { kind: true, amount: true, categoryId: true, variantId: true, title: true, category: { select: { name: true } } },
+      select: { kind: true, amount: true, categoryId: true, extraCategoryIds: true, variantId: true, title: true, category: { select: { name: true } } },
     });
     if (!b) return { ok: false, error: "El beneficio no existe" };
     const r = descuentoDeBeneficio(b, lineas);
@@ -239,7 +239,8 @@ export async function registrarVentaPos(input: unknown, actorId: string, registe
   }
 }
 
-type LineaBeneficio = { variantId: string; categoryId: string; parentCategoryId: string | null; unitPrice: number; total: number };
+/** `categorias`: la del producto y sus ancestros (hasta dos niveles arriba). */
+type LineaBeneficio = { variantId: string; categorias: string[]; unitPrice: number; total: number };
 
 /**
  * Cuánto descuenta un beneficio sobre el ticket.
@@ -248,13 +249,17 @@ type LineaBeneficio = { variantId: string; categoryId: string; parentCategoryId:
  *    ticket (así sale del inventario por el motor, como cualquier venta).
  */
 export function descuentoDeBeneficio(
-  b: { kind: string; amount: { toString(): string } | number | null; categoryId: string | null; variantId: string | null; category?: { name: string } | null },
+  b: {
+    kind: string; amount: { toString(): string } | number | null; categoryId: string | null;
+    extraCategoryIds?: string[]; variantId: string | null; category?: { name: string } | null;
+  },
   lineas: LineaBeneficio[],
 ): { ok: true; discount: number } | { ok: false; error: string } {
   if (b.kind === "DESCUENTO_CATEGORIA") {
-    // La categoría del beneficio cubre también sus subcategorías.
+    // Cada categoría del beneficio cubre también sus subcategorías.
+    const cubre = new Set([b.categoryId, ...(b.extraCategoryIds ?? [])].filter(Boolean));
     const base = lineas
-      .filter((l) => l.categoryId === b.categoryId || l.parentCategoryId === b.categoryId)
+      .filter((l) => l.categorias.some((c) => cubre.has(c)))
       .reduce((s, l) => s + l.total, 0);
     if (base <= 0) return { ok: false, error: `Agrega al ticket un producto de ${b.category?.name ?? "la categoría del beneficio"}` };
     const pct = Number(b.amount?.toString() ?? 0);
@@ -287,7 +292,13 @@ async function armarLineas(lines: { variantId: string; qty: number }[]) {
       priceCopOnline: true,
       priceUsdStore: true,
       priceUsdOnline: true,
-      product: { select: { name: true, categoryId: true, category: { select: { parentId: true } } } },
+      product: {
+        select: {
+          name: true,
+          categoryId: true,
+          category: { select: { parentId: true, parent: { select: { parentId: true } } } },
+        },
+      },
     },
   });
   if (variantes.length !== cantidades.size) {
@@ -310,7 +321,10 @@ async function armarLineas(lines: { variantId: string; qty: number }[]) {
       const qty = cantidades.get(v.id)!;
       return {
         variantId: v.id, sku: v.sku, productName: v.product.name, variantName: v.name,
-        categoryId: v.product.categoryId, parentCategoryId: v.product.category.parentId, qty, unitPrice: precio, total: precio * qty,
+        categorias: [v.product.categoryId, v.product.category.parentId, v.product.category.parent?.parentId].filter(
+          (c): c is string => Boolean(c),
+        ),
+        qty, unitPrice: precio, total: precio * qty,
       };
     })
     // Orden estable: dos ventas con ítems cruzados no se bloquean entre sí.
@@ -330,7 +344,7 @@ export async function previsualizarBeneficio(
   if (!armado.ok) return armado;
   const b = await db.benefit.findUnique({
     where: { id: benefitId },
-    select: { kind: true, amount: true, categoryId: true, variantId: true, category: { select: { name: true } } },
+    select: { kind: true, amount: true, categoryId: true, extraCategoryIds: true, variantId: true, category: { select: { name: true } } },
   });
   if (!b) return { ok: false, error: "El beneficio no existe" };
   return descuentoDeBeneficio(b, armado.lineas);

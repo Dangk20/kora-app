@@ -6,6 +6,7 @@
 // `errores.traducir`: aquí solo lo que dibuja la pantalla.
 export const cuenta = {
   meta: {
+    nuevaClave: "Crea tu contraseña · KORA",
     entrar: "Entrar a mi cuenta · KORA",
     crear: "Crear mi cuenta · KORA",
     recuperar: "Recuperar tu contraseña · KORA",
@@ -13,6 +14,13 @@ export const cuenta = {
     baja: "Suscripción · KORA",
   },
 
+  nuevaClave: {
+    titulo: "Crea tu contraseña",
+    bajada: "Entraste con la contraseña temporal que te enviamos al correo. Elige una nueva para seguir.",
+    nueva: "Nueva contraseña",
+    boton: "Guardar y entrar",
+    enviando: "Guardando…",
+  },
   entrar: {
     titulo: "Entrar a mi cuenta",
     bajada: "Consulta tu Kora Cashback, tus pedidos y tus datos.",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Gift,
   Lock,
   LayoutDashboard,
   Layers,
@@ -46,6 +47,7 @@ const NAV: NavItem[] = [
   { href: "/admin/ventas", label: "Movimientos", permission: "sales:view", icon: Receipt },
   { href: "/admin/clientes", label: "Clientes", permission: "customers:view", icon: UsersRound },
   { href: "/admin/cupones", label: "Cupones", permission: "coupons:view", icon: Ticket },
+  { href: "/admin/ruleta", label: "Ruleta", permission: "loyalty:view", icon: Gift },
   {
     href: "/admin/campanas",
     label: "Email marketing",
