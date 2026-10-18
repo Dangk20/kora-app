@@ -190,7 +190,7 @@ export async function confirmPasswordReset(
     // marcara después y algo fallara en medio, el código seguiría vivo sobre
     // una cuenta que ya cambió.
     db.passwordReset.update({ where: { id: fila.id }, data: { usedAt: now } }),
-    db.customer.update({ where: { id: cliente.id }, data: { passwordHash } }),
+    db.customer.update({ where: { id: cliente.id }, data: { passwordHash, mustChangePassword: false } }),
   ]);
 
   // Fuera de la transacción a propósito: si esto fallara, la contraseña ya

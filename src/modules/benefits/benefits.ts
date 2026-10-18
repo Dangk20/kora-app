@@ -49,6 +49,8 @@ export type NuevoBeneficio = {
   /** CASHBACK: pesos. DESCUENTO_CATEGORIA: porcentaje 1–100. */
   amount?: number;
   categoryId?: string;
+  /** DESCUENTO_CATEGORIA: otras categorías que cubre el mismo descuento. */
+  extraCategoryIds?: string[];
   variantId?: string;
   grantedById?: string;
   now?: Date;
@@ -90,10 +92,14 @@ export async function otorgarBeneficio(datos: NuevoBeneficio, tx?: Tx): Promise<
       if (pct < 1 || pct > 100) return { ok: false, error: "El descuento va de 1% a 100%" };
       const cat = datos.categoryId ? await t.category.findUnique({ where: { id: datos.categoryId }, select: { name: true } }) : null;
       if (!cat) return { ok: false, error: "Elige la categoría del descuento" };
+      const extra = [...new Set(datos.extraCategoryIds ?? [])].filter((id) => id !== datos.categoryId);
+      if (extra.length && (await t.category.count({ where: { id: { in: extra } } })) !== extra.length) {
+        return { ok: false, error: "Una de las categorías del descuento no existe" };
+      }
       const b = await t.benefit.create({
         data: {
           customerId: datos.customerId, kind: "DESCUENTO_CATEGORIA", source: datos.source ?? "MANUAL",
-          title: datos.title?.trim() || `${pct}% en ${cat.name}`, amount: pct, categoryId: datos.categoryId,
+          title: datos.title?.trim() || `${pct}% en ${cat.name}`, amount: pct, categoryId: datos.categoryId, extraCategoryIds: extra,
           expiresAt, grantedById: datos.grantedById, createdAt: ahora,
         },
       });

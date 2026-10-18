@@ -15,6 +15,7 @@ const VIEWS: { prefix: string; title: string; subtitle: string }[] = [
   { prefix: "/admin/pedidos", title: "Pedidos y envíos", subtitle: "Ventas online y su estado" },
   { prefix: "/admin/ventas", title: "Movimientos", subtitle: "Lo que entra, lo que sale y los cierres de caja" },
   { prefix: "/admin/cupones", title: "Cupones", subtitle: "Descuentos y su uso" },
+  { prefix: "/admin/ruleta", title: "Ruleta", subtitle: "Premios de la gran apertura" },
   { prefix: "/admin/campanas", title: "Email marketing", subtitle: "Campañas a tu base de clientes" },
   // Última: `/admin` es prefijo de todas las demás, así que cualquier ruta que
   // no tenga su entrada aquí acaba llamándose "Dashboard" sin que nada falle.

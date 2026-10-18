@@ -2,6 +2,7 @@ import type { cuenta as es } from "../es/cuenta";
 
 export const cuenta: typeof es = {
   meta: {
+    nuevaClave: "Create your password · KORA",
     entrar: "Sign in · KORA",
     crear: "Create your account · KORA",
     recuperar: "Reset your password · KORA",
@@ -9,6 +10,13 @@ export const cuenta: typeof es = {
     baja: "Subscription · KORA",
   },
 
+  nuevaClave: {
+    titulo: "Create your password",
+    bajada: "You signed in with the temporary password we emailed you. Choose a new one to continue.",
+    nueva: "New password",
+    boton: "Save and continue",
+    enviando: "Saving…",
+  },
   entrar: {
     titulo: "Sign in to your account",
     bajada: "Check your Kora Cashback, your orders and your details.",

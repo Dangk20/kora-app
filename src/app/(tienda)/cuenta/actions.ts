@@ -11,6 +11,7 @@ import { normalizarTelefono } from "@/modules/customers/phone";
 import {
   MENSAJE_ACCESO,
   changePassword,
+  fijarClaveNueva,
   registerBuyer,
   verifyBuyer,
 } from "@/modules/buyer/account";
@@ -77,6 +78,10 @@ export async function entrar(_prev: FormState, formData: FormData): Promise<Form
   limpiarIntentos(ip);
   const h = await headers();
   await startBuyerSession(r.customerId, h.get("user-agent") ?? undefined);
+
+  // Entró con la contraseña temporal del registro rápido: primero la cambia.
+  const temporal = await db.customer.findUnique({ where: { id: r.customerId }, select: { mustChangePassword: true } });
+  if (temporal?.mustChangePassword) redirect("/cuenta/nueva-clave");
   redirect(destinoSeguro(formData.get("volver")));
 }
 
@@ -165,6 +170,16 @@ export async function actualizarDatos(_prev: FormState, formData: FormData): Pro
 
   revalidatePath("/cuenta");
   return { ok: true };
+}
+
+/** Cambio obligado de la contraseña temporal (registro rápido de la ruleta). */
+export async function fijarClave(_prev: FormState, formData: FormData): Promise<FormState> {
+  const buyer = await requireBuyer();
+  const { errores } = await getMessages();
+  const r = await fijarClaveNueva(buyer.customerId, String(formData.get("nueva") ?? ""));
+  if (!r.ok) return { error: errores.traducir(r.error) };
+  await revokeAllSessions(buyer.customerId, await currentBuyerToken());
+  redirect("/cuenta");
 }
 
 export async function cambiarPassword(_prev: FormState, formData: FormData): Promise<FormState> {

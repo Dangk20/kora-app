@@ -156,7 +156,33 @@ export async function changePassword(
 
   await db.customer.update({
     where: { id: customerId },
-    data: { passwordHash: await hashPassword(nueva) },
+    data: { passwordHash: await hashPassword(nueva), mustChangePassword: false },
   });
   return { ok: true };
+}
+
+/**
+ * Contraseña temporal del registro rápido de la ruleta: una POR PERSONA, que
+ * llega a su correo. Una clave igual para todos dejaría entrar a la cuenta de
+ * cualquiera sabiendo solo su correo. Sin 0/O ni 1/I/L, para dictarla o
+ * copiarla del correo sin confundirse.
+ */
+export function generarClaveTemporal(): string {
+  const alfabeto = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return `KORA-${Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join("")}`;
+}
+
+/**
+ * Cambio OBLIGADO tras entrar con la contraseña temporal: no pide la actual
+ * (la acaba de escribir para entrar) y solo vale mientras la marca siga puesta.
+ */
+export async function fijarClaveNueva(customerId: string, nueva: string): Promise<ChangePasswordResult> {
+  const problema = passwordProblem(nueva);
+  if (problema) return { ok: false, error: problema };
+  const r = await db.customer.updateMany({
+    where: { id: customerId, mustChangePassword: true },
+    data: { passwordHash: await hashPassword(nueva), mustChangePassword: false },
+  });
+  return r.count === 1 ? { ok: true } : { ok: false, error: MENSAJE_ACCESO };
 }
