@@ -29,6 +29,8 @@ import { cookies as cookiesEs } from "./es/cookies";
 import { cookies as cookiesEn } from "./en/cookies";
 import { ruleta as ruletaEs } from "./es/ruleta";
 import { ruleta as ruletaEn } from "./en/ruleta";
+import { anuncio as anuncioEs } from "./es/anuncio";
+import { anuncio as anuncioEn } from "./en/anuncio";
 
 const es = {
   comun: comunEs,
@@ -45,6 +47,7 @@ const es = {
   movil: movilEs,
   cookies: cookiesEs,
   ruleta: ruletaEs,
+  anuncio: anuncioEs,
 };
 
 export type Messages = typeof es;
@@ -64,6 +67,7 @@ const en: Messages = {
   movil: movilEn,
   cookies: cookiesEn,
   ruleta: ruletaEn,
+  anuncio: anuncioEn,
 };
 
 export const MESSAGES: Record<"es" | "en", Messages> = { es, en };

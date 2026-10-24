@@ -25,6 +25,7 @@ import { CartDrawer } from "./cart-drawer";
 import { activeLocale } from "@/modules/i18n/server";
 import { MESSAGES } from "@/modules/i18n/messages";
 import { I18nProvider } from "@/modules/i18n/provider";
+import { GranAperturaModal } from "@/modules/storefront/announcement/gran-apertura-modal";
 
 /** `+573142751611` → `+57 314 275 1611` para mostrarlo en el header. */
 function displayPhone(e164: string): string {
@@ -182,6 +183,13 @@ export default async function StoreLayout({
       <MobileBottomNav />
 
       <CartDrawer />
+      {/* Espera a que el visitante responda el aviso de cookies: no se tapan. */}
+      <GranAperturaModal
+        esperaConsentimiento={(() => {
+          const m = measurementPublicConfig();
+          return Boolean(m.metaPixelId || m.ga4Id || m.clarityId);
+        })()}
+      />
 
       {/* Medición publicitaria: aviso de cookies y etiquetas de Meta y Google,
           solo si el entorno las configura y solo tras "Aceptar". La
